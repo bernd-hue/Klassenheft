@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2e7d32">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Klassenheft">
+<title>Klassenheft · MS Mooskirchen</title>
+<link rel="manifest" href="manifest.json">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ══════════════════════════════════════════════════════
+  // FIREBASE CONFIG – nach Setup hier einfügen
+  // Anleitung: siehe Beilage "GitHub_Firebase_Anleitung.docx"
+  // ══════════════════════════════════════════════════════
+  const FIREBASE_CONFIG = {
+    apiKey:            "DEIN_API_KEY",
+    authDomain:        "DEIN_PROJECT.firebaseapp.com",
+    projectId:         "DEIN_PROJECT_ID",
+    storageBucket:     "DEIN_PROJECT.appspot.com",
+    messagingSenderId: "DEINE_SENDER_ID",
+    appId:             "DEINE_APP_ID"
+  };
+
+  const DEMO_MODE = FIREBASE_CONFIG.apiKey === "DEIN_API_KEY";
+
+  let db = null;
+  if (!DEMO_MODE) {
+    const app = initializeApp(FIREBASE_CONFIG);
+    db = getFirestore(app);
+  }
+
+  // ── Globale Helfer für den Rest der App ──
+  window._db = db;
+  window._DEMO = DEMO_MODE;
+  window._fs = { doc, getDoc, setDoc, onSnapshot, collection, getDocs };
+  window.dispatchEvent(new Event("firebase-ready"));
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --green:    #2e7d32;
+  --green2:   #388e3c;
+  --green3:   #1b5e20;
+  --green-bg: #e8f5e9;
+  --green-mid:#c8e6c9;
+  --paper:    #f4f8f4;
+  --card:     #ffffff;
+  --line:     #c8ddc8;
+  --muted:    #5a7a5a;
+  --graphite: #1e2d1e;
+  --red:      #c0392b;
+  --red-bg:   #fdecea;
+  --amber:    #b7791f;
+  --amber-bg: #fef3c7;
+  --blue:     #1565c0;
+  --blue-bg:  #e3f0ff;
+  --radius:   12px;
+  --mono:     'JetBrains Mono', monospace;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin:0; padding:0; }
+body {
+  background: var(--paper); font-family: 'Inter', sans-serif;
+  color: var(--graphite); min-height: 100vh; padding-bottom: 82px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── LOGIN SCREEN ── */
+#loginScreen {
+  position: fixed; inset: 0; background: var(--green3);
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; z-index: 999; padding: 24px;
+}
+.login-card {
+  background: #fff; border-radius: 20px; padding: 32px 24px;
+  width: 100%; max-width: 360px; box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+}
+.login-logo {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: var(--green3); display: flex; align-items: center;
+  justify-content: center; margin: 0 auto 16px;
+  font-size: 1.4rem; font-weight: 900; color: #fff;
+  letter-spacing: -0.04em; font-family: 'Inter', sans-serif;
+}
+.login-card h2 {
+  font-size: 1.2rem; font-weight: 800; text-align: center;
+  color: var(--green3); margin-bottom: 4px;
+}
+.login-card .sub {
+  font-size: 0.75rem; color: var(--muted); text-align: center;
+  margin-bottom: 24px;
+}
+.login-field { margin-bottom: 14px; }
+.login-field label {
+  display: block; font-size: 0.68rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); margin-bottom: 5px;
+}
+.login-field input, .login-field select {
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1.5px solid var(--line); font-family: 'Inter', sans-serif;
+  font-size: 0.95rem; color: var(--graphite); background: var(--paper);
+}
+.login-field input:focus { outline: none; border-color: var(--green); }
+.login-btn {
+  width: 100%; padding: 14px; border-radius: 10px; border: none;
+  background: var(--green); color: #fff; font-family: 'Inter', sans-serif;
+  font-weight: 800; font-size: 1rem; cursor: pointer; margin-top: 8px;
+}
+.login-btn:active { opacity: 0.9; }
+.demo-badge {
+  background: #fff3cd; border: 1px solid #ffe082; border-radius: 8px;
+  padding: 8px 12px; font-size: 0.72rem; color: #856404;
+  margin-bottom: 16px; line-height: 1.4; text-align: center;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  background: var(--green); color: #fff;
+  position: sticky; top: 0; z-index: 60;
+  box-shadow: 0 2px 8px rgba(46,125,50,0.3);
+}
+.topbar-inner {
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(env(safe-area-inset-top,0px) + 12px) 16px 12px;
+}
+.topbar-logo {
+  width: 34px; height: 34px; border-radius: 9px; background: #fff;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  font-size: 1rem; font-weight: 900; color: var(--green);
+  letter-spacing: -0.05em; box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+.topbar-title { flex: 1; }
+.topbar-title h1 { font-size: 1.05rem; font-weight: 800; color: #fff; }
+.topbar-title .sub { font-size: 0.62rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.07em; }
+.topbar-user {
+  font-size: 0.72rem; color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.15); border-radius: 20px;
+  padding: 4px 10px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+}
+.topbar-stripe { height: 3px; background: linear-gradient(90deg,var(--green3),#66bb6a,var(--green3)); }
+
+/* ── CLASS TABS ── */
+.class-tabs {
+  display: flex; gap: 6px; padding: 10px 14px 0;
+  overflow-x: auto; scrollbar-width: none; background: var(--paper);
+}
+.class-tabs::-webkit-scrollbar { display: none; }
+.ctab {
+  flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+  background: var(--card); border: 1.5px solid var(--line);
+  font-size: 0.78rem; font-weight: 700; color: var(--muted);
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.ctab.active { background: var(--green); border-color: var(--green); color: #fff; }
+.ctab.add { color: var(--green2); border-color: var(--green2); border-style: dashed; }
+
+/* ── MAIN ── */
+main { padding: 10px 14px; max-width: 640px; margin: 0 auto; }
+.view { display: none; }
+.view.active { display: block; }
+.slabel {
+  font-size: 0.62rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--muted); margin: 18px 2px 8px;
+}
+
+/* ── SYNC STATUS ── */
+.sync-bar {
+  font-size: 0.68rem; padding: 5px 14px; text-align: center;
+  color: var(--muted); background: var(--green-bg);
+  border-bottom: 1px solid var(--green-mid);
+}
+.sync-bar.saving { color: var(--amber); background: var(--amber-bg); }
+.sync-bar.error  { color: var(--red);   background: var(--red-bg); }
+.sync-bar.ok     { color: var(--green); background: var(--green-bg); }
+
+/* ── STUDENT CARD ── */
+.scard {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--line); margin-bottom: 8px;
+  overflow: hidden; position: relative;
+  box-shadow: 0 1px 3px rgba(46,125,50,0.06);
+}
+.scard-bar { position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bar-color,var(--green)); }
+.scard-row { display:flex;align-items:center;gap:10px;padding:13px 14px 13px 18px;cursor:pointer; }
+.scard-info { flex:1;min-width:0; }
+.scard-name { font-weight:700;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.scard-meta { font-size:0.68rem;color:var(--muted);margin-top:2px; }
+.grade-badge {
+  font-family:var(--mono);font-weight:700;font-size:1.1rem;
+  color:var(--green);background:var(--green-bg);
+  border-radius:8px;padding:4px 10px;min-width:42px;text-align:center;flex-shrink:0;
+}
+.grade-badge.empty { color:var(--muted);font-size:0.75rem;font-weight:500;font-family:'Inter',sans-serif; }
+.chevron { color:var(--muted);font-size:0.85rem;transition:transform 0.2s;flex-shrink:0; }
+.scard-row.open .chevron { transform:rotate(90deg); }
+.scard-detail { display:none;border-top:1px solid var(--line);padding:14px 14px 14px 18px; }
+.scard-detail.open { display:block; }
+
+/* ── BREAKDOWN ── */
+.breakdown { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px; }
+.bk-box { background:var(--paper);border-radius:10px;padding:10px 12px;border:1px solid var(--line); }
+.bk-label { font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:4px; }
+.bk-val { font-family:var(--mono);font-weight:700;font-size:1.3rem;color:var(--green); }
+.bk-val.sub { font-size:0.85rem;color:var(--muted);font-family:'Inter',sans-serif;font-weight:500; }
+.bk-pct { font-size:0.7rem;color:var(--muted);margin-top:1px; }
+
+/* ── QUICK ACTIONS ── */
+.quick-actions { display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px; }
+.qbtn {
+  flex:1;min-width:72px;padding:9px 6px;border-radius:10px;border:none;cursor:pointer;
+  font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:700;color:#fff;
+  display:flex;flex-direction:column;align-items:center;gap:3px;transition:opacity 0.15s;
+}
+.qbtn:active { opacity:0.8; }
+.qbtn .qi { font-size:1rem; }
+.qbtn.ma-btn { background:var(--green); }
+.qbtn.hu-btn { background:#1565c0; }
+.qbtn.kp-btn { background:#2e6b2e; }
+
+/* ── ENTRY LIST ── */
+.entry { display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--paper);font-size:0.82rem; }
+.entry:last-child { border-bottom:none; }
+.entry-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px; }
+.entry-body { flex:1;line-height:1.4; }
+.entry-type { font-weight:600; }
+.entry-date { font-size:0.65rem;color:var(--muted);margin-top:1px; }
+.entry-del { background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.78rem;padding:2px 5px; }
+.empty-list { font-size:0.8rem;color:var(--muted);font-style:italic;padding:6px 0 4px; }
+
+/* ── BUTTONS ── */
+.add-student-btn {
+  width:100%;padding:13px;border-radius:var(--radius);
+  border:1.5px dashed var(--green-mid);background:transparent;
+  color:var(--green);font-family:'Inter',sans-serif;font-weight:700;font-size:0.85rem;cursor:pointer;margin-top:4px;
+}
+.empty-state { text-align:center;padding:50px 20px;color:var(--muted); }
+.empty-state .eicon { font-size:2.5rem;margin-bottom:10px; }
+.empty-state h2 { font-size:1rem;color:var(--graphite);margin-bottom:6px; }
+.empty-state p { font-size:0.82rem;line-height:1.5; }
+
+/* ── STD TOGGLE ── */
+.std-toggle { display:flex;border-radius:8px;overflow:hidden;border:1.5px solid var(--line);width:fit-content; }
+.std-btn { padding:6px 14px;background:var(--card);border:none;font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:700;cursor:pointer;color:var(--muted);transition:all 0.15s; }
+.std-btn.active-std { background:#1565c0;color:#fff; }
+.std-btn.active-ahs { background:var(--green);color:#fff; }
+.std-badge { font-size:0.58rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;padding:2px 6px;border-radius:4px;margin-left:5px;vertical-align:middle; }
+.std-badge.std { background:#e3f0ff;color:#1565c0; }
+.std-badge.ahs { background:var(--green-bg);color:var(--green3); }
+
+/* ── SA INLINE ── */
+.sa-item { display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--green-bg);font-size:0.82rem; }
+.sa-item:last-child { border-bottom:none; }
+
+/* ── SETTINGS ── */
+.sett-card { background:var(--card);border-radius:var(--radius);border:1px solid var(--line);padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(46,125,50,0.06); }
+.sett-card h3 { font-size:0.9rem;font-weight:700;margin-bottom:5px; }
+.sett-card p { font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:12px; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position:fixed;bottom:0;left:0;right:0;background:var(--card);
+  border-top:2px solid var(--green-bg);display:flex;
+  padding:6px 8px calc(env(safe-area-inset-bottom,0px) + 6px);z-index:60;
+}
+.nbtn {
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:7px 4px;background:none;border:none;cursor:pointer;
+  font-family:'Inter',sans-serif;font-size:0.6rem;font-weight:700;
+  color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;
+}
+.nbtn .ni { font-size:1.2rem; }
+.nbtn.active { color:var(--green); }
+
+/* ── OVERLAY / SHEET ── */
+.overlay { position:fixed;inset:0;background:rgba(27,94,32,0.45);z-index:100;display:none;align-items:flex-end; }
+.overlay.open { display:flex; }
+.sheet {
+  background:var(--paper);width:100%;border-radius:20px 20px 0 0;
+  border-top:3px solid var(--green);
+  padding:20px 18px calc(env(safe-area-inset-bottom,0px) + 20px);
+  max-height:88vh;overflow-y:auto;animation:sheetUp 0.22s ease;
+}
+@keyframes sheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.sheet h3 { font-size:1rem;font-weight:800;margin-bottom:14px;color:var(--green3); }
+.field { margin-bottom:13px; }
+.field label { display:block;font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:5px; }
+.field input,.field select,.field textarea {
+  width:100%;padding:11px 13px;border-radius:10px;border:1.5px solid var(--line);
+  background:var(--card);font-family:'Inter',sans-serif;font-size:0.92rem;color:var(--graphite);
+}
+.field input:focus,.field select:focus { outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(46,125,50,0.15); }
+.sheet-actions { display:flex;gap:9px;margin-top:16px; }
+.btn { flex:1;padding:13px;border-radius:10px;border:none;font-family:'Inter',sans-serif;font-weight:700;font-size:0.88rem;cursor:pointer; }
+.btn-primary { background:var(--green);color:#fff; }
+.btn-secondary { background:var(--line);color:var(--graphite); }
+.ma-grid { display:flex;flex-direction:column;gap:7px; }
+.ma-opt { padding:12px 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);cursor:pointer;font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:10px;transition:all 0.12s; }
+.ma-opt.sel { border-color:var(--green);background:var(--green-bg); }
+.ma-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
+.key-box { background:var(--green-bg);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:0.78rem;color:var(--green3);border:1px solid var(--green-mid); }
+.key-box strong { display:block;margin-bottom:4px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em; }
+.ampel-btn { flex:1;padding:12px 4px;border-radius:10px;border:2px solid var(--line);background:var(--card);font-size:1.1rem;cursor:pointer;transition:all 0.15s; }
+
+/* ── TEAM VIEW ── */
+.team-card {
+  background:var(--card);border-radius:var(--radius);border:1px solid var(--line);
+  padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+}
+.team-avatar {
+  width:40px;height:40px;border-radius:50%;background:var(--green);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:800;font-size:1rem;flex-shrink:0;
+}
+.team-info { flex:1; }
+.team-name { font-weight:700;font-size:0.9rem; }
+.team-role { font-size:0.7rem;color:var(--muted);margin-top:2px; }
+.team-online { width:10px;height:10px;border-radius:50%;background:#ccc;flex-shrink:0; }
+.team-online.online { background:var(--green); }
+
+/* ── TOAST ── */
+.toast {
+  position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--green3);color:#fff;padding:10px 18px;border-radius:30px;
+  font-size:0.8rem;font-weight:600;opacity:0;transition:all 0.22s;z-index:200;pointer-events:none;white-space:nowrap;
+}
+.toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">MS</div>
+    <h2>Klassenheft</h2>
+    <div class="sub">MS Mooskirchen · Lehrerzugang</div>
+    <div class="demo-badge" id="demoBadge" style="display:none">
+      ⚠️ Demo-Modus: Daten werden nur lokal gespeichert.<br>Firebase noch nicht eingerichtet.
+    </div>
+    <div class="login-field">
+      <label>Name</label>
+      <input type="text" id="loginName" placeholder="z. B. Bernd Muster" autocomplete="name">
+    </div>
+    <div class="login-field">
+      <label>PIN (4-stellig)</label>
+      <input type="password" id="loginPin" placeholder="••••" maxlength="4" inputmode="numeric">
+    </div>
+    <button class="login-btn" id="loginBtn">Anmelden</button>
+  </div>
+</div>
+
+<!-- SYNC BAR -->
+<div class="sync-bar ok" id="syncBar">✓ Verbunden · Daten werden geteilt</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-logo">MS</div>
+    <div class="topbar-title">
+      <h1 id="topTitle">Klassenheft · Mathematik</h1>
+      <div class="sub" id="topSub">MS Mooskirchen</div>
+    </div>
+    <div class="topbar-user" id="userBadge" onclick="logout()">
+      <span id="userInitials">?</span> Abmelden
+    </div>
+  </div>
+  <div class="topbar-stripe"></div>
+</div>
+
+<div class="class-tabs" id="classTabs"></div>
+
+<main>
+  <div class="view active" id="view-schueler">
+    <div class="slabel">Schülerinnen &amp; Schüler</div>
+    <div id="studentList"></div>
+    <button class="add-student-btn" id="addStudentBtn">+ Schüler hinzufügen</button>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div class="eicon">📐</div>
+      <h2>Noch keine Klasse angelegt</h2>
+      <p>Tippe oben auf "+ Klasse", um zu beginnen.</p>
+    </div>
+  </div>
+
+  <div class="view" id="view-team">
+    <div class="slabel">Kollegium – aktive Nutzer</div>
+    <div id="teamList"></div>
+    <div class="slabel" style="margin-top:20px">Mein Konto</div>
+    <div class="sett-card">
+      <h3>👤 Angemeldet als</h3>
+      <p id="myAccountInfo" style="margin-bottom:0"></p>
+    </div>
+    <div class="sett-card">
+      <h3>🔑 PIN ändern</h3>
+      <div class="field"><label>Neuer PIN (4-stellig)</label><input type="password" id="newPinInput" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+      <button class="btn btn-primary" id="changePinBtn" style="width:100%">PIN speichern</button>
+    </div>
+  </div>
+
+  <div class="view" id="view-settings">
+    <div class="slabel">Notenzusammensetzung &amp; Transparenz</div>
+    <div class="sett-card" style="border-left:4px solid var(--green)">
+      <h3>📋 Wie setzt sich die Note zusammen?</h3>
+      <p style="margin-bottom:10px">Gemäß <strong>§ 3 Abs. 3 LBVO</strong> zu Schuljahresbeginn bekanntgegeben.</p>
+      <div style="background:var(--green-bg);border-radius:8px;padding:12px;margin-bottom:10px">
+        <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--green);margin-bottom:8px">Gesamtnote = Tendenz (pädagogische Entscheidung)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:#fff;border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:1.5rem;font-weight:800;color:var(--green)">40%</div>
+            <div style="font-size:0.72rem;font-weight:700;color:var(--muted)">Schularbeiten</div>
+            <div style="font-size:0.65rem;color:var(--muted);margin-top:3px">pädagog. gewichtet*</div>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:1.5rem;font-weight:800;color:var(--green)">60%</div>
+            <div style="font-size:0.72rem;font-weight:700;color:var(--muted)">Mitarbeit</div>
+            <div style="font-size:0.65rem;color:var(--muted);margin-top:3px">Mündl. MA · Hausübungen</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff8e1;border-radius:8px;padding:12px;border:1px solid #ffe082;font-size:0.75rem;color:#5d4037;line-height:1.6">
+        <strong>§ 20 SchUG:</strong> Alle Jahresleistungen zugrunde legen, dem zuletzt erreichten Leistungsstand mehr Gewicht geben. Die App gewichtet die letzten 3 SA doppelt – das ist die pädagogische Entscheidung der Lehrkraft, keine gesetzliche Pflicht.<br><br>
+        <strong>Rechtsprechung BVwG:</strong> Leistungsbeurteilung ist eine pädagogische Tätigkeit, keine Rechenaufgabe. Die Tendenz ist Orientierungshilfe.
+      </div>
+    </div>
+    <div class="slabel">Schularbeiten dieser Klasse</div>
+    <div class="sett-card">
+      <h3>📝 Schularbeiten verwalten</h3>
+      <p>Einmalig anlegen – dann per Tipp beim Schüler auswählen.</p>
+      <div id="saTemplateList"></div>
+      <button class="btn btn-primary" id="addSaTemplateBtn" style="width:100%;margin-top:10px">+ Schularbeit anlegen</button>
+    </div>
+    <div class="slabel">Kompetenzen dieser Klasse</div>
+    <div class="sett-card">
+      <h3>🔍 Kompetenzen verwalten</h3>
+      <p style="background:#e8f5e9;border-radius:7px;padding:8px 10px;border:1px solid #c8e6c9;margin-bottom:10px;font-size:0.75rem">
+        <strong>§ 1 Abs. 2 LBVO:</strong> Informationsfeststellung – fließt nicht in die Note ein. In Mathe (§ 8 Abs. 4 LBVO) sind benotete Tests unzulässig.
+      </p>
+      <div id="kompetenzList"></div>
+      <button class="btn btn-primary" id="addKompetenzBtn" style="width:100%;margin-top:10px">+ Kompetenz anlegen</button>
+    </div>
+    <div class="slabel">Daten</div>
+    <div class="sett-card">
+      <h3>📤 Lokales Backup exportieren</h3>
+      <p>Sicherheitskopie aller Daten als Datei.</p>
+      <button class="btn btn-primary" id="exportBtn" style="width:100%">Backup speichern</button>
+    </div>
+    <div class="sett-card">
+      <h3>🗑️ Klasse löschen</h3>
+      <p>Aktuelle Klasse inkl. aller Schüler und Einträge löschen.</p>
+      <button class="btn btn-secondary" id="deleteClassBtn" style="width:100%;color:var(--red)">Klasse löschen</button>
+    </div>
+  </div>
+
+  <div class="view" id="view-statistik">
+    <div class="slabel">Klassen-Auswertung</div>
+    <div id="statistikContent">
+      <div class="empty-state"><div class="eicon">📊</div><h2>Keine Klasse ausgewählt</h2></div>
+    </div>
+  </div>
+</main>
+
+<div class="bottom-nav">
+  <button class="nbtn active" data-view="schueler"><span class="ni">📋</span>Schüler</button>
+  <button class="nbtn" data-view="statistik"><span class="ni">📊</span>Statistik</button>
+  <button class="nbtn" data-view="team"><span class="ni">👥</span>Team</button>
+  <button class="nbtn" data-view="settings"><span class="ni">⚙️</span>Einstellungen</button>
+</div>
+
+<!-- OVERLAYS -->
+<div class="overlay" id="ovNewClass"><div class="sheet">
+  <h3>Neue Klasse</h3>
+  <div class="field"><label>Bezeichnung</label><input type="text" id="newClassName" placeholder="z. B. 1A"></div>
+  <div class="field"><label>Jahrgang</label><select id="newClassJg"><option value="1">1. Jahrgang</option><option value="2">2. Jahrgang</option><option value="3">3. Jahrgang</option><option value="4">4. Jahrgang</option></select></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovNewClass">Abbrechen</button><button class="btn btn-primary" id="confirmNewClass">Anlegen</button></div>
+</div></div>
+
+<div class="overlay" id="ovNewStudent"><div class="sheet">
+  <h3>Schüler hinzufügen</h3>
+  <div class="field"><label>Name</label><input type="text" id="newStudentName" placeholder="Vor- und Nachname"></div>
+  <div class="field" id="newStudentStdField"><label>Leistungsstufe</label><select id="newStudentStd"><option value="standard">Standard</option><option value="ahs">AHS-Standard</option></select></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovNewStudent">Abbrechen</button><button class="btn btn-primary" id="confirmNewStudent">Hinzufügen</button></div>
+</div></div>
+
+<div class="overlay" id="ovEditStudent"><div class="sheet">
+  <h3>Name ändern</h3>
+  <div class="field"><label>Name</label><input type="text" id="editStudentName"></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovEditStudent">Abbrechen</button><button class="btn btn-primary" id="confirmEditStudent">Speichern</button></div>
+</div></div>
+
+<div class="overlay" id="ovMitarbeit"><div class="sheet">
+  <h3>Mündliche Mitarbeit</h3>
+  <div class="ma-grid" id="maGrid">
+    <div class="ma-opt" data-val="pos"><span class="ma-dot" style="background:var(--green)"></span>Positiv mitgearbeitet</div>
+    <div class="ma-opt" data-val="neu"><span class="ma-dot" style="background:var(--muted)"></span>Neutral / aufgepasst</div>
+    <div class="ma-opt" data-val="neg"><span class="ma-dot" style="background:#e07b00"></span>Wenig / gar nicht</div>
+  </div>
+  <div class="field" style="margin-top:12px"><label>Optionale Notiz</label><input type="text" id="maNotiz" placeholder="z. B. Beispiel richtig erklärt"></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovMitarbeit">Abbrechen</button><button class="btn btn-primary" id="confirmMa">Speichern</button></div>
+</div></div>
+
+<div class="overlay" id="ovHU"><div class="sheet">
+  <h3>Hausübung</h3>
+  <div class="ma-grid" id="huGrid">
+    <div class="ma-opt" data-val="perfekt"><span class="ma-dot" style="background:var(--green)"></span>Perfekt ✓✓</div>
+    <div class="ma-opt" data-val="gemacht"><span class="ma-dot" style="background:#1565c0"></span>Gemacht – mit Fehlern</div>
+    <div class="ma-opt" data-val="nicht"><span class="ma-dot" style="background:var(--red)"></span>Nicht gemacht ✗</div>
+  </div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovHU">Abbrechen</button><button class="btn btn-primary" id="confirmHU">Speichern</button></div>
+</div></div>
+
+<div class="overlay" id="ovKompetenz"><div class="sheet">
+  <h3>🔍 Kompetenzcheck</h3>
+  <div style="background:#e8f5e9;border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:0.75rem;color:#1b5e20;border:1px solid #c8e6c9">
+    Informationsfeststellung gem. § 1 Abs. 2 LBVO – fließt <strong>nicht</strong> in die Note ein
+  </div>
+  <div class="field">
+    <label>Kompetenz / Thema</label>
+    <div id="kompetenzChipList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+    <input type="text" id="kompetenzThema" placeholder="Thema tippen oder oben wählen…">
+  </div>
+  <div class="field">
+    <label>Lernstand</label>
+    <div style="display:flex;gap:8px">
+      <button class="ampel-btn" data-val="ok" style="border-color:#c8e6c9;background:#f1f8f1">✅<br><span style="font-size:0.7rem;font-weight:700;color:var(--green)">beherrscht</span></button>
+      <button class="ampel-btn" data-val="teilweise" style="border-color:#ffe082;background:#fffde7">🟡<br><span style="font-size:0.7rem;font-weight:700;color:#f9a825">teilweise</span></button>
+      <button class="ampel-btn" data-val="nachholbedarf" style="border-color:#ffcdd2;background:#fff5f5">🔴<br><span style="font-size:0.7rem;font-weight:700;color:var(--red)">Nachholbedarf</span></button>
+    </div>
+  </div>
+  <div class="field"><label>Notiz (optional)</label><input type="text" id="kompetenzNotiz" placeholder="z. B. Verfahren klar, Rechenfehler"></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovKompetenz">Abbrechen</button><button class="btn btn-primary" id="confirmKompetenz">Speichern</button></div>
+</div></div>
+
+<div class="overlay" id="ovSchularbeit"><div class="sheet">
+  <h3>Schularbeit eintragen</h3>
+  <div class="key-box" id="saKeyBox"><strong>Benotungsschlüssel</strong>–</div>
+  <div class="field"><label>Welche Schularbeit?</label><div id="saTemplateSelect" class="ma-grid"></div></div>
+  <div id="saStep2" style="display:none">
+    <div class="field"><label>Erzielte Punkte <span id="saMaxHint" style="font-weight:400;text-transform:none;letter-spacing:0"></span></label><input type="number" id="saPunkte" min="0" max="9999" placeholder="z. B. 18"></div>
+    <div class="field" id="saGradeResult" style="display:none"><label>Berechnete Note</label><div style="font-family:var(--mono);font-weight:700;font-size:1.5rem;color:var(--green);padding:8px 0" id="saGradeDisplay">–</div></div>
+  </div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovSchularbeit">Abbrechen</button><button class="btn btn-primary" id="confirmSa">Speichern</button></div>
+</div></div>
+
+<div class="overlay" id="ovNewSaTemplate"><div class="sheet">
+  <h3>Schularbeit anlegen</h3>
+  <div class="field"><label>Bezeichnung</label><input type="text" id="satName" placeholder="z. B. 1. Schularbeit"></div>
+  <div class="field"><label>Max. Punkte</label><input type="number" id="satMax" placeholder="z. B. 24" min="1"></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovNewSaTemplate">Abbrechen</button><button class="btn btn-primary" id="confirmNewSaTemplate">Anlegen</button></div>
+</div></div>
+
+<div class="overlay" id="ovNewKompetenz"><div class="sheet">
+  <h3>Kompetenz anlegen</h3>
+  <div class="field"><label>Bezeichnung</label><input type="text" id="newKompetenzName" placeholder="z. B. Brüche, Gleichungen…"></div>
+  <div class="sheet-actions"><button class="btn btn-secondary" data-close="ovNewKompetenz">Abbrechen</button><button class="btn btn-primary" id="confirmNewKompetenz">Anlegen</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// WARTEN AUF FIREBASE READY
+// ══════════════════════════════════════════════════════
+window.addEventListener("firebase-ready", () => { APP.init(); });
+
+const APP = (() => {
+"use strict";
+
+const SK = "klassenheft_v3_";
+const COLORS = ["#2e7d32","#1565c0","#c0392b","#6a1b9a","#b7791f","#00695c"];
+const MA_VAL = {pos:1.0,neu:0.5,neg:0.0};
+const HU_VAL = {perfekt:1.0,gemacht:0.6,nicht:0.0};
+
+let state = { classes:[], activeId:null };
+let currentUser = null;
+let expandedId = null;
+let ctx = {};
+let saveTimeout = null;
+let unsubscribe = null;
+
+// ── BENOTUNGSSCHLÜSSEL ──
+function getNote(pct, jg, std) {
+  if (jg===1) {
+    if (pct>=90) return 1; if (pct>=77) return 2;
+    if (pct>=64) return 3; if (pct>=25) return 4; return 5;
+  }
+  if (std==="ahs") {
+    if (pct>=90) return 1; if (pct>=77) return 2;
+    if (pct>=64) return 3; if (pct>=51) return 4; return 5;
+  }
+  if (pct>=64) return 1; if (pct>=51) return 2;
+  if (pct>=37) return 3; if (pct>=25) return 4; return 5;
+}
+function keyText(jg,std) {
+  if (jg===1) return "1=90–100% · 2=77–89% · 3=64–76% · 4=25–63% · 5=0–24%";
+  if (std==="ahs") return "AHS: 1=90–100% · 2=77–89% · 3=64–76% · 4=51–63% · 5≤50%";
+  return "Standard: 1=64–76% · 2=51–63% · 3=37–50% · 4=25–36% · 5≤24%";
+}
+
+// ── UTILITIES ──
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function esc(s){ const d=document.createElement("div"); d.textContent=s||""; return d.innerHTML; }
+function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString("de-AT",{day:"2-digit",month:"2-digit",year:"2-digit"}); }
+function noteColorHex(n){
+  if(!n) return "#aaa";
+  const r=Math.round(n);
+  if(r<=1) return "#2e7d32"; if(r<=2) return "#1565c0";
+  if(r<=3) return "#b7791f"; if(r<=4) return "#e65100"; return "#c0392b";
+}
+function noteColor(n){ return noteColorHex(n); }
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),1800);
+}
+function setSyncBar(status,msg){
+  const b=document.getElementById("syncBar");
+  b.className="sync-bar "+status; b.textContent=msg;
+}
+
+// ── STORAGE: Firebase OR localStorage ──
+function storageKey(){ return SK+(currentUser?.name||"guest"); }
+
+async function saveToFirebase(){
+  if(window._DEMO || !window._db) { saveLocal(); return; }
+  setSyncBar("saving","⏳ Wird gespeichert…");
+  try {
+    const {doc,setDoc} = window._fs;
+    await setDoc(doc(window._db,"teachers",currentUser.name),{
+      state: JSON.stringify(state),
+      updatedAt: Date.now(),
+      displayName: currentUser.name
+    });
+    setSyncBar("ok","✓ Gespeichert · "+new Date().toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"}));
+    saveLocal();
+  } catch(e){
+    setSyncBar("error","⚠ Speicherfehler – lokal gesichert");
+    saveLocal();
+  }
+}
+
+function saveLocal(){
+  try { localStorage.setItem(storageKey(), JSON.stringify(state)); } catch(e){}
+}
+
+function save(){
+  saveLocal();
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveToFirebase, 800);
+}
+
+async function loadFromFirebase(){
+  if(window._DEMO || !window._db){ loadLocal(); return; }
+  try {
+    const {doc,getDoc} = window._fs;
+    const snap = await getDoc(doc(window._db,"teachers",currentUser.name));
+    if(snap.exists()){
+      state = JSON.parse(snap.data().state);
+      if(!state.classes) state.classes=[];
+      saveLocal();
+    } else { loadLocal(); }
+    setSyncBar("ok","✓ Verbunden · Daten werden geteilt");
+  } catch(e){ loadLocal(); setSyncBar("error","⚠ Offline – lokale Daten"); }
+}
+
+function loadLocal(){
+  try { const r=localStorage.getItem(storageKey()); if(r) state=JSON.parse(r); }
+  catch(e){}
+  if(!state.classes) state.classes=[];
+}
+
+// ── AUTH ──
+function hashPin(pin){ let h=0; for(let i=0;i<pin.length;i++) h=(h*31+pin.charCodeAt(i))>>>0; return h.toString(36); }
+
+async function login(name, pin){
+  if(!name||!pin||pin.length<4){ toast("Name und 4-stelligen PIN eingeben"); return; }
+  currentUser = { name: name.trim(), pinHash: hashPin(pin) };
+
+  // Verify or register PIN in Firebase
+  if(!window._DEMO && window._db){
+    try {
+      const {doc,getDoc,setDoc} = window._fs;
+      const uRef = doc(window._db,"users",name.trim());
+      const uSnap = await getDoc(uRef);
+      if(uSnap.exists()){
+        if(uSnap.data().pinHash !== currentUser.pinHash){
+          toast("Falscher PIN"); currentUser=null; return;
+        }
+      } else {
+        // Neuer Nutzer
+        await setDoc(uRef,{ name:name.trim(), pinHash:currentUser.pinHash, createdAt:Date.now() });
+      }
+      // Update last seen
+      await setDoc(uRef,{ lastSeen:Date.now(), name:name.trim(), pinHash:currentUser.pinHash },{merge:true});
+    } catch(e){ console.warn("Auth error",e); }
+  }
+
+  // Save login locally
+  localStorage.setItem("kh_user", JSON.stringify(currentUser));
+  await loadFromFirebase();
+  showApp();
+}
+
+function logout(){
+  if(!confirm("Wirklich abmelden?")) return;
+  if(unsubscribe) unsubscribe();
+  currentUser=null;
+  localStorage.removeItem("kh_user");
+  document.getElementById("loginScreen").style.display="flex";
+  document.body.style.overflow="hidden";
+}
+
+function showApp(){
+  document.getElementById("loginScreen").style.display="none";
+  document.body.style.overflow="";
+  const initials = currentUser.name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);
+  document.getElementById("userInitials").textContent=initials;
+  document.getElementById("myAccountInfo").textContent=`Angemeldet als: ${currentUser.name}`;
+  if(!state.activeId && state.classes.length) state.activeId=state.classes[0].id;
+  renderAll();
+  loadTeam();
+}
+
+// ── TEAM ──
+async function loadTeam(){
+  if(window._DEMO || !window._db){ renderTeamDemo(); return; }
+  try {
+    const {collection,getDocs} = window._fs;
+    const snap = await getDocs(collection(window._db,"users"));
+    const users=[];
+    snap.forEach(d=>users.push(d.data()));
+    renderTeam(users);
+  } catch(e){ renderTeamDemo(); }
+}
+
+function renderTeamDemo(){
+  renderTeam([{name:currentUser.name, lastSeen:Date.now()}]);
+}
+
+function renderTeam(users){
+  const list=document.getElementById("teamList");
+  list.innerHTML="";
+  const now=Date.now();
+  users.forEach(u=>{
+    const online = u.lastSeen && (now-u.lastSeen)<600000; // 10min
+    const initials = u.name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);
+    const card=document.createElement("div"); card.className="team-card";
+    card.innerHTML=`
+      <div class="team-avatar">${initials}</div>
+      <div class="team-info">
+        <div class="team-name">${esc(u.name)}${u.name===currentUser?.name?' (ich)':''}</div>
+        <div class="team-role">${online?"Aktiv":"Zuletzt: "+(u.lastSeen?new Date(u.lastSeen).toLocaleDateString("de-AT"):"-")}</div>
+      </div>
+      <div class="team-online ${online?'online':''}"></div>`;
+    list.appendChild(card);
+  });
+}
+
+// ── CALC ──
+function calcSaWeighted(sas){
+  if(!sas.length) return null;
+  const sorted=sas.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const n=sorted.length, df=Math.max(0,n-3);
+  let sum=0,wsum=0;
+  sorted.forEach((e,i)=>{ const w=i>=df?2:1; sum+=e.note*w; wsum+=w; });
+  return sum/wsum;
+}
+function calcStudentData(s){
+  const entries=s.entries||[];
+  const sas=entries.filter(e=>e.type==="schularbeit");
+  const mas=entries.filter(e=>e.type==="mitarbeit");
+  const hus=entries.filter(e=>e.type==="hu");
+  const saAvgNote=calcSaWeighted(sas);
+  let maScore=null, huScore=null;
+  if(mas.length){ const avg=mas.reduce((a,e)=>a+MA_VAL[e.val],0)/mas.length; maScore=5-avg*4; }
+  if(hus.length){ const avg=hus.reduce((a,e)=>a+HU_VAL[e.val],0)/hus.length; huScore=5-avg*4; }
+  let mitarbeitNote=null;
+  const comps=[];
+  if(maScore!==null) comps.push({val:maScore,w:4});
+  if(huScore!==null) comps.push({val:huScore,w:6});
+  if(comps.length){ const ws=comps.reduce((a,c)=>a+c.w,0); mitarbeitNote=comps.reduce((a,c)=>a+c.val*c.w,0)/ws; }
+  let gesamtNote=null;
+  if(saAvgNote!==null && mitarbeitNote!==null) gesamtNote=saAvgNote*0.4+mitarbeitNote*0.6;
+  else if(saAvgNote!==null) gesamtNote=saAvgNote;
+  else if(mitarbeitNote!==null) gesamtNote=mitarbeitNote;
+  return {saAvgNote,maScore,huScore,mitarbeitNote,gesamtNote,sas,mas,hus};
+}
+
+function getActive(){ return state.classes.find(c=>c.id===state.activeId)||null; }
+
+// ── RENDER TABS ──
+function renderTabs(){
+  const wrap=document.getElementById("classTabs"); wrap.innerHTML="";
+  state.classes.forEach(c=>{
+    const t=document.createElement("div");
+    t.className="ctab"+(c.id===state.activeId?" active":"");
+    t.innerHTML=`${esc(c.name)} <span style="font-size:0.62rem;opacity:0.7">${c.jg}.Jg</span>`;
+    t.onclick=()=>{ state.activeId=c.id; expandedId=null; save(); renderAll(); };
+    wrap.appendChild(t);
+  });
+  const add=document.createElement("div");
+  add.className="ctab add"; add.textContent="+ Klasse";
+  add.onclick=()=>openOv("ovNewClass");
+  wrap.appendChild(add);
+}
+
+// ── RENDER STUDENTS ──
+function renderStudents(){
+  const cls=getActive();
+  const list=document.getElementById("studentList");
+  const empty=document.getElementById("emptyState");
+  const addBtn=document.getElementById("addStudentBtn");
+  const topSub=document.getElementById("topSub");
+  if(!cls){ list.innerHTML=""; empty.style.display="block"; addBtn.style.display="none"; topSub.textContent="MS Mooskirchen"; return; }
+  empty.style.display="none"; addBtn.style.display="block";
+  topSub.textContent=`Klasse ${cls.name} · ${(cls.students||[]).length} Schüler`;
+  list.innerHTML="";
+  (cls.students||[]).forEach((s,idx)=>{
+    const color=COLORS[idx%COLORS.length];
+    const d=calcStudentData(s);
+    const gNote=d.gesamtNote;
+    const card=document.createElement("div"); card.className="scard"; card.style.setProperty("--bar-color",color);
+    const sbar=document.createElement("div"); sbar.className="scard-bar"; card.appendChild(sbar);
+    const stdBadge=cls.jg>=2?`<span class="std-badge ${s.std==='ahs'?'ahs':'std'}">${s.std==='ahs'?'AHS':'Std'}</span>`:'';
+    const row=document.createElement("div");
+    row.className="scard-row"+(expandedId===s.id?" open":"");
+    row.innerHTML=`
+      <div class="scard-info">
+        <div class="scard-name">${esc(s.name)}${stdBadge}</div>
+        <div class="scard-meta">${(s.entries||[]).filter(e=>e.type!=="umstufung").length} Einträge · SA: ${d.sas.length} · MA: ${d.mas.length} · HÜ: ${d.hus.length}</div>
+      </div>
+      <button class="entry-del" style="background:none;border:none;color:var(--muted);font-size:0.95rem;cursor:pointer;padding:6px;flex-shrink:0" data-edit="${s.id}">✎</button>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:0.55rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:1px">Tendenz</div>
+        <div class="grade-badge ${gNote===null?'empty':''}" style="${gNote?'color:'+noteColor(gNote):''}">
+          ${gNote?Math.round(gNote):'–'}
+        </div>
+      </div>
+      <div class="chevron">▸</div>`;
+    row.querySelector("[data-edit]").onclick=ev=>{ ev.stopPropagation(); ctx.editStudentId=s.id; document.getElementById("editStudentName").value=s.name; openOv("ovEditStudent"); };
+    row.querySelector(".scard-info").onclick=()=>{ expandedId=expandedId===s.id?null:s.id; renderStudents(); };
+    row.querySelector(".chevron").onclick=()=>{ expandedId=expandedId===s.id?null:s.id; renderStudents(); };
+    card.appendChild(row);
+
+    if(expandedId===s.id){
+      const det=document.createElement("div"); det.className="scard-detail open";
+
+      // Std toggle
+      if(cls.jg>=2){
+        const wrap2=document.createElement("div"); wrap2.style.cssText="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap";
+        const ums=(s.entries||[]).filter(e=>e.type==="umstufung");
+        if(ums.length){ const last=ums[ums.length-1]; const info=document.createElement("div"); info.style.cssText="font-size:0.68rem;color:var(--amber);font-weight:600"; info.textContent=`⚠ Umgestuft am ${fmtDate(last.date)}`; wrap2.appendChild(info); }
+        const tog=document.createElement("div"); tog.className="std-toggle";
+        tog.innerHTML=`<button class="std-btn ${s.std!=='ahs'?'active-std':''}" data-std="standard">Standard</button><button class="std-btn ${s.std==='ahs'?'active-ahs':''}" data-std="ahs">AHS-Standard</button>`;
+        tog.querySelectorAll("button").forEach(b=>{ b.onclick=ev=>{ ev.stopPropagation(); const ns=b.dataset.std; if(ns===s.std) return; if(!confirm(`${esc(s.name)} auf ${ns==='ahs'?'AHS-Standard':'Standard'} umstufen?\nBisherige Noten bleiben erhalten.`)) return; s.entries=s.entries||[]; s.entries.push({id:uid(),type:"umstufung",vonStd:s.std,aufStd:ns,date:new Date().toISOString()}); s.std=ns; save(); renderStudents(); toast("Umstufung gespeichert"); }; });
+        wrap2.appendChild(tog); det.appendChild(wrap2);
+      }
+
+      // Breakdown
+      const bk=document.createElement("div");
+      bk.innerHTML=`<div class="breakdown">
+        <div class="bk-box"><div class="bk-label">Schularbeit (40%)</div><div class="bk-val" style="color:${noteColor(d.saAvgNote)}">${d.saAvgNote?d.saAvgNote.toFixed(1):'–'}</div><div class="bk-pct">${d.sas.length} SA · jüngste höher gewichtet</div></div>
+        <div class="bk-box"><div class="bk-label">Mitarbeit (60%)</div><div class="bk-val" style="color:${noteColor(d.mitarbeitNote)}">${d.mitarbeitNote?d.mitarbeitNote.toFixed(1):'–'}</div><div class="bk-pct">Mündl. MA · Hausübungen</div></div>
+        <div class="bk-box"><div class="bk-label">Mündl. MA</div><div class="bk-val ${d.maScore===null?'sub':''}" style="${d.maScore!==null?'color:'+noteColor(d.maScore):''}">${d.maScore!==null?d.maScore.toFixed(1):'–'}</div><div class="bk-pct">${(s.entries||[]).filter(e=>e.type==="mitarbeit"&&e.val==="pos").length}× pos · ${(s.entries||[]).filter(e=>e.type==="mitarbeit"&&e.val==="neg").length}× neg</div></div>
+        <div class="bk-box"><div class="bk-label">Hausübungen</div><div class="bk-val ${d.huScore===null?'sub':''}" style="${d.huScore!==null?'color:'+noteColor(d.huScore):''}">${d.huScore!==null?d.huScore.toFixed(1):'–'}</div><div class="bk-pct">${(s.entries||[]).filter(e=>e.type==="hu"&&e.val==="perfekt").length}× ✓✓ · ${(s.entries||[]).filter(e=>e.type==="hu"&&e.val==="nicht").length}× ✗</div></div>
+        <div class="bk-box" style="grid-column:span 2;background:${gNote?noteColor(gNote)+'18':'var(--paper)'};border-color:${gNote?noteColor(gNote):'var(--line)'}">
+          <div class="bk-label">Tendenz (Orientierung)</div>
+          <div class="bk-val" style="color:${noteColor(gNote)}">${gNote?Math.round(gNote):'–'}</div>
+          <div class="bk-pct" style="font-style:italic">pädagogische Entscheidung der Lehrkraft</div>
+        </div>
+      </div>`;
+      det.appendChild(bk);
+
+      // Schularbeiten inline
+      const templates=cls.saTemplates||[];
+      if(templates.length){
+        const saSection=document.createElement("div"); saSection.style.cssText="margin-bottom:12px";
+        const saHead=document.createElement("div"); saHead.style.cssText="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px";
+        saHead.innerHTML=`<div class="slabel" style="margin:0">Schularbeiten</div>${cls.jg>=2?`<div style="font-size:0.65rem;font-weight:700;color:${s.std==='ahs'?'var(--green)':'#1565c0'};text-transform:uppercase;letter-spacing:0.06em">Aktuell: ${s.std==='ahs'?'AHS-Standard':'Standard'}</div>`:''}`;
+        saSection.appendChild(saHead);
+        templates.forEach(t=>{
+          const existing=(s.entries||[]).find(e=>e.type==="schularbeit"&&e.label===t.name);
+          const tRow=document.createElement("div");
+          tRow.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--paper);border-radius:10px;border:1px solid var(--line);margin-bottom:7px";
+          if(existing){
+            const ums=(s.entries||[]).find(e=>e.type==="umstufung"&&new Date(e.date)>new Date(existing.date));
+            const stdAtTime=ums?(ums.vonStd==="ahs"?"AHS":"Std"):(s.std==="ahs"?"AHS":"Std");
+            const wasChanged=!!ums;
+            tRow.innerHTML=`<div style="flex:1"><div style="font-weight:700;font-size:0.85rem">${esc(t.name)}</div><div style="font-size:0.7rem;color:var(--muted)">${existing.pct}% von ${t.max} Pkt · <span style="color:${wasChanged?'var(--amber)':'var(--muted)'};font-weight:${wasChanged?700:400}">${stdAtTime}${wasChanged?' ⚠':''}</span></div></div>
+            <div style="font-family:var(--mono);font-weight:800;font-size:1.2rem;color:${noteColor(existing.note)};min-width:28px;text-align:center">${existing.note}</div>
+            <button class="entry-del" data-eid="${existing.id}">✕</button>`;
+            tRow.querySelector(".entry-del").onclick=ev=>{ ev.stopPropagation(); s.entries=s.entries.filter(x=>x.id!==existing.id); save(); renderStudents(); };
+          } else {
+            tRow.innerHTML=`<div style="flex:1"><div style="font-weight:700;font-size:0.85rem">${esc(t.name)}</div><div style="font-size:0.7rem;color:var(--muted)">max. ${t.max} Punkte</div></div>
+            <input type="number" min="0" max="${t.max}" placeholder="Pkt" style="width:64px;padding:7px 9px;border-radius:8px;border:1.5px solid var(--line);font-family:var(--mono);font-weight:700;font-size:0.95rem;text-align:center;background:var(--card);color:var(--graphite)" class="sa-inline-input">
+            <div class="sa-inline-preview" style="font-family:var(--mono);font-weight:800;font-size:1.2rem;color:var(--muted);min-width:28px;text-align:center">–</div>
+            <button class="sa-inline-save btn btn-primary" style="padding:7px 12px;font-size:0.78rem;min-width:auto;flex-shrink:0;opacity:0.4" disabled>✓</button>`;
+            const inp=tRow.querySelector(".sa-inline-input");
+            const preview=tRow.querySelector(".sa-inline-preview");
+            const saveBtn=tRow.querySelector(".sa-inline-save");
+            inp.addEventListener("click",e=>e.stopPropagation());
+            inp.addEventListener("input",()=>{
+              const p=parseFloat(inp.value);
+              if(!isNaN(p)&&p>=0&&p<=t.max){
+                const pct=Math.round(p/t.max*100);
+                const note=getNote(pct,cls.jg,s.std||"standard");
+                preview.textContent=note; preview.style.color=noteColor(note);
+                saveBtn.disabled=false; saveBtn.style.opacity="1";
+                saveBtn.dataset.p=p; saveBtn.dataset.pct=pct; saveBtn.dataset.note=note;
+              } else { preview.textContent="–"; preview.style.color="var(--muted)"; saveBtn.disabled=true; saveBtn.style.opacity="0.4"; }
+            });
+            inp.addEventListener("keydown",e=>{ if(e.key==="Enter") saveBtn.click(); });
+            saveBtn.addEventListener("click",ev=>{
+              ev.stopPropagation(); if(saveBtn.disabled) return;
+              const note=parseInt(saveBtn.dataset.note); const pct=parseInt(saveBtn.dataset.pct);
+              s.entries=s.entries||[];
+              s.entries.push({id:uid(),type:"schularbeit",note,pct,label:t.name,date:new Date().toISOString()});
+              save(); renderStudents(); toast(`${t.name}: Note ${note}`);
+            });
+          }
+          saSection.appendChild(tRow);
+        });
+        det.appendChild(saSection);
+      }
+
+      // Kompetenzen
+      const komps=(s.entries||[]).filter(e=>e.type==="kompetenz");
+      if(komps.length){
+        const ks=document.createElement("div"); ks.style.cssText="margin-bottom:12px";
+        const kh=document.createElement("div"); kh.style.cssText="font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:7px"; kh.textContent="Kompetenzübersicht (nicht bewertet)";
+        ks.appendChild(kh);
+        const byThema={}; komps.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(k=>{ byThema[k.thema]=k; });
+        const ampelColor={ok:"var(--green)",teilweise:"#f9a825",nachholbedarf:"var(--red)"};
+        const ampelIcon={ok:"✅",teilweise:"🟡",nachholbedarf:"🔴"};
+        const grid=document.createElement("div"); grid.style.cssText="display:flex;flex-wrap:wrap;gap:6px";
+        Object.values(byThema).forEach(k=>{
+          const chip=document.createElement("div");
+          chip.style.cssText=`display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;background:var(--paper);border:1.5px solid ${ampelColor[k.ampel]||"#ccc"}`;
+          chip.innerHTML=`${ampelIcon[k.ampel]||"○"} ${esc(k.thema)}`;
+          grid.appendChild(chip);
+        });
+        ks.appendChild(grid); det.appendChild(ks);
+      }
+
+      // Quick actions
+      const qa=document.createElement("div"); qa.className="quick-actions";
+      qa.innerHTML=`<button class="qbtn ma-btn" data-a="ma"><span class="qi">✋</span>Mitarbeit</button><button class="qbtn hu-btn" data-a="hu"><span class="qi">📓</span>Hausübung</button><button class="qbtn kp-btn" data-a="kompetenz"><span class="qi">🔍</span>Kompetenz</button>`;
+      qa.querySelectorAll("button").forEach(b=>{ b.onclick=e=>{ e.stopPropagation(); handleAction(s,b.dataset.a,cls); }; });
+      det.appendChild(qa);
+
+      // Entry list
+      const el=document.createElement("div"); el.className="entry-list";
+      const entries=(s.entries||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+      if(!entries.length){ el.innerHTML=`<div class="empty-list">Noch keine Einträge.</div>`; }
+      else {
+        entries.forEach(e=>{
+          if(e.type==="umstufung"){
+            const div=document.createElement("div"); div.style.cssText="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--amber-bg)";
+            div.innerHTML=`<div style="flex:1;height:2px;background:var(--amber-bg);border-radius:2px"></div><div style="font-size:0.68rem;font-weight:700;color:var(--amber);text-align:center;line-height:1.4">⚠ ${e.vonStd==="ahs"?"AHS-Standard":"Standard"} → ${e.aufStd==="ahs"?"AHS-Standard":"Standard"}<br><span style="font-weight:400;color:var(--muted)">${fmtDate(e.date)}</span></div><div style="flex:1;height:2px;background:var(--amber-bg);border-radius:2px"></div>`;
+            el.appendChild(div); return;
+          }
+          let dot="#ccc",typeStr="",valStr="";
+          if(e.type==="schularbeit"){ dot=noteColor(e.note); typeStr="Schularbeit"; valStr=`Note ${e.note} (${e.pct}%) – ${esc(e.label||"")}`; }
+          else if(e.type==="mitarbeit"){ dot=e.val==="pos"?"var(--green)":e.val==="neg"?"#e07b00":"var(--muted)"; typeStr="Mitarbeit"; valStr=e.val==="pos"?"Positiv":e.val==="neg"?"Wenig/nicht":"Neutral"; if(e.notiz) valStr+=` – ${esc(e.notiz)}`; }
+          else if(e.type==="kompetenz"){ const al={ok:"#2e7d32",teilweise:"#f9a825",nachholbedarf:"#c0392b"}; const lab={ok:"✅ beherrscht",teilweise:"🟡 teilweise",nachholbedarf:"🔴 Nachholbedarf"}; dot=al[e.ampel]||"#ccc"; typeStr="Kompetenzcheck ⓘ"; valStr=`${esc(e.thema)} – ${lab[e.ampel]||""}${e.notiz?` · ${esc(e.notiz)}`:""}`;  }
+          else if(e.type==="hu"){ dot=e.val==="perfekt"?"var(--green)":e.val==="nicht"?"var(--red)":"#1565c0"; typeStr="Hausübung"; valStr=e.val==="perfekt"?"Perfekt ✓✓":e.val==="nicht"?"Nicht gemacht ✗":"Gemacht (Fehler)"; }
+          const row2=document.createElement("div"); row2.className="entry";
+          row2.innerHTML=`<div class="entry-dot" style="background:${dot}"></div><div class="entry-body"><span class="entry-type">${typeStr}:</span> ${valStr}<div class="entry-date">${fmtDate(e.date)}</div></div><button class="entry-del" data-eid="${e.id}">✕</button>`;
+          row2.querySelector(".entry-del").onclick=ev=>{ ev.stopPropagation(); s.entries=s.entries.filter(x=>x.id!==e.id); save(); renderStudents(); };
+          el.appendChild(row2);
+        });
+      }
+      det.appendChild(el);
+      card.appendChild(det);
+    }
+    list.appendChild(card);
+  });
+}
+
+// ── ACTIONS ──
+function handleAction(s,action,cls){
+  const es=s.std||"standard";
+  ctx={studentId:s.id,jg:cls.jg,std:es};
+  if(action==="ma"){ document.getElementById("maNotiz").value=""; document.querySelectorAll("#maGrid .ma-opt").forEach(o=>o.classList.remove("sel")); ctx.maVal=null; openOv("ovMitarbeit"); }
+  else if(action==="hu"){ document.querySelectorAll("#huGrid .ma-opt").forEach(o=>o.classList.remove("sel")); ctx.huVal=null; openOv("ovHU"); }
+  else if(action==="kompetenz"){
+    const chips=document.getElementById("kompetenzChipList"); chips.innerHTML="";
+    (cls.kompetenzTemplates||[]).forEach(kt=>{ const ch=document.createElement("button"); ch.textContent=kt.name; ch.style.cssText="padding:4px 10px;border-radius:16px;border:1.5px solid var(--line);background:var(--card);font-size:0.75rem;font-weight:600;cursor:pointer;color:var(--graphite)"; ch.onclick=()=>{ document.getElementById("kompetenzThema").value=kt.name; document.querySelectorAll("#kompetenzChipList button").forEach(b=>b.style.background="var(--card)"); ch.style.background="var(--green-bg)"; }; chips.appendChild(ch); });
+    document.getElementById("kompetenzThema").value=""; document.getElementById("kompetenzNotiz").value="";
+    document.querySelectorAll(".ampel-btn").forEach(b=>{ b.style.opacity="0.5"; b.style.transform="scale(1)"; }); ctx.ampelVal=null; openOv("ovKompetenz");
+  }
+}
+
+// ── OV HANDLERS ──
+document.querySelectorAll("[data-close]").forEach(el=>{ el.onclick=()=>closeOv(el.dataset.close); });
+document.querySelectorAll(".overlay").forEach(ov=>{ ov.addEventListener("click",e=>{ if(e.target===ov) ov.classList.remove("open"); }); });
+function openOv(id){ document.getElementById(id).classList.add("open"); }
+function closeOv(id){ document.getElementById(id).classList.remove("open"); }
+
+document.getElementById("confirmNewClass").onclick=()=>{
+  const name=document.getElementById("newClassName").value.trim(); if(!name){ toast("Bezeichnung eingeben"); return; }
+  const jg=parseInt(document.getElementById("newClassJg").value);
+  const nc={id:uid(),name,jg,students:[],saTemplates:[],kompetenzTemplates:[]};
+  state.classes.push(nc); state.activeId=nc.id;
+  document.getElementById("newClassName").value=""; save(); closeOv("ovNewClass"); renderAll(); toast(`Klasse "${name}" angelegt`);
+};
+
+document.getElementById("addStudentBtn").onclick=()=>{
+  const cls=getActive(); if(!cls){ toast("Erst Klasse anlegen"); return; }
+  document.getElementById("newStudentName").value=""; document.getElementById("newStudentStd").value="standard";
+  document.getElementById("newStudentStdField").style.display=cls.jg>=2?"block":"none";
+  openOv("ovNewStudent"); setTimeout(()=>document.getElementById("newStudentName").focus(),300);
+};
+document.getElementById("confirmNewStudent").onclick=()=>{
+  const name=document.getElementById("newStudentName").value.trim(); if(!name){ toast("Name eingeben"); return; }
+  const cls=getActive(); const std=cls.jg>=2?document.getElementById("newStudentStd").value:"standard";
+  cls.students=cls.students||[]; cls.students.push({id:uid(),name,std,entries:[]});
+  save(); closeOv("ovNewStudent"); renderStudents(); toast(`${name} hinzugefügt`);
+};
+
+document.getElementById("confirmEditStudent").onclick=()=>{
+  const name=document.getElementById("editStudentName").value.trim(); if(!name){ toast("Name eingeben"); return; }
+  const cls=getActive(); const s=cls.students.find(x=>x.id===ctx.editStudentId); if(!s) return;
+  s.name=name; save(); closeOv("ovEditStudent"); renderStudents(); toast("Name gespeichert");
+};
+document.getElementById("editStudentName").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("confirmEditStudent").click(); });
+
+document.getElementById("maGrid").addEventListener("click",e=>{ const o=e.target.closest(".ma-opt"); if(!o) return; document.querySelectorAll("#maGrid .ma-opt").forEach(x=>x.classList.remove("sel")); o.classList.add("sel"); ctx.maVal=o.dataset.val; });
+document.getElementById("confirmMa").onclick=()=>{
+  if(!ctx.maVal){ toast("Bitte auswählen"); return; }
+  const cls=getActive(); const s=cls.students.find(x=>x.id===ctx.studentId);
+  s.entries=s.entries||[]; s.entries.push({id:uid(),type:"mitarbeit",val:ctx.maVal,notiz:document.getElementById("maNotiz").value.trim(),date:new Date().toISOString()});
+  save(); closeOv("ovMitarbeit"); renderStudents(); toast("Mitarbeit gespeichert");
+};
+
+document.getElementById("huGrid").addEventListener("click",e=>{ const o=e.target.closest(".ma-opt"); if(!o) return; document.querySelectorAll("#huGrid .ma-opt").forEach(x=>x.classList.remove("sel")); o.classList.add("sel"); ctx.huVal=o.dataset.val; });
+document.getElementById("confirmHU").onclick=()=>{
+  if(!ctx.huVal){ toast("Bitte auswählen"); return; }
+  const cls=getActive(); const s=cls.students.find(x=>x.id===ctx.studentId);
+  s.entries=s.entries||[]; s.entries.push({id:uid(),type:"hu",val:ctx.huVal,date:new Date().toISOString()});
+  save(); closeOv("ovHU"); renderStudents(); toast("Hausübung gespeichert");
+};
+
+document.querySelectorAll(".ampel-btn").forEach(btn=>{ btn.addEventListener("click",()=>{ document.querySelectorAll(".ampel-btn").forEach(b=>{ b.style.opacity="0.5"; b.style.transform="scale(1)"; }); btn.style.opacity="1"; btn.style.transform="scale(1.06)"; ctx.ampelVal=btn.dataset.val; }); });
+document.getElementById("confirmKompetenz").onclick=()=>{
+  const thema=document.getElementById("kompetenzThema").value.trim(); if(!thema){ toast("Thema eingeben"); return; }
+  if(!ctx.ampelVal){ toast("Lernstand auswählen"); return; }
+  const cls=getActive(); const s=cls.students.find(x=>x.id===ctx.studentId);
+  s.entries=s.entries||[]; s.entries.push({id:uid(),type:"kompetenz",thema,ampel:ctx.ampelVal,notiz:document.getElementById("kompetenzNotiz").value.trim(),date:new Date().toISOString()});
+  save(); closeOv("ovKompetenz"); renderStudents(); const icons={ok:"✅",teilweise:"🟡",nachholbedarf:"🔴"}; toast(`${icons[ctx.ampelVal]||""} ${thema}`);
+};
+
+// SA Template
+document.getElementById("addSaTemplateBtn").onclick=()=>{ const cls=getActive(); if(!cls){ toast("Keine Klasse"); return; } document.getElementById("satName").value=""; document.getElementById("satMax").value=""; openOv("ovNewSaTemplate"); setTimeout(()=>document.getElementById("satName").focus(),300); };
+document.getElementById("confirmNewSaTemplate").onclick=()=>{
+  const name=document.getElementById("satName").value.trim(); const max=parseFloat(document.getElementById("satMax").value);
+  if(!name){ toast("Bezeichnung eingeben"); return; } if(!max||max<1){ toast("Max. Punkte eingeben"); return; }
+  const cls=getActive(); cls.saTemplates=cls.saTemplates||[]; cls.saTemplates.push({id:uid(),name,max});
+  save(); closeOv("ovNewSaTemplate"); renderSaTemplates(); toast(`"${name}" angelegt`);
+};
+
+// SA Entry
+document.getElementById("saPunkte").addEventListener("input",()=>{
+  const p=parseFloat(document.getElementById("saPunkte").value); const m=ctx.selectedTemplate?.max;
+  if(m&&p>=0&&p<=m){ const pct=Math.round(p/m*100); const note=getNote(pct,ctx.jg||1,ctx.std||"standard"); document.getElementById("saGradeDisplay").textContent=`Note ${note} (${pct}%)`; document.getElementById("saGradeResult").style.display="block"; }
+  else document.getElementById("saGradeResult").style.display="none";
+});
+document.getElementById("confirmSa").onclick=()=>{
+  if(!ctx.selectedTemplate){ toast("Bitte Schularbeit auswählen"); return; }
+  const p=parseFloat(document.getElementById("saPunkte").value); const m=ctx.selectedTemplate.max;
+  if(isNaN(p)||p<0||p>m){ toast(`Punkte: 0 bis ${m}`); return; }
+  const pct=Math.round(p/m*100); const note=getNote(pct,ctx.jg,ctx.std);
+  const cls=getActive(); const s=cls.students.find(x=>x.id===ctx.studentId);
+  s.entries=s.entries||[]; s.entries.push({id:uid(),type:"schularbeit",note,pct,label:ctx.selectedTemplate.name,date:new Date().toISOString()});
+  save(); closeOv("ovSchularbeit"); renderStudents(); toast(`Note ${note} gespeichert`);
+};
+
+// Kompetenz Template
+document.getElementById("addKompetenzBtn").onclick=()=>{ const cls=getActive(); if(!cls){ toast("Keine Klasse"); return; } document.getElementById("newKompetenzName").value=""; openOv("ovNewKompetenz"); setTimeout(()=>document.getElementById("newKompetenzName").focus(),300); };
+document.getElementById("confirmNewKompetenz").onclick=()=>{
+  const name=document.getElementById("newKompetenzName").value.trim(); if(!name){ toast("Name eingeben"); return; }
+  const cls=getActive(); cls.kompetenzTemplates=cls.kompetenzTemplates||[];
+  if(cls.kompetenzTemplates.find(k=>k.name===name)){ toast("Bereits vorhanden"); return; }
+  cls.kompetenzTemplates.push({id:uid(),name}); save(); closeOv("ovNewKompetenz"); renderKompetenzTemplates(); toast(`"${name}" angelegt`);
+};
+
+// PIN Change
+document.getElementById("changePinBtn").onclick=()=>{
+  const pin=document.getElementById("newPinInput").value.trim();
+  if(pin.length!==4||isNaN(pin)){ toast("4-stellige Zahl eingeben"); return; }
+  currentUser.pinHash=hashPin(pin); localStorage.setItem("kh_user",JSON.stringify(currentUser));
+  if(!window._DEMO&&window._db){ const {doc,setDoc}=window._fs; setDoc(doc(window._db,"users",currentUser.name),{pinHash:currentUser.pinHash},{merge:true}); }
+  document.getElementById("newPinInput").value=""; toast("PIN geändert");
+};
+
+// ── RENDER HELPERS ──
+function renderSaTemplates(){
+  const cls=getActive(); const list=document.getElementById("saTemplateList"); if(!list||!cls){ return; }
+  const templates=cls.saTemplates||[];
+  if(!templates.length){ list.innerHTML=`<div style="font-size:0.8rem;color:var(--muted);font-style:italic;padding:4px 0 8px">Noch keine Schularbeiten.</div>`; return; }
+  list.innerHTML="";
+  templates.forEach((t,i)=>{ const row=document.createElement("div"); row.className="sa-item"; row.innerHTML=`<div><div style="font-weight:600;font-size:0.85rem">${esc(t.name)}</div><div style="font-size:0.7rem;color:var(--muted)">max. ${t.max} Punkte</div></div><button class="entry-del" data-idx="${i}">✕</button>`; row.querySelector(".entry-del").onclick=()=>{ if(!confirm(`"${t.name}" löschen?`)) return; cls.saTemplates.splice(i,1); save(); renderSaTemplates(); }; list.appendChild(row); });
+}
+function renderKompetenzTemplates(){
+  const cls=getActive(); const list=document.getElementById("kompetenzList"); if(!list||!cls) return;
+  const templates=cls.kompetenzTemplates||[];
+  if(!templates.length){ list.innerHTML=`<div style="font-size:0.8rem;color:var(--muted);font-style:italic;padding:4px 0 8px">Noch keine Kompetenzen.</div>`; return; }
+  list.innerHTML="";
+  templates.forEach((t,i)=>{ const row=document.createElement("div"); row.className="sa-item"; row.innerHTML=`<span style="font-size:0.85rem;font-weight:600">${esc(t.name)}</span><button class="entry-del">✕</button>`; row.querySelector(".entry-del").onclick=()=>{ if(!confirm(`"${t.name}" löschen?`)) return; cls.kompetenzTemplates.splice(i,1); save(); renderKompetenzTemplates(); }; list.appendChild(row); });
+}
+
+// ── STATISTIK ──
+function renderStatistik(){
+  const cls=getActive(); const wrap=document.getElementById("statistikContent"); if(!wrap) return;
+  if(!cls||!(cls.students||[]).length){ wrap.innerHTML=`<div class="empty-state"><div class="eicon">📊</div><h2>Keine Daten</h2><p>Klasse anlegen und Leistungen eintragen.</p></div>`; return; }
+  const students=cls.students; const allData=students.map(s=>({s,d:calcStudentData(s)})); const withGrade=allData.filter(x=>x.d.gesamtNote!==null);
+  if(!withGrade.length){ wrap.innerHTML=`<div class="empty-state"><div class="eicon">📊</div><h2>Noch keine Noten</h2><p>Schularbeiten und Mitarbeit eintragen.</p></div>`; return; }
+  const notes=withGrade.map(x=>x.d.gesamtNote); const avg=notes.reduce((a,b)=>a+b,0)/notes.length; const positiv=notes.filter(x=>x<=3).length;
+  const distrib=[1,2,3,4,5].map(n=>({n,count:notes.filter(x=>Math.round(x)===n).length})); const maxCount=Math.max(...distrib.map(d=>d.count),1);
+  let html=`<div style="background:var(--green);color:#fff;border-radius:12px;padding:16px;margin-bottom:14px"><div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;opacity:0.7;margin-bottom:8px">Klasse ${esc(cls.name)} · ${cls.jg}. Jahrgang · Elterngespräch</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div style="text-align:center"><div style="font-size:2rem;font-weight:800">${avg.toFixed(1)}</div><div style="font-size:0.65rem;opacity:0.75;text-transform:uppercase">Ø Klasse</div></div><div style="text-align:center"><div style="font-size:2rem;font-weight:800">${positiv}/${withGrade.length}</div><div style="font-size:0.65rem;opacity:0.75;text-transform:uppercase">Positiv</div></div><div style="text-align:center"><div style="font-size:2rem;font-weight:800">${students.length}</div><div style="font-size:0.65rem;opacity:0.75;text-transform:uppercase">Schüler</div></div></div></div>`;
+  html+=`<div class="sett-card" style="margin-bottom:10px"><h3>📊 Notenverteilung</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">`;
+  distrib.forEach(({n,count})=>{ const pct=Math.round(count/notes.length*100); const bw=Math.round(count/maxCount*100); const col=noteColorHex(n); html+=`<div style="display:flex;align-items:center;gap:10px"><div style="font-family:var(--mono);font-weight:800;font-size:1rem;color:${col};width:18px;text-align:center">${n}</div><div style="flex:1;background:var(--paper);border-radius:6px;height:22px;overflow:hidden"><div style="width:${bw}%;height:100%;background:${col};border-radius:6px;display:flex;align-items:center;padding-left:8px">${count>0?`<span style="font-size:0.7rem;font-weight:700;color:#fff">${count}</span>`:""}</div></div><div style="font-size:0.72rem;color:var(--muted);width:32px;text-align:right">${pct}%</div></div>`; });
+  html+=`</div></div>`;
+  // Schüler Verlauf
+  html+=`<div class="sett-card" style="margin-bottom:10px"><h3>👥 Leistungsverlauf je Schüler</h3><div style="font-size:0.72rem;color:var(--muted);margin:6px 0 10px">Antippen für Diagramm</div><div style="display:flex;flex-direction:column;gap:8px">`;
+  const sorted=withGrade.slice().sort((a,b)=>a.d.gesamtNote-b.d.gesamtNote);
+  sorted.forEach(({s,d})=>{
+    const tendenz=Math.round(d.gesamtNote); const nhCount=(s.entries||[]).filter(e=>e.type==="kompetenz"&&e.ampel==="nachholbedarf").length; const huNi=(s.entries||[]).filter(e=>e.type==="hu"&&e.val==="nicht").length;
+    const stdLabel=cls.jg>=2?`<span style="font-size:0.62rem;padding:1px 5px;border-radius:4px;margin-left:5px;background:${s.std==='ahs'?'var(--green-bg)':'#e3f0ff'};color:${s.std==='ahs'?'var(--green)':'#1565c0'};font-weight:700">${s.std==='ahs'?'AHS':'Std'}</span>`:'';
+    const sas=(s.entries||[]).filter(e=>e.type==="schularbeit").sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const mas=(s.entries||[]).filter(e=>e.type==="mitarbeit").sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const kompe=(s.entries||[]).filter(e=>e.type==="kompetenz").sort((a,b)=>new Date(a.date)-new Date(b.date));
+    let svgHtml='<div style="text-align:center;color:#bbb;padding:20px 0;font-size:0.78rem">Noch keine Daten für Diagramm</div>';
+    const allDates=[...sas,...mas,...kompe].map(e=>new Date(e.date)).sort((a,b)=>a-b);
+    if(allDates.length>0){
+      const W=320,H=150,PAD={t:18,r:16,b:34,l:32}; const cW=W-PAD.l-PAD.r,cH=H-PAD.t-PAD.b;
+      const noteY=n=>PAD.t+((n-1)/4)*cH; const minT=allDates[0].getTime(); const maxT=allDates[allDates.length-1].getTime(); const rangeT=maxT-minT||1; const dateX=t=>PAD.l+((t-minT)/rangeT)*cW;
+      let grid=''; [1,2,3,4,5].forEach(n=>{ const y=noteY(n); grid+=`<line x1="${PAD.l}" y1="${y}" x2="${W-PAD.r}" y2="${y}" stroke="${n===3?'#ddd':'#eee'}" stroke-width="${n===3?1.5:1}" stroke-dasharray="${n===3?'4,3':'3,3'}"/><text x="${PAD.l-5}" y="${y+4}" text-anchor="end" font-size="9" fill="#888" font-family="monospace">${n}</text>`; });
+      let saLine='',saPoints='';
+      if(sas.length){ const pts=sas.map(e=>({x:dateX(new Date(e.date).getTime()),y:noteY(e.note),note:e.note})); if(pts.length>1) saLine=`<path d="M${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L')}" stroke="#2e7d32" stroke-width="2.5" fill="none"/>`; pts.forEach(p=>{ saPoints+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${noteColorHex(p.note)}" stroke="#fff" stroke-width="1.5"/><text x="${p.x.toFixed(1)}" y="${(p.y-8).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="bold" fill="${noteColorHex(p.note)}" font-family="monospace">${p.note}</text>`; }); }
+      let maLine='';
+      if(mas.length){ let rs=0,pts=[]; mas.forEach((e,i)=>{ rs+=5-MA_VAL[e.val]*4; pts.push({x:dateX(new Date(e.date).getTime()),y:noteY(rs/(i+1))}); }); if(pts.length>1) maLine=`<path d="M${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L')}" stroke="#1565c0" stroke-width="1.8" fill="none" stroke-dasharray="5,3" opacity="0.7"/>`; }
+      let kompRow=''; kompe.forEach(k=>{ const x=dateX(new Date(k.date).getTime()); const col=k.ampel==='ok'?'#2e7d32':k.ampel==='teilweise'?'#f9a825':'#c0392b'; const ico=k.ampel==='ok'?'✓':k.ampel==='teilweise'?'~':'!'; kompRow+=`<circle cx="${x.toFixed(1)}" cy="${(H-PAD.b+20).toFixed(1)}" r="6" fill="${col}" opacity="0.9"/><text x="${x.toFixed(1)}" y="${(H-PAD.b+24).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="bold" fill="#fff" font-family="monospace">${ico}</text>`; });
+      if(kompe.length) kompRow=`<text x="${PAD.l-5}" y="${(H-PAD.b+24).toFixed(1)}" text-anchor="end" font-size="7.5" fill="#888">K</text>`+kompRow;
+      const legend=`<circle cx="${PAD.l}" cy="${PAD.t-4}" r="4" fill="#2e7d32"/><text x="${PAD.l+7}" y="${PAD.t}" font-size="8" fill="#444" font-family="sans-serif">SA</text><line x1="${PAD.l+25}" y1="${PAD.t-4}" x2="${PAD.l+37}" y2="${PAD.t-4}" stroke="#1565c0" stroke-width="1.8" stroke-dasharray="4,2"/><text x="${PAD.l+40}" y="${PAD.t}" font-size="8" fill="#444" font-family="sans-serif">Mitarbeit</text>`;
+      svgHtml=`<svg viewBox="0 0 ${W} ${H+8}" style="width:100%;max-width:380px;display:block;margin:0 auto"><rect x="${PAD.l}" y="${PAD.t}" width="${cW}" height="${cH}" rx="4" fill="#fafafa" stroke="#eee" stroke-width="1"/>${grid}${maLine}${saLine}${saPoints}${kompRow}${legend}</svg>`;
+    }
+    let schwaechen=[],staerken=[];
+    if(d.saAvgNote>3.5) schwaechen.push(`Schularbeiten: Ø Note ${d.saAvgNote.toFixed(1)}`);
+    if(d.maScore>3) schwaechen.push("Mündliche Mitarbeit ausbaufähig");
+    if(d.huScore>3) schwaechen.push("Hausübungen oft nicht gemacht");
+    if(nhCount>0) schwaechen.push(`${nhCount}× Nachholbedarf (Kompetenzcheck)`);
+    if(d.saAvgNote<=2) staerken.push(`Schularbeiten sehr gut (Ø ${d.saAvgNote.toFixed(1)})`);
+    if(d.maScore<=2) staerken.push("Sehr aktive Mitarbeit");
+    if(d.huScore<=1.5) staerken.push("Hausübungen zuverlässig");
+    const analysis=(staerken.length+schwaechen.length>0)?`<div style="padding:10px 12px;border-top:1px solid var(--line);background:#fafdf9">${staerken.length>0?`<div style="font-size:0.72rem;font-weight:700;color:var(--green);margin-bottom:4px">✅ Stärken</div><div style="font-size:0.75rem;margin-bottom:8px">${staerken.map(x=>`• ${x}`).join('<br>')}</div>`:''} ${schwaechen.length>0?`<div style="font-size:0.72rem;font-weight:700;color:var(--red);margin-bottom:4px">⚠️ Förderbedarf</div><div style="font-size:0.75rem">${schwaechen.map(x=>`• ${x}`).join('<br>')}</div>`:''}</div>`:'';
+    html+=`<div style="background:var(--card);border-radius:10px;border:1px solid var(--line);border-left:4px solid ${noteColorHex(d.gesamtNote)};overflow:hidden"><div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.chev').textContent=this.nextElementSibling.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;user-select:none"><div style="flex:1;min-width:0"><div style="font-size:0.87rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}${stdLabel}</div><div style="font-size:0.67rem;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap"><span>SA: ${d.saAvgNote!==null?d.saAvgNote.toFixed(1):'–'}</span><span>MA: ${d.maScore!==null?d.maScore.toFixed(1):'–'}</span><span>HÜ: ${d.huScore!==null?d.huScore.toFixed(1):'–'}</span>${nhCount>0?`<span style="color:var(--red);font-weight:700">🔴 ${nhCount}×</span>`:''}</div></div><div style="font-family:var(--mono);font-weight:900;font-size:1.4rem;color:${noteColorHex(d.gesamtNote)};flex-shrink:0">${tendenz}</div><div class="chev" style="color:var(--muted);font-size:0.85rem;flex-shrink:0">▸</div></div><div style="display:none;border-top:1px solid var(--line)"><div style="padding:12px;background:var(--paper)"><div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:8px">Leistungsverlauf</div>${svgHtml}<div style="font-size:0.68rem;color:var(--muted);text-align:center;margin-top:4px">K = Kompetenzcheck</div></div>${analysis}</div></div>`;
+  });
+  html+=`</div></div>`;
+  allData.filter(x=>x.d.gesamtNote===null).forEach(({s})=>{ html+=`<div style="background:var(--paper);border-radius:8px;padding:10px 12px;border:1px solid var(--line);opacity:0.6;font-size:0.85rem;font-weight:600;color:var(--muted);margin-bottom:6px">${esc(s.name)} – Noch keine Daten</div>`; });
+  html+=`<div style="background:#fff8e1;border-radius:10px;padding:12px 14px;margin-bottom:16px;border:1px solid #ffe082;font-size:0.75rem;color:#5d4037;line-height:1.6"><strong>§ 20 SchUG · Hinweis für Elterngespräche:</strong> Die Tendenz ist eine pädagogische Orientierungshilfe. Die endgültige Jahresbeurteilung liegt im pädagogischen Ermessen der Lehrkraft (BVwG-Rechtsprechung).</div>`;
+  wrap.innerHTML=html;
+}
+
+// ── EXPORT ──
+document.getElementById("exportBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=`klassenheft-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); toast("Backup gespeichert");
+};
+document.getElementById("deleteClassBtn").onclick=()=>{
+  const cls=getActive(); if(!cls){ toast("Keine Klasse"); return; }
+  if(!confirm(`Klasse "${cls.name}" löschen?`)) return;
+  state.classes=state.classes.filter(c=>c.id!==cls.id); state.activeId=state.classes.length?state.classes[0].id:null;
+  save(); renderAll(); toast("Klasse gelöscht");
+};
+
+// ── NAV ──
+document.querySelectorAll(".nbtn").forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll(".nbtn").forEach(x=>x.classList.remove("active")); b.classList.add("active");
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); document.getElementById("view-"+b.dataset.view).classList.add("active");
+    if(b.dataset.view==="settings"){ renderSaTemplates(); renderKompetenzTemplates(); }
+    if(b.dataset.view==="statistik") renderStatistik();
+    if(b.dataset.view==="team") loadTeam();
+  };
+});
+
+function renderAll(){ renderTabs(); renderStudents(); }
+
+// ── INIT ──
+function init(){
+  // Check demo mode
+  if(window._DEMO) document.getElementById("demoBadge").style.display="block";
+  // Auto-login
+  try { const u=localStorage.getItem("kh_user"); if(u){ currentUser=JSON.parse(u); loadFromFirebase().then(showApp); return; } } catch(e){}
+  // Show login
+  document.getElementById("loginBtn").onclick=()=>{
+    const name=document.getElementById("loginName").value.trim();
+    const pin=document.getElementById("loginPin").value;
+    login(name,pin);
+  };
+  document.getElementById("loginPin").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("loginBtn").click(); });
+  document.body.style.overflow="hidden";
+}
+
+return { init };
+})();
+
+function logout(){ APP && typeof APP === 'object' && localStorage.removeItem("kh_user") && location.reload(); }
+</script>
+</body>
+</html>
