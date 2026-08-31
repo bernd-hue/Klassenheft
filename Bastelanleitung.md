@@ -1,6 +1,6 @@
 # Selbst ändern, ohne Daten zu verlieren
 
-Für Klassenheft ab Version 4. Diese Anleitung setzt keine Programmierkenntnisse voraus.
+Für Klassenheft ab Version 6. Diese Anleitung setzt keine Programmierkenntnisse voraus.
 
 ## Das Wichtigste zuerst: gehen die Schülerdaten verloren?
 
@@ -62,7 +62,7 @@ Ganz oben in der Datei steht ein Block mit der Überschrift **HIER DARFST DU GEF
    Richtig: `schularbeit: "Schularbeit"` wird zu `schularbeit: "Schularbeit neu"`
    Falsch: `Schularbeit: "Schularbeit"`
 2. Kommas, geschweifte Klammern und eckige Klammern stehen lassen.
-3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "4";` wird zu `"5"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
+3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "6";` wird zu `"7"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
 
 ### Was wo steht
 
@@ -89,7 +89,7 @@ Die sechs Farbpunkte, die beim Anlegen einer eigenen Beurteilung zur Wahl stehen
 
 ### Wenn nach dem Ändern gar nichts mehr geht
 
-Das passiert praktisch immer durch ein fehlendes Komma oder eine fehlende Klammer. Kein Grund zur Sorge, die Daten sind davon nicht betroffen. Nimm einfach wieder die vorige Fassung der Datei, die im Projektordner mit Datum im Namen liegt, zum Beispiel `Klassenheft_v3_2026-08-28.html`. Benenne sie in `Klassenheft.html` um und alles ist wie vorher, samt aller Noten.
+Das passiert praktisch immer durch ein fehlendes Komma oder eine fehlende Klammer. Kein Grund zur Sorge, die Daten sind davon nicht betroffen. Nimm einfach wieder die vorige Fassung der Datei, die im Projektordner mit Datum im Namen liegt, zum Beispiel `Klassenheft_v5_2026-08-28.html`. Benenne sie in `Klassenheft.html` um und alles ist wie vorher, samt aller Noten.
 
 ## Wenn du unsicher bist
 

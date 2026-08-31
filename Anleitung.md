@@ -1,4 +1,4 @@
-# Klassenheft, Version 5
+# Klassenheft, Version 6
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -46,6 +46,8 @@ Damit ein Gerät die App wie eine installierte App behandelt, muss sie über ein
 Steht die Leiste auf *Ganzes Jahr*, landet eine neue Note automatisch im Semester, das zum heutigen Datum passt. September bis Jänner ist das erste, Februar bis Juli das zweite Semester.
 
 Bestehende Einträge aus der Zeit vor dieser Version wurden anhand ihres Datums einmalig zugeordnet. Auf dem Elternsprechtag-Blatt und in der Wochensicherung stehen immer beide Semesterschnitte und der Jahresschnitt nebeneinander.
+
+Ein Hinweis dazu, falls es beim Elternsprechtag Nachfragen gibt: Im Modus *Anteil in Prozent* wird der Jahreswert aus den Anteilen des ganzen Jahres neu gerechnet, er ist also nicht einfach der Mittelwert der beiden Semester. Ist eine Kategorie nur in einem Semester besetzt, trägt sie dort den vollen Anteil, über das Jahr aber nur ihren eigenen. Der Jahreswert kann dadurch knapp neben den beiden Semesterwerten liegen. Das ist rechnerisch richtig und liegt am Prozentmodell selbst. Im Modus *Faktor je Note* liegt der Jahreswert dagegen immer zwischen den beiden Semesterwerten.
 
 ## Neue Fassung einspielen
 

@@ -1,6 +1,6 @@
 # Klassenheft auf iPhone und MacBook installieren
 
-Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 28.08.2026, Version 5.
+Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 28.08.2026, Version 6.
 
 ---
 
@@ -20,7 +20,7 @@ Du hast bereits eine Adresse: **bernd-hue.github.io/Klassenheft**. Dort liegt no
 2. Oben auf **Add file**, dann **Upload files**.
 3. Im Finder den Ordner **Klassenheft_App** öffnen (liegt auf dem Schreibtisch unter `Bernd/Claude/`).
 4. Dort alle Dateien markieren, mit **Cmd + A**, und mit der Maus in das GitHub-Fenster ziehen.
-5. Unten ins Textfeld **Version 5** schreiben und auf **Commit changes** klicken.
+5. Unten ins Textfeld **Version 6** schreiben und auf **Commit changes** klicken.
 6. Ein bis zwei Minuten warten. GitHub braucht kurz, bis die neue Fassung ausgeliefert wird.
 
 Fertig. Die alten Dateien mit gleichem Namen werden dabei überschrieben, das ist so gewollt.
@@ -31,7 +31,7 @@ Fertig. Die alten Dateien mit gleichem Namen werden dabei überschrieben, das is
 
 Am MacBook **bernd-hue.github.io/Klassenheft** aufrufen.
 
-Richtig ist es, wenn du unten drei Reiter siehst: **Home**, **Statistik**, **Einstellungen**, und unter Einstellungen ganz unten **Klassenheft, Version 5** steht.
+Richtig ist es, wenn du unten drei Reiter siehst: **Home**, **Statistik**, **Einstellungen**, und unter Einstellungen ganz unten **Klassenheft, Version 6** steht.
 
 Erscheint noch die alte Fassung mit der PIN-Abfrage, dann liegt sie noch im Zwischenspeicher des Browsers:
 
@@ -110,7 +110,7 @@ Dann lade ich dir eine neue `index.html`, du lädst sie wie in Schritt 1 bei Git
 ## Kurzfassung zum Abhaken
 
 - [ ] Dateien bei GitHub hochgeladen
-- [ ] Am MacBook geprüft, dass Version 5 erscheint
+- [ ] Am MacBook geprüft, dass Version 6 erscheint
 - [ ] Am MacBook in Chrome installiert
 - [ ] Am iPhone in Safari zum Home-Bildschirm hinzugefügt
 - [ ] Am iPhone ab jetzt nur noch das Symbol verwenden

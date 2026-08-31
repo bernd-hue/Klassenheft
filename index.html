@@ -197,7 +197,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "5";
+const APP_FASSUNG = "6";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -465,6 +465,14 @@ function isProzentMode(sub){ return sub && sub.weightMode === "prozent"; }
    damit ein Test oder ein Referat direkt über Punkte eingegeben werden kann.
    Die Notenkacheln bleiben daneben immer bedienbar. */
 function hasSchluessel(cat){ return cat === "diktat" || PROZENT_CATS.indexOf(cat) !== -1 || isCustomCat(cat); }
+
+/* Kurzform für die schmalen Auswahlchips. Erst sehr lange Namen werden
+   gekürzt, damit gebräuchliche Bezeichnungen wie Lernzielkontrolle
+   vollständig lesbar bleiben. */
+function kurzName(name){
+  const t = String(name || "").trim();
+  return t.length > 20 ? t.slice(0, 19) + "." : t;
+}
 
 function nextCustomColor(sub){
   const belegt = customCats(sub).map(c => c.fg);
@@ -769,7 +777,18 @@ function avatarHtml(s, klein){
 
 /* ---------- RAHMEN ---------- */
 
-function switchTab(t){ tab = t; render(); }
+/* Tippt man auf den Reiter, in dem man ohnehin schon ist, geht es zurück
+   auf dessen Übersicht. Das ist der übliche Weg, um aus einer Unterseite
+   wieder herauszukommen, ohne die Pfeile links oben zu suchen. */
+function switchTab(t){
+  if(tab === t){
+    if(t === "home") homeView.screen = "list";
+    else if(t === "statistik") statView.screen = "list";
+    else settingsView.screen = "list";
+  }
+  tab = t;
+  render();
+}
 
 /* ---------- SEMESTERLEISTE ----------
    Eine einzige Leiste, überall gleich. Sie entscheidet, welcher Zeitraum
@@ -878,28 +897,43 @@ function renderHomeList(){
 }
 
 function renderNewSubject(){
+  /* Gibt es noch keine Klasse, wird die Auswahlliste weggelassen. Sie hätte
+     ohnehin nur den einen Eintrag "Neue Klasse anlegen", und das Feld für die
+     Bezeichnung muss von Anfang an sichtbar sein. */
+  const ersteKlasse = state.classes.length === 0;
+
   const klassenOpts = state.classes.map(c =>
-    `<option value="${c.id}">${c.name}</option>`).join("");
-  const tplOpts = Object.keys(SUBJECT_TEMPLATES).map(k =>
+    `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+
+  /* Die erste Vorlage in der Liste ist beim Öffnen ausgewählt. Ihr
+     Erklärungstext muss deshalb auch gleich sichtbar sein. */
+  const vorlagenKeys = Object.keys(SUBJECT_TEMPLATES);
+  const vorlageJetzt = vorlagenKeys[0];
+  const tplOpts = vorlagenKeys.map(k =>
     `<option value="${k}">${SUBJECT_TEMPLATES[k].label}</option>`).join("");
-  const tplNotes = Object.keys(SUBJECT_TEMPLATES).map(k =>
-    `<div id="tplNote_${k}" style="display:none;">${SUBJECT_TEMPLATES[k].note}</div>`).join("");
+  const tplNotes = vorlagenKeys.map(k =>
+    `<div id="tplNote_${k}" style="display:${k === vorlageJetzt ? "block" : "none"};">${SUBJECT_TEMPLATES[k].note}</div>`).join("");
+
+  const klasseFeld = ersteKlasse
+    ? `<span class="field-label">Klasse</span>
+       <input type="text" id="klasseInput" placeholder="z. B. 2A" required autofocus>`
+    : `<span class="field-label">Klasse</span>
+       <select id="klasseSelect" onchange="toggleNeueKlasse()">
+         ${klassenOpts}
+         <option value="__neu">Neue Klasse anlegen</option>
+       </select>
+       <div id="neueKlasseBox" style="display:none;">
+         <span class="field-label">Bezeichnung der neuen Klasse</span>
+         <input type="text" id="klasseInput" placeholder="z. B. 3B">
+       </div>`;
 
   return `
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('list')">&lsaquo;</span>
-      <span class="title" style="${titleStyle("home")}">Neue Klasse oder Fach</span>
+      <span class="title" style="${titleStyle("home")}">${ersteKlasse ? "Erste Klasse anlegen" : "Neue Klasse oder Fach"}</span>
     </div>
     <form onsubmit="createSubject(event)">
-      <span class="field-label">Klasse</span>
-      <select id="klasseSelect" onchange="toggleNeueKlasse()">
-        ${klassenOpts}
-        <option value="__neu">Neue Klasse anlegen</option>
-      </select>
-      <div id="neueKlasseBox" style="display:none;">
-        <span class="field-label">Bezeichnung der neuen Klasse</span>
-        <input type="text" id="klasseInput" placeholder="z. B. 2A">
-      </div>
+      ${klasseFeld}
       <span class="field-label">Fach</span>
       <input type="text" id="fachInput" placeholder="z. B. Deutsch" required oninput="suggestTemplate(this.value)">
       <span class="field-label">Bewertung</span>
@@ -938,13 +972,26 @@ function createSubject(ev){
   ev.preventDefault();
   const fach = document.getElementById("fachInput").value.trim();
   if(!fach) return;
-  const wahl = document.getElementById("klasseSelect").value;
+  /* Beim allerersten Mal gibt es keine Auswahlliste, dann wird immer eine
+     neue Klasse angelegt. */
+  const auswahl = document.getElementById("klasseSelect");
+  const wahl = auswahl ? auswahl.value : "__neu";
   let cls;
   if(wahl === "__neu" || !wahl){
-    const name = document.getElementById("klasseInput").value.trim();
-    if(!name){ alert("Bitte eine Bezeichnung für die neue Klasse eingeben, zum Beispiel 2A."); return; }
-    cls = { id: uid(), name: name, stufe: stufeFromKlasse(name), students: [], subjects: [] };
-    state.classes.push(cls);
+    const feld = document.getElementById("klasseInput");
+    const name = feld ? feld.value.trim() : "";
+    if(!name){
+      alert("Bitte eine Bezeichnung für die Klasse eingeben, zum Beispiel 2A.");
+      if(feld) feld.focus();
+      return;
+    }
+    /* Gibt es die Bezeichnung schon, wird die bestehende Klasse verwendet,
+       statt eine zweite mit demselben Namen anzulegen. */
+    cls = state.classes.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+    if(!cls){
+      cls = { id: uid(), name: name, stufe: stufeFromKlasse(name), students: [], subjects: [] };
+      state.classes.push(cls);
+    }
   } else {
     cls = getClass(wahl);
     if(!cls) return;
@@ -2836,7 +2883,7 @@ function addCustomCat(ev){
   const farbe = CUSTOM_COLORS.find(c => c.fg === settingsView.newCatColor) || nextCustomColor(sub);
   const key = "x_" + uid();
   if(!Array.isArray(sub.customCats)) sub.customCats = [];
-  sub.customCats.push({ key: key, label: name, short: name.length > 14 ? name.slice(0,13) + "." : name, fg: farbe.fg, bg: farbe.bg });
+  sub.customCats.push({ key: key, label: name, short: kurzName(name), fg: farbe.fg, bg: farbe.bg });
   const liste = activeCats(sub).concat([key]);
   sub.cats = allCatKeys(sub).filter(k => liste.indexOf(k) !== -1);
   if(typeof sub.weights[key] !== "number") sub.weights[key] = isProzentMode(sub) ? 10 : 1;
@@ -2857,7 +2904,7 @@ function renameCustomCat(key, name){
   const schonDa = allCatKeys(sub).some(k => k !== key && catLabel(sub, k).toLowerCase() === neu.toLowerCase());
   if(schonDa){ alert("Eine Beurteilung mit dem Namen " + neu + " gibt es in diesem Fach schon."); render(); return; }
   c.label = neu;
-  c.short = neu.length > 14 ? neu.slice(0, 13) + "." : neu;
+  c.short = kurzName(neu);
   save();
   render();
 }
