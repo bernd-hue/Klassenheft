@@ -114,6 +114,34 @@
   .tabbtn{flex:1; text-align:center; padding:10px 4px 8px; font-size:11px; font-weight:bold; cursor:pointer; border-top:3px solid transparent; color:#000000; background:#fff;}
   .tabbtn.active{border-top-width:3px;}
 
+  /* Notenvergabe: Hauptweg groß, Feinheiten klein darunter */
+  button.gross{width:100%; font-size:16px; padding:14px;}
+  .feinbereich{padding:10px 16px; border-top:1px solid #000000;}
+  .feinzeile{display:flex; align-items:center; gap:10px;}
+  .feinlabel{font-size:12px; font-weight:bold; white-space:nowrap;}
+  .stufe-btn{
+    border:1.5px solid #000000; border-radius:8px; padding:14px 12px; margin-bottom:8px;
+    font-size:15px; font-weight:bold; text-align:center; cursor:pointer;
+  }
+
+  /* Schnellerfassung: eine Zeile je Schüler:in */
+  .schnell-zeile{display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid #000000;}
+  .schnell-name{flex:1; min-width:0; font-size:13px; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .schnell-tiles{display:flex; gap:4px; flex-shrink:0;}
+  .schnell-tile{
+    width:34px; height:34px; border-radius:6px; border:1.5px solid #000000;
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:bold; cursor:pointer;
+  }
+  .schnell-stufen{display:flex; gap:4px; flex-shrink:0;}
+  .schnell-stufe{
+    min-width:34px; height:34px; padding:0 8px; border-radius:6px; border:1.5px solid #000000;
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer;
+  }
+
+  /* Diagramme */
+  .chart{padding:8px 16px 12px; border-bottom:1px solid #000000;}
+  .chart svg{display:block;}
+
   /* Erinnerung an die Wochensicherung */
   .banner{padding:10px 16px; border-bottom:2px solid #000000; background:#FFF6DA; display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
   .banner .txt{font-size:12px; flex:1; min-width:180px;}
@@ -144,6 +172,8 @@
   .pr-kpi div:last-child{border-right:none;}
   .pr-kpi .v{font-size:16pt; font-weight:bold;}
   .pr-kpi .l{font-size:8pt;}
+  .pr-chart{margin:2mm 0 3mm; page-break-inside:avoid;}
+  .pr-chart svg{width:100%; height:auto; display:block;}
   .pr-note{font-size:9pt; margin-top:4mm;}
   .pr-sign{margin-top:12mm; display:flex; gap:12mm; font-size:9pt;}
   .pr-sign div{flex:1; border-top:1px solid #000000; padding-top:1.5mm;}
@@ -197,7 +227,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "6";
+const APP_FASSUNG = "7";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -335,6 +365,19 @@ const PROZENT_KEYS = {
   standard: [[64,1],[51,2],[37,3],[25,4],[0,5]]
 };
 
+/* ---------- STUFEN STATT NOTEN ----------
+   Hausübungen sind keine Leistungsfeststellung und dürfen nicht benotet
+   werden. Sie werden deshalb in Stufen festgehalten und zählen nicht in den
+   Notenschnitt. Die Stufen stehen von der besten zur schwächsten.
+   Andere Kategorien lassen sich in den Einstellungen ebenso auf Stufen
+   umstellen. */
+const STUFEN_LISTEN = {
+  hausuebung: ["sehr gut gemacht", "gut gemacht", "gemacht", "nicht gemacht"]
+};
+
+/* Kategorien, die in einem neuen Fach von Anfang an in Stufen laufen */
+const STUFEN_VORGABE = ["hausuebung"];
+
 const NIVEAU_LABELS = { ahs: "Standard AHS", standard: "Standard" };
 
 /* ==========================================================================
@@ -459,6 +502,45 @@ function activeCats(sub){
   return allCatKeys(sub).filter(k => list.indexOf(k) !== -1);
 }
 
+/* ---------- STUFEN ----------
+   Eine Kategorie läuft entweder in Noten oder in Stufen. Stufen zählen
+   nicht in den Notenschnitt, werden aber vollständig festgehalten. */
+
+function istStufenCat(sub, cat){
+  return !!(sub && Array.isArray(sub.stufenCats) && sub.stufenCats.indexOf(cat) !== -1);
+}
+
+function stufenListe(sub, cat){
+  if(sub && sub.stufenTexte && Array.isArray(sub.stufenTexte[cat]) && sub.stufenTexte[cat].length) return sub.stufenTexte[cat];
+  return STUFEN_LISTEN[cat] || STUFEN_LISTEN.hausuebung;
+}
+
+/* Kurzform für die schmalen Felder der Schnellerfassung.
+   "sehr gut gemacht" wird zu "sehr gut", "nicht gemacht" zu "nicht". */
+function stufenKurz(text){
+  const t = String(text || "").trim();
+  const woerter = t.split(/\s+/);
+  if(woerter.length > 1 && woerter[woerter.length - 1].toLowerCase() === "gemacht"){
+    return woerter.slice(0, -1).join(" ");
+  }
+  return t.length > 12 ? t.slice(0, 11) + "." : t;
+}
+
+function stufenText(sub, e){
+  const liste = stufenListe(sub, e.cat);
+  return liste[e.stufe] || e.label || "Stufe";
+}
+
+/* Kategorien, die tatsächlich in den Notenschnitt eingehen */
+function notenCats(sub){
+  return activeCats(sub).filter(k => !istStufenCat(sub, k));
+}
+
+/* Alle Stufeneinträge einer Person */
+function stufenOf(sub, studentId, sem){
+  return entriesOf(sub, studentId, sem).filter(e => e.type === "stufe");
+}
+
 function isProzentMode(sub){ return sub && sub.weightMode === "prozent"; }
 
 /* Eigene Beurteilungen bekommen den Prozent- und Punkteschlüssel automatisch,
@@ -552,6 +634,15 @@ function normaliseClass(cls){
     });
     if(!Array.isArray(sub.competencies)) sub.competencies = defaultCompetencies(sub.fach);
     if(!Array.isArray(sub.entries)) sub.entries = [];
+    /* Stufen-Kategorien festlegen. Vorgabe ist die Hausübung, weil sie nicht
+       benotet werden darf. Liegen in einem Fach schon Hausübungsnoten aus
+       einer früheren Fassung, bleibt es dort bei Noten, damit sich kein
+       bereits angezeigter Notenschnitt rückwirkend ändert. */
+    if(!Array.isArray(sub.stufenCats)){
+      sub.stufenCats = STUFEN_VORGABE.filter(k =>
+        !sub.entries.some(e => e.type === "note" && e.cat === k));
+    }
+    if(!sub.stufenTexte || typeof sub.stufenTexte !== "object") sub.stufenTexte = {};
     sub.entries.forEach(e => {
       if(!e.id) e.id = uid();
       /* Zeitstempel wird für das Zusammenführen zweier Geräte gebraucht.
@@ -668,7 +759,8 @@ let pendingPhoto = null;
 
 let tab = "home";
 let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
-                 newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1 };
+                 newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
+                 zeigeGewicht:false, zeigeSchluessel:false, schnellIds:{} };
 let statView = { screen:"list", classId:null, subjectId:null };
 let settingsView = { screen:"list", classId:null, subjectId:null };
 
@@ -862,6 +954,7 @@ function renderHome(){
   if(homeView.screen === "student") return renderStudent();
   if(homeView.screen === "newEntry") return renderNewEntry();
   if(homeView.screen === "newNote") return renderNewNote();
+  if(homeView.screen === "schnell") return renderSchnell();
   return renderHomeList();
 }
 
@@ -1003,6 +1096,9 @@ function createSubject(ev){
   const sub = { id: uid(), fach: fach, competencies: defaultCompetencies(fach), entries: [] };
   applyTemplate(sub, document.getElementById("tplSelect").value);
   cls.subjects.push(sub);
+  /* Alle Vorgaben ergänzen, zum Beispiel dass die Hausübung ohne Note läuft.
+     Sonst gälten sie erst nach einem Neustart der App. */
+  normaliseClass(cls);
   save();
   goHome("roster", cls.id, sub.id);
 }
@@ -1044,6 +1140,7 @@ function renderRoster(){
     ${rows || '<div class="helptext">Noch keine Schüler:innen in der Klasse ' + cls.name + '.</div>'}
     ${wechsel}
     <div class="footer">
+      <button class="gross" onclick="goSchnell()">Ganze Klasse bewerten</button>
       <button onclick="goHome('newStudent')">+ Schüler:in</button>
     </div>
   `;
@@ -1116,6 +1213,16 @@ function renderStudent(){
   const noten = homeView.noteFilter === "alle" ? alleNoten : alleNoten.filter(n => n.cat === homeView.noteFilter);
   const verlauf = eigene.filter(e => e.type !== "note").slice().reverse();
 
+  const verlauf2 = verlaufSvg(sub, s.id);
+  const bilanz = stufenBilanz(sub, s.id);
+  const bilanzZeilen = bilanz.length ? bilanz.map(b => {
+    const c = catCol(sub, b.cat);
+    return `<div class="entry">
+      <span class="catdot" style="background:${c.fg};"></span>
+      <div class="txt"><b>${esc(b.label)}</b> &middot; ${esc(b.teile.join(", "))}</div>
+    </div>`;
+  }).join("") : "";
+
   const chipDefs = [["alle","Alle",null]].concat(activeCats(sub).map(k => [k, catShort(sub,k), catCol(sub,k)]));
   const chips = chipDefs.map(([key,lbl,col]) => {
     const active = homeView.noteFilter === key;
@@ -1152,7 +1259,14 @@ function renderStudent(){
     if(e.type === "positiv") return `<div class="entry positiv"><span>+</span><div class="txt">${e.text}</div><span class="date">${e.date}</span>${del}</div>`;
     if(e.type === "negativ") return `<div class="entry negativ"><span>&minus;</span><div class="txt">${e.text}</div><span class="date">${e.date}</span>${del}</div>`;
     if(e.type === "foto") return `<div class="entry"><img class="thumb" src="${e.dataUrl}"><div class="txt">Foto &ndash; ${e.tag}</div><span class="date">${e.date}</span>${del}</div>`;
-    return `<div class="entry"><span>&#9633;</span><div class="txt">${e.text}</div><span class="date">${e.date}</span>${del}</div>`;
+    if(e.type === "stufe"){
+      const c = catCol(sub, e.cat);
+      return `<div class="entry">
+        <span class="catdot" style="background:${c.fg};"></span>
+        <div class="txt">${esc(catLabel(sub, e.cat))}: ${esc(stufenText(sub, e))}</div>
+        <span class="date">${e.date}</span>${del}</div>`;
+    }
+    return `<div class="entry"><span>&#9633;</span><div class="txt">${esc(e.text || "")}</div><span class="date">${e.date}</span>${del}</div>`;
   }).join("");
 
   const assignBar = pendingPhoto ? `
@@ -1197,6 +1311,8 @@ function renderStudent(){
       <div class="stat"><div class="val ${schnitt !== null && schnitt >= 4 ? "red" : ""}">${fmtO(schnitt)}</div><div class="lbl">Notenschnitt</div></div>
       <div class="stat"><div class="val"><span class="green">${pos}</span> / <span class="${neg > pos ? "red" : ""}">${neg}</span></div><div class="lbl">Positiv / Negativ</div></div>
     </div>
+    ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
+    ${bilanzZeilen}
     <div class="label">NOTEN</div>
     <div class="chips">${chips}</div>
     ${noteRows || '<div class="helptext">Keine Einträge in dieser Kategorie.</div>'}
@@ -1394,23 +1510,39 @@ function renderNewNote(){
       <div class="chips">${chips}</div>
       <div class="label" style="color:${col.fg};">ERREICHTE KOMPETENZEN</div>
       <div style="padding:0 16px;">${boxen || '<div class="helptext" style="padding-left:0;">Noch keine Kompetenzen hinterlegt, siehe Einstellungen.</div>'}</div>
-      ${weightSlider(sub, cat)}
-      <form onsubmit="createNote(event)"><button type="submit">Speichern</button></form>
+      <form onsubmit="createNote(event)" style="padding:12px 16px 8px;">
+        <button type="submit" class="gross">Speichern</button>
+      </form>
+      <div class="feinbereich">
+        <div class="feinzeile">
+          <span class="feinlabel">Gewichtung</span>
+          <span id="noteWeightVal" style="font-weight:bold;">${fmtW(homeView.noteWeight)}</span>
+          <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
+        </div>
+        ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">` : ""}
+      </div>
     `;
   }
 
-  let rechner = "";
-  if(hasSchluessel(cat)){
-    const istDiktat = cat === "diktat";
-    rechner = `
-      <div class="label" style="color:${col.fg};">${istDiktat ? "FEHLER" : "PROZENT ODER PUNKTE"}</div>
-      <div style="padding:0 16px;">
-        <input type="text" id="leistungInput" inputmode="decimal"
-               placeholder="${istDiktat ? "z. B. 4" : "z. B. 82 oder 33/40"}"
-               oninput="recalcNote()" autofocus>
+  /* Stufen statt Noten, zum Beispiel bei der Hausübung.
+     Ein Tipp auf eine Stufe speichert sofort, das ist der kürzeste Weg. */
+  if(istStufenCat(sub, cat)){
+    const stufen = stufenListe(sub, cat).map((t, i) => {
+      const anteil = i / Math.max(1, stufenListe(sub, cat).length - 1);
+      const g = anteil <= 0.34 ? gradeColor(1) : (anteil >= 0.99 ? gradeColor(5) : gradeColor(3));
+      return `<div class="stufe-btn" style="background:${g.bg}; border-color:${g.fg}; color:${g.fg};"
+                   onclick="createStufe(${i})">${t}</div>`;
+    }).join("");
+    return `
+      <div class="header" style="${headerStyle("home")}">
+        <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
+        <span class="title" style="${titleStyle("home")}">${catLabel(sub, cat)} eintragen</span>
+        <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
       </div>
-      <div class="helptext" id="basisHint" style="padding-top:0;"></div>
-      <div class="helptext" style="padding-top:0;">Schlüssel ${cls.stufe === 1 ? "1. Klasse" : NIVEAU_LABELS[key === "standard" ? "standard" : "ahs"]}: ${schluesselText(istDiktat ? "fehler" : "prozent", key)}${istDiktat ? "<br>Textlänge laut Vorlage ca. 45 bis 65 Wörter." : ""}<br>Du kannst die Note auch einfach unten antippen.</div>
+      <div class="chips">${chips}</div>
+      <div class="label" style="color:${col.fg};">EINTRAG, EIN TIPP GENÜGT</div>
+      <div style="padding:0 16px 12px;">${stufen}</div>
+      <div class="helptext">${catLabel(sub, cat)} wird nicht benotet und zählt nicht in den Notenschnitt. Der Eintrag wird sofort gespeichert.</div>
     `;
   }
 
@@ -1423,35 +1555,228 @@ function renderNewNote(){
     return `<div class="grade-tile" id="tile_${v}" style="${style}" onclick="selectNoteGrade(${v})">${v}</div>`;
   }).join("");
 
+  /* Rechner und Gewichtung stehen bewusst unter dem Speichern-Knopf.
+     Wer nur eine Note antippen will, ist nach drei Tipps fertig. */
+  let rechner = "";
+  if(hasSchluessel(cat)){
+    const istDiktat = cat === "diktat";
+    rechner = `
+      <div class="feinbereich">
+        <div class="feinzeile">
+          <span class="feinlabel">${istDiktat ? "Fehler" : "Punkte oder Prozent"}</span>
+          <input type="text" id="leistungInput" inputmode="decimal" style="margin-bottom:0; flex:1;"
+                 placeholder="${istDiktat ? "z. B. 4" : "z. B. 82 oder 33/40"}" oninput="recalcNote()">
+        </div>
+        <div class="helptext" id="basisHint" style="padding:4px 0 0;"></div>
+        <div class="helptext" style="padding:2px 0 0;">
+          <button class="ghost" onclick="toggleSchluessel()">${homeView.zeigeSchluessel ? "Schlüssel ausblenden" : "Schlüssel anzeigen"}</button>
+        </div>
+        ${homeView.zeigeSchluessel ? `<div class="helptext" style="padding:0;">${cls.stufe === 1 ? "1. Klasse" : NIVEAU_LABELS[key === "standard" ? "standard" : "ahs"]}: ${schluesselText(istDiktat ? "fehler" : "prozent", key)}${istDiktat ? "<br>Textlänge laut Vorlage ca. 45 bis 65 Wörter." : ""}</div>` : ""}
+      </div>`;
+  }
+
+  const gewicht = `
+      <div class="feinbereich">
+        <div class="feinzeile">
+          <span class="feinlabel">Gewichtung</span>
+          <span id="noteWeightVal" style="font-weight:bold;">${fmtW(homeView.noteWeight)}</span>
+          <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
+        </div>
+        ${homeView.zeigeGewicht ? `
+        <input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">
+        <div class="helptext" style="padding:2px 0 0;">${isProzentMode(sub)
+          ? "Wie stark diese Note innerhalb von " + catLabel(sub,cat) + " zählt. Die Kategorie selbst hat " + fmtPct(sub.weights[cat] ?? 0) + " % Anteil."
+          : "Wie stark diese Note im Notenschnitt zählt."}</div>` : ""}
+      </div>`;
+
   return `
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
       <span class="title" style="${titleStyle("home")}">Note eintragen</span>
-      <div class="sub">${s.name} &middot; ${sub.fach}${cls.stufe === 1 ? "" : " &middot; " + NIVEAU_LABELS[s.niveau]} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
+      <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${cls.stufe === 1 ? "" : " &middot; " + NIVEAU_LABELS[s.niveau]} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
     </div>
     <div class="chips">${chips}</div>
-    ${rechner}
-    <div class="label">NOTE</div>
-    <div class="grade-row">${tiles}</div>
-    ${weightSlider(sub, cat)}
-    <form onsubmit="createNote(event)">
-      <button type="submit" id="saveNoteBtn" ${homeView.newNoteGrade === null ? "disabled" : ""}>Speichern</button>
+    <div class="grade-row" style="padding-top:12px;">${tiles}</div>
+    <form onsubmit="createNote(event)" style="padding:12px 16px 8px;">
+      <button type="submit" id="saveNoteBtn" class="gross" ${homeView.newNoteGrade === null ? "disabled" : ""}>Speichern</button>
     </form>
+    ${rechner}
+    ${gewicht}
   `;
 }
 
-function weightSlider(sub, cat){
-  const hilfe = isProzentMode(sub)
-    ? "Wie stark diese Note innerhalb der Kategorie " + catLabel(sub,cat) + " zählt. Die Kategorie selbst hat " + fmtPct(sub.weights[cat] ?? 0) + " % Anteil an der Gesamtnote."
-    : "Wie stark diese Note im Notenschnitt zählt. Vorbelegt mit dem Wert des Fachs.";
+/* ---------- SCHNELLERFASSUNG ----------
+   Der kurze Weg für den Alltag: Kategorie einmal wählen, danach je
+   Schüler:in ein einziger Tipp. Jeder Tipp speichert sofort, ein zweiter
+   Tipp auf dieselbe Zeile bessert aus. */
+
+function goSchnell(){
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  const cats = activeCats(sub);
+  if(cats.indexOf(homeView.newNoteCat) === -1) homeView.newNoteCat = cats[0] || "mitarbeit";
+  homeView.noteWeight = startWeight(sub, homeView.newNoteCat);
+  homeView.schnellIds = {};
+  homeView.screen = "schnell";
+  render();
+}
+
+function schnellCat(cat){
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  homeView.newNoteCat = cat;
+  homeView.noteWeight = startWeight(sub, cat);
+  homeView.schnellIds = {};
+  render();
+}
+
+function schnellNote(studentId, wert){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  const cat = homeView.newNoteCat;
+  if(!sub) return;
+  const bekannt = homeView.schnellIds[studentId];
+  const vorhanden = bekannt ? sub.entries.find(e => e.id === bekannt) : null;
+  if(vorhanden){
+    vorhanden.value = wert;
+    vorhanden.ts = Date.now();
+  } else {
+    const eintrag = { id: uid(), studentId: studentId, type: "note", cat: cat,
+      value: wert, w: typeof homeView.noteWeight === "number" ? homeView.noteWeight : 1,
+      basis: null, ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub, cat) };
+    sub.entries.push(eintrag);
+    homeView.schnellIds[studentId] = eintrag.id;
+  }
+  save();
+  render();
+}
+
+function schnellStufe(studentId, index){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  const cat = homeView.newNoteCat;
+  if(!sub) return;
+  const bekannt = homeView.schnellIds[studentId];
+  const vorhanden = bekannt ? sub.entries.find(e => e.id === bekannt) : null;
+  if(vorhanden){
+    vorhanden.stufe = index;
+    vorhanden.label = stufenListe(sub, cat)[index];
+    vorhanden.ts = Date.now();
+  } else {
+    const eintrag = { id: uid(), studentId: studentId, type: "stufe", cat: cat,
+      stufe: index, label: stufenListe(sub, cat)[index], ts: Date.now(),
+      sem: semesterFuerNeu(), date: today() };
+    sub.entries.push(eintrag);
+    homeView.schnellIds[studentId] = eintrag.id;
+  }
+  save();
+  render();
+}
+
+function schnellLoeschen(studentId){
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  const id = homeView.schnellIds[studentId];
+  if(!sub || !id) return;
+  sub.entries = sub.entries.filter(e => e.id !== id);
+  delete homeView.schnellIds[studentId];
+  save();
+  render();
+}
+
+function renderSchnell(){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return renderHomeList();
+
+  const cats = activeCats(sub);
+  let cat = homeView.newNoteCat;
+  if(cats.indexOf(cat) === -1){ cat = cats[0] || "mitarbeit"; homeView.newNoteCat = cat; }
+  const stufenModus = istStufenCat(sub, cat);
+  const col = catCol(sub, cat);
+
+  const chips = cats.map(k => {
+    const c = catCol(sub, k);
+    const aktiv = k === cat;
+    const style = aktiv
+      ? `background:${c.fg}; border-color:${c.fg}; color:#fff;`
+      : `background:${c.bg}; border-color:${c.fg}; color:${c.fg};`;
+    return `<div class="chip" style="${style}" onclick="schnellCat('${k}')">${catShort(sub,k)}</div>`;
+  }).join("");
+
+  const stufen = stufenListe(sub, cat);
+  const gesetzt = Object.keys(homeView.schnellIds || {}).length;
+
+  const zeilen = cls.students.map(s => {
+    const id = homeView.schnellIds[s.id];
+    const eintrag = id ? sub.entries.find(e => e.id === id) : null;
+    let felder;
+    if(stufenModus){
+      felder = `<div class="schnell-stufen">` + stufen.map((t, i) => {
+        const anteil = i / Math.max(1, stufen.length - 1);
+        const g = anteil <= 0.34 ? gradeColor(1) : (anteil >= 0.99 ? gradeColor(5) : gradeColor(3));
+        const sel = eintrag && eintrag.stufe === i;
+        const style = sel
+          ? `background:${g.fg}; border-color:${g.fg}; color:#fff;`
+          : `background:${g.bg}; border-color:${g.fg}; color:${g.fg};`;
+        return `<div class="schnell-stufe" style="${style}" title="${esc(t)}" onclick="schnellStufe('${s.id}',${i})">${esc(stufenKurz(t))}</div>`;
+      }).join("") + `</div>`;
+    } else {
+      felder = `<div class="schnell-tiles">` + [1,2,3,4,5].map(v => {
+        const g = gradeColor(v);
+        const sel = eintrag && eintrag.value === v;
+        const style = sel
+          ? `background:${g.fg}; border-color:${g.fg}; color:#fff;`
+          : `background:${g.bg}; border-color:${g.fg}; color:${g.fg};`;
+        return `<div class="schnell-tile" style="${style}" onclick="schnellNote('${s.id}',${v})">${v}</div>`;
+      }).join("") + `</div>`;
+    }
+    const zurueck = eintrag ? `<button class="ghost small" title="Eintrag wieder entfernen" onclick="schnellLoeschen('${s.id}')">&times;</button>` : "";
+    return `<div class="schnell-zeile">
+      <div class="schnell-name">${esc(s.name)}</div>
+      ${felder}${zurueck}
+    </div>`;
+  }).join("");
+
+  const gewichtZeile = stufenModus ? "" : `
+    <div class="feinbereich" style="border-top:none;">
+      <div class="feinzeile">
+        <span class="feinlabel">Gewichtung für alle</span>
+        <span id="noteWeightVal" style="font-weight:bold;">${fmtW(homeView.noteWeight)}</span>
+        <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
+      </div>
+      ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">` : ""}
+    </div>`;
+
   return `
-    <div class="label" style="border-top:2px solid #000; margin-top:4px;">GEWICHTUNG DIESER NOTE</div>
-    <div class="slider-row" style="border-bottom:none;">
-      <div class="top"><span>Zählt</span><span id="noteWeightVal">${fmtW(homeView.noteWeight)}</span></div>
-      <input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)">
+    <div class="header" style="${headerStyle("home")}">
+      <span class="back" style="${titleStyle("home")}" onclick="goHome('roster')">&lsaquo;</span>
+      <span class="title" style="${titleStyle("home")}">Ganze Klasse bewerten</span>
+      <div class="sub">${esc(cls.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
     </div>
-    <div class="helptext" style="padding-top:0;">${hilfe}</div>
+    <div class="chips">${chips}</div>
+    <div class="helptext" style="color:${col.fg};">${stufenModus
+      ? catLabel(sub, cat) + ": ein Tipp je Zeile, wird sofort gespeichert und zählt nicht in den Notenschnitt."
+      : "Ein Tipp je Zeile genügt, die Note wird sofort gespeichert. Nochmal tippen bessert aus."}</div>
+    ${gewichtZeile}
+    ${zeilen || '<div class="helptext">Noch keine Schüler:innen in dieser Klasse.</div>'}
+    <div class="footer">
+      <button onclick="goHome('roster')">Fertig${gesetzt ? " (" + gesetzt + " eingetragen)" : ""}</button>
+    </div>
   `;
+}
+
+function toggleGewicht(){ homeView.zeigeGewicht = !homeView.zeigeGewicht; render(); }
+function toggleSchluessel(){ homeView.zeigeSchluessel = !homeView.zeigeSchluessel; render(); }
+
+/* Stufeneintrag, speichert sofort */
+function createStufe(index){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  const cat = homeView.newNoteCat;
+  if(!sub || !istStufenCat(sub, cat)) return;
+  sub.entries.push({ id: uid(), studentId: homeView.studentId, type: "stufe", cat: cat,
+    stufe: index, label: stufenListe(sub, cat)[index], ts: Date.now(),
+    sem: semesterFuerNeu(), date: today() });
+  save();
+  goHome("student");
 }
 
 function createNote(ev){
@@ -1753,6 +2078,13 @@ function wordDokument(){
               String(n.value)
             ]);
             body += wTable(["Datum","Beurteilung","Grundlage","Gewicht","Note"], zeilen, [1100,2400,2900,1100,900]);
+          }
+
+          const stufen = eigene.filter(e => e.type === "stufe");
+          if(stufen.length){
+            const zeilen = stufen.map(e => [e.date, catLabel(sub, e.cat), stufenText(sub, e)]);
+            body += wP("Ohne Note, zum Beispiel Hausübungen", { size:16, after:40 });
+            body += wTable(["Datum","Art","Eintrag"], zeilen, [1100,2400,4900]);
           }
 
           const rest = eigene.filter(e => e.type === "positiv" || e.type === "negativ" || e.type === "notiz");
@@ -2226,7 +2558,8 @@ function uebertragungBereich(){
 
 function ansichtenZuruecksetzen(){
   homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
-               newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1 };
+               newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
+               zeigeGewicht:false, zeigeSchluessel:false, schnellIds:{} };
   statView = { screen:"list", classId:null, subjectId:null };
   settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null };
 }
@@ -2270,6 +2603,110 @@ document.getElementById("importInput").addEventListener("change", function(ev){
   };
   reader.readAsText(file);
 });
+
+/* ---------- DIAGRAMME ----------
+   Reines SVG, ohne fremde Bibliothek. Dadurch erscheinen die Diagramme
+   genauso im Ausdruck und im PDF wie am Bildschirm.
+
+   Bewusst einreihig und schwarz: Der Verlauf zeigt eine einzige Größe,
+   nämlich die Note über die Zeit. Es braucht also keine Farbunterscheidung
+   und keine Legende. Die Balken der Verteilung nutzen den bereits
+   abgestimmten Notenfarbverlauf und tragen zusätzlich immer ihre Zahl,
+   die Farbe steht also nie allein. */
+
+function svgEsc(t){ return esc(t); }
+
+/* Notenverlauf einer Person in einem Fach, in zeitlicher Folge.
+   Oben die Eins, unten die Fünf, so wie man es im Zeugnis liest. */
+function verlaufSvg(sub, studentId, sem, breite, hoehe){
+  const noten = entriesOf(sub, studentId, sem).filter(e => e.type === "note");
+  if(noten.length < 2) return "";
+
+  const b = breite || 380, h = hoehe || 130;
+  const links = 26, rechts = 8, oben = 10, unten = 22;
+  const iB = b - links - rechts, iH = h - oben - unten;
+  const x = i => links + (noten.length === 1 ? iB / 2 : (iB * i) / (noten.length - 1));
+  const y = wert => oben + (iH * (wert - 1)) / 4;
+
+  let gitter = "";
+  for(let n = 1; n <= 5; n++){
+    gitter += `<line x1="${links}" y1="${y(n).toFixed(1)}" x2="${b - rechts}" y2="${y(n).toFixed(1)}" stroke="#cccccc" stroke-width="1"/>` +
+              `<text x="${links - 7}" y="${(y(n) + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#666666">${n}</text>`;
+  }
+
+  const punkte = noten.map((e, i) => x(i).toFixed(1) + "," + y(e.value).toFixed(1)).join(" ");
+  const linie = `<polyline points="${punkte}" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+  const marken = noten.map((e, i) => {
+    const g = gradeColor(e.value);
+    const titel = svgEsc(noteBezeichnung(sub, e) + " " + e.date + ": Note " + e.value);
+    return `<circle cx="${x(i).toFixed(1)}" cy="${y(e.value).toFixed(1)}" r="4.5" fill="${g.fg}" stroke="#ffffff" stroke-width="2"><title>${titel}</title></circle>`;
+  }).join("");
+
+  /* Nur erstes und letztes Datum beschriften, sonst wird es unleserlich */
+  const ersteBeschriftung = `<text x="${links}" y="${h - 6}" font-size="10" fill="#666666">${svgEsc(noten[0].date)}</text>`;
+  const letzteBeschriftung = `<text x="${b - rechts}" y="${h - 6}" text-anchor="end" font-size="10" fill="#666666">${svgEsc(noten[noten.length - 1].date)}</text>`;
+
+  const schnitt = computeSchnitt(sub, studentId, sem);
+  const mittellinie = schnitt === null ? "" :
+    `<line x1="${links}" y1="${y(schnitt).toFixed(1)}" x2="${b - rechts}" y2="${y(schnitt).toFixed(1)}" stroke="#000000" stroke-width="1" stroke-dasharray="4 3" opacity="0.45"/>`;
+
+  return `<svg viewBox="0 0 ${b} ${h}" width="100%" height="${h}" role="img" preserveAspectRatio="xMidYMid meet"
+      aria-label="Notenverlauf mit ${noten.length} Noten, Schnitt ${fmt(schnitt)}">
+    ${gitter}${mittellinie}${linie}${marken}${ersteBeschriftung}${letzteBeschriftung}
+  </svg>`;
+}
+
+/* Wie oft welche Note in einer Klasse vergeben wurde */
+function verteilungSvg(sub, sem, breite, hoehe){
+  const noten = notenOf(sub, sem);
+  if(!noten.length) return "";
+  const anzahl = [1,2,3,4,5].map(n => noten.filter(e => e.value === n).length);
+  const groesste = Math.max.apply(null, anzahl) || 1;
+
+  const b = breite || 380, h = hoehe || 120;
+  const unten = 22, oben = 14;
+  const iH = h - oben - unten;
+  const spalte = b / 5;
+  const balkenBreite = spalte * 0.56;
+
+  const balken = anzahl.map((wert, i) => {
+    const g = gradeColor(i + 1);
+    const hoeheBalken = groesste ? (iH * wert) / groesste : 0;
+    const xPos = i * spalte + (spalte - balkenBreite) / 2;
+    const yPos = oben + iH - hoeheBalken;
+    const stab = wert === 0 ? "" :
+      `<rect x="${xPos.toFixed(1)}" y="${yPos.toFixed(1)}" width="${balkenBreite.toFixed(1)}" height="${hoeheBalken.toFixed(1)}"
+             rx="3" fill="${g.bg}" stroke="${g.fg}" stroke-width="1.5"><title>Note ${i+1}: ${wert}×</title></rect>`;
+    const zahl = `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${(wert === 0 ? oben + iH - 4 : yPos - 4).toFixed(1)}"
+             text-anchor="middle" font-size="11" font-weight="bold" fill="#000000">${wert}</text>`;
+    const beschriftung = `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${h - 6}" text-anchor="middle" font-size="11" fill="#000000">${i + 1}</text>`;
+    return stab + zahl + beschriftung;
+  }).join("");
+
+  return `<svg viewBox="0 0 ${b} ${h}" width="100%" height="${h}" role="img" preserveAspectRatio="xMidYMid meet"
+      aria-label="Verteilung der Noten, ${anzahl.map((v,i) => (i+1) + ": " + v + " mal").join(", ")}">
+    <line x1="0" y1="${(h - unten).toFixed(1)}" x2="${b}" y2="${(h - unten).toFixed(1)}" stroke="#000000" stroke-width="1.5"/>
+    ${balken}
+  </svg>`;
+}
+
+/* Zusammenfassung der Stufeneinträge, zum Beispiel der Hausübungen */
+function stufenBilanz(sub, studentId, sem){
+  const liste = stufenOf(sub, studentId, sem);
+  if(!liste.length) return [];
+  const cats = {};
+  liste.forEach(e => {
+    if(!cats[e.cat]) cats[e.cat] = {};
+    const t = stufenText(sub, e);
+    cats[e.cat][t] = (cats[e.cat][t] || 0) + 1;
+  });
+  return Object.keys(cats).map(cat => ({
+    cat: cat,
+    label: catLabel(sub, cat),
+    teile: stufenListe(sub, cat).filter(t => cats[cat][t]).map(t => cats[cat][t] + "× " + t)
+  }));
+}
 
 /* ---------- ELTERNSPRECHTAG UND AUSDRUCK ----------
    Baut ein A4-Blatt in #printArea und ruft den Druckdialog auf. Der Ausdruck
@@ -2326,6 +2763,20 @@ function noteTabelle(sub, studentId){
   </table>`;
 }
 
+/* Stufeneinträge, zum Beispiel Hausübungen. Sie werden nicht benotet und
+   erscheinen deshalb getrennt von der Notentabelle. */
+function stufenTabelle(sub, studentId){
+  const liste = stufenOf(sub, studentId);
+  if(!liste.length) return "";
+  const bilanz = stufenBilanz(sub, studentId).map(b =>
+    `<div class="pr-note" style="margin-top:2mm;"><b>${esc(b.label)}</b> (wird nicht benotet): ${esc(b.teile.join(", "))}</div>`).join("");
+  const zeilen = liste.map(e =>
+    `<tr><td style="width:14%;">${esc(e.date)}</td><td style="width:26%;">${esc(catLabel(sub, e.cat))}</td><td>${esc(stufenText(sub, e))}</td></tr>`).join("");
+  return bilanz + `<table class="pr-tbl" style="margin-top:2mm;">
+    <tr><th>Datum</th><th>Art</th><th>Eintrag</th></tr>${zeilen}
+  </table>`;
+}
+
 function verlaufTabelle(sub, studentId){
   const liste = entriesOf(sub, studentId).filter(e => e.type === "positiv" || e.type === "negativ" || e.type === "notiz");
   if(!liste.length) return "";
@@ -2346,6 +2797,7 @@ function blattSchueler(cls, s){
     const pn = countPosNeg(sub, s.id);
     const hatWas = entriesOf(sub, s.id).length > 0;
     if(!hatWas) return "";
+    const grafik = verlaufSvg(sub, s.id, undefined, 520, 150);
     return `
       <div class="pr-h2">${esc(sub.fach)}</div>
       <div class="pr-kpi">
@@ -2353,7 +2805,9 @@ function blattSchueler(cls, s){
         <div><div class="v">${pn.pos}</div><div class="l">Positiv</div></div>
         <div><div class="v">${pn.neg}</div><div class="l">Negativ</div></div>
       </div>
+      ${grafik ? '<div class="pr-chart">' + grafik + "</div>" : ""}
       ${noteTabelle(sub, s.id)}
+      ${stufenTabelle(sub, s.id)}
       ${verlaufTabelle(sub, s.id)}
       ${semesterZeile(sub, s.id)}`;
   }).join("");
@@ -2388,7 +2842,8 @@ function blattKlasse(cls, sub){
       <td style="text-align:center;">${p.neg}</td>
       <td style="text-align:center; font-weight:bold;">${fmt(p.schnitt)}</td>
     </tr>`).join("");
-  const proKat = activeCats(sub).map(k => {
+  const verteilung = verteilungSvg(sub, undefined, 520, 130);
+  const proKat = notenCats(sub).map(k => {
     const noten = notenOf(sub).filter(e => e.cat === k);
     if(!noten.length) return "";
     const mittel = noten.reduce((a,n) => a + n.value, 0) / noten.length;
@@ -2409,6 +2864,7 @@ function blattKlasse(cls, sub){
       <div><div class="v">${cls.students.length}</div><div class="l">Schüler:innen</div></div>
       <div><div class="v">${notenOf(sub).length}</div><div class="l">Noten im Zeitraum</div></div>
     </div>
+    ${verteilung ? '<div class="pr-h2">Verteilung der Noten</div><div class="pr-chart">' + verteilung + "</div>" : ""}
     <table class="pr-tbl">
       <tr><th>Name</th><th style="width:22%;">Leistungsniveau</th><th style="width:10%;">Positiv</th><th style="width:10%;">Negativ</th><th style="width:12%;">Schnitt</th></tr>
       ${zeilen || '<tr><td colspan="5">Noch keine Schüler:innen.</td></tr>'}
@@ -2504,7 +2960,25 @@ function renderStatDetail(){
     </div>`;
   }).join("");
 
-  const perCat = activeCats(sub).map(k => {
+  const verteilung = verteilungSvg(sub);
+
+  /* Stufen zählen nicht in den Schnitt, gehören aber in die Auswertung */
+  const stufenUebersicht = activeCats(sub).filter(k => istStufenCat(sub, k)).map(k => {
+    const c = catCol(sub, k);
+    const liste = sub.entries.filter(e => e.type === "stufe" && e.cat === k &&
+      (aktivesSemester() === "alle" || eintragSemester(e) === aktivesSemester()));
+    if(!liste.length) return "";
+    const zaehler = {};
+    liste.forEach(e => { const t = stufenText(sub, e); zaehler[t] = (zaehler[t] || 0) + 1; });
+    const teile = stufenListe(sub, k).filter(t => zaehler[t]).map(t => zaehler[t] + "× " + t);
+    return `<div class="entry">
+      <span class="catdot" style="background:${c.fg};"></span>
+      <div class="txt">${esc(catLabel(sub, k))} &middot; ${esc(teile.join(", "))}</div>
+      <span class="badge" style="border-color:${c.fg}; color:${c.fg}; background:${c.bg};">zählt nicht</span>
+    </div>`;
+  }).join("");
+
+  const perCat = notenCats(sub).map(k => {
     const noten = notenOf(sub).filter(e => e.cat === k);
     if(!noten.length) return "";
     const mittel = noten.reduce((a,n) => a + n.value, 0) / noten.length;
@@ -2528,9 +3002,11 @@ function renderStatDetail(){
       <div class="stat"><div class="val ${klassenschnitt !== null && klassenschnitt >= 4 ? "red" : ""}">${fmtO(klassenschnitt)}</div><div class="lbl">Klassenschnitt</div></div>
       <div class="stat"><div class="val"><span class="green">${totalPos}</span> / <span class="${totalNeg > totalPos ? "red" : ""}">${totalNeg}</span></div><div class="lbl">Positiv / Negativ gesamt</div></div>
     </div>
+    ${verteilung ? '<div class="label">VERTEILUNG DER NOTEN</div><div class="chart">' + verteilung + "</div>" : ""}
     <div class="label">SCHÜLER:INNEN</div>
     ${rows || '<div class="helptext">Noch keine Schüler:innen.</div>'}
     ${perCat ? '<div class="label" style="border-top:2px solid #000;">JE KATEGORIE</div>' + perCat : ""}
+    ${stufenUebersicht ? '<div class="label" style="border-top:2px solid #000;">OHNE NOTE</div>' + stufenUebersicht : ""}
     <div class="label" style="border-top:2px solid #000;">ELTERNSPRECHTAG</div>
     <div class="helptext">Blatt mit Notenübersicht, Verlauf und Unterschriftenzeile. Im Druckdialog lässt es sich auch als PDF sichern und den Eltern mitgeben.</div>
     <div class="footer">
@@ -2693,7 +3169,21 @@ function renderSettingsDetail(){
     return `<div class="chip" style="${style}" onclick="setWeightMode('${k}')">${lbl}</div>`;
   }).join("");
 
-  const weightRows = cats.map(k => {
+  /* Stufen-Kategorien haben kein Gewicht, sie zählen nicht in den Schnitt */
+  const artZeilen = cats.map(k => {
+    const c = catCol(sub, k);
+    const stufig = istStufenCat(sub, k);
+    const chip = (an, lbl, wert) => `<div class="chip" style="${an
+      ? "background:#000; border-color:#000; color:#fff;"
+      : "background:#fff; border-color:#000; color:#000;"}" onclick="setStufenCat('${k}',${wert})">${lbl}</div>`;
+    return `<div style="padding:8px 16px; border-bottom:1px solid #000000; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span class="catdot" style="background:${c.fg};"></span>
+      <span style="flex:1; min-width:120px; font-size:13px; font-weight:bold;">${esc(catLabel(sub,k))}</span>
+      ${chip(!stufig, "Note", false)}${chip(stufig, "ohne Note", true)}
+    </div>`;
+  }).join("");
+
+  const weightRows = notenCats(sub).map(k => {
     const c = catCol(sub, k);
     const w = typeof sub.weights[k] === "number" ? sub.weights[k] : (prozent ? 10 : 1);
     return `
@@ -2703,7 +3193,7 @@ function renderSettingsDetail(){
     </div>`;
   }).join("");
 
-  const summe = cats.reduce((a,k) => a + (typeof sub.weights[k] === "number" ? sub.weights[k] : 0), 0);
+  const summe = notenCats(sub).reduce((a,k) => a + (typeof sub.weights[k] === "number" ? sub.weights[k] : 0), 0);
   const summeBox = prozent
     ? `<div class="helptext" id="pctSumBox">Summe ${fmtPct(summe)} %. Die App rechnet die Anteile automatisch hoch, die Summe muss also nicht genau 100 sein.</div>`
     : "";
@@ -2759,6 +3249,10 @@ function renderSettingsDetail(){
     <div class="label" style="border-top:2px solid #000;">KATEGORIEN</div>
     <div class="helptext">Nur angehakte Kategorien erscheinen bei der Notenvergabe.</div>
     <div style="padding:0 16px 8px;">${catToggles}</div>
+
+    <div class="label" style="border-top:2px solid #000;">BENOTET ODER NUR VERMERKT</div>
+    <div class="helptext">Hausübungen sind keine Leistungsfeststellung und dürfen nicht benotet werden. Sie stehen deshalb auf »ohne Note« und werden in Stufen festgehalten, die nicht in den Notenschnitt einfließen. Für jede andere Kategorie lässt sich das genauso einstellen.</div>
+    ${artZeilen}
 
     <div class="label" style="border-top:2px solid #000;">EIGENE BEURTEILUNGEN</div>
     <div class="helptext">Fehlt eine Beurteilungsart, legst du sie hier selbst an, zum Beispiel Referat, Portfolio, Lernzielkontrolle oder Mitschrift. Sie erscheint danach wie jede andere Kategorie bei der Notenvergabe und in der Gewichtung.</div>
@@ -2866,6 +3360,27 @@ function reapplyTemplate(){
 }
 
 /* ---------- EIGENE BEURTEILUNGEN ---------- */
+
+/* Kategorie zwischen Note und Stufen umstellen */
+function setStufenCat(cat, aufStufen){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  if(!Array.isArray(sub.stufenCats)) sub.stufenCats = [];
+  const istJetzt = istStufenCat(sub, cat);
+  if(istJetzt === !!aufStufen) return;
+  if(aufStufen && sub.entries.some(e => e.type === "note" && e.cat === cat)){
+    if(!confirm("In " + catLabel(sub, cat) + " gibt es schon Noten. Sie bleiben erhalten, zählen aber ab jetzt nicht mehr in den Notenschnitt. Umstellen?")) { render(); return; }
+  }
+  if(!aufStufen && sub.entries.some(e => e.type === "stufe" && e.cat === cat)){
+    if(!confirm("In " + catLabel(sub, cat) + " gibt es schon Einträge ohne Note. Sie bleiben erhalten und zählen weiterhin nicht mit. Auf Noten umstellen?")) { render(); return; }
+  }
+  sub.stufenCats = aufStufen
+    ? sub.stufenCats.concat([cat])
+    : sub.stufenCats.filter(k => k !== cat);
+  if(!aufStufen && typeof sub.weights[cat] !== "number") sub.weights[cat] = isProzentMode(sub) ? 10 : 1;
+  save();
+  render();
+}
 
 function setNewCatColor(fg){
   settingsView.newCatColor = fg;

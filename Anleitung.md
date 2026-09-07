@@ -1,4 +1,4 @@
-# Klassenheft, Version 6
+# Klassenheft, Version 7
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -33,6 +33,39 @@ Damit ein Gerät die App wie eine installierte App behandelt, muss sie über ein
    **Android:** Menü, dann *App installieren*.
    **Mac, Windows:** in Chrome oder Edge das Installationssymbol rechts in der Adresszeile.
 4. Ab jetzt startet die App mit einem Klick, ohne Adresszeile und ohne Browserrahmen.
+
+## Schnell benoten: die ganze Klasse in einem Durchgang
+
+Der kürzeste Weg im Alltag führt über die Klassenliste, nicht über die einzelne Schüler:in.
+
+1. Klasse und Fach öffnen.
+2. Unten auf **Ganze Klasse bewerten**.
+3. Oben einmal die Beurteilungsart wählen, zum Beispiel Schularbeit.
+4. Dann je Zeile **ein einziger Tipp** auf die Note. Sie wird sofort gespeichert.
+
+Ein zweiter Tipp in derselben Zeile bessert aus, es entsteht kein doppelter Eintrag. Das Kreuz rechts entfernt den gerade gemachten Eintrag wieder. Unten steht mit, wie viele Einträge du in diesem Durchgang gesetzt hast.
+
+Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit einem Tipp auf *ändern*. Die App merkt sich die zuletzt gewählte Beurteilungsart.
+
+Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese Maske ist jetzt schlanker: Beurteilungsart, die fünf Notenfelder, Speichern. Der Rechner für Punkte und Prozent sowie die Gewichtung stehen darunter und stören den kurzen Weg nicht mehr.
+
+## Hausübungen werden nicht benotet
+
+Hausübungen sind keine Leistungsfeststellung und dürfen nicht in die Note einfließen. Die App hält sie deshalb in Stufen fest statt in Noten:
+
+**sehr gut gemacht · gut gemacht · gemacht · nicht gemacht**
+
+Diese Einträge erscheinen im Verlauf, in der Statistik unter *Ohne Note*, auf dem Elternsprechtag-Blatt und in der Wochensicherung, aber sie verändern den Notenschnitt nicht. In der Schnellerfassung genügt auch hier ein Tipp je Zeile.
+
+Das gilt in jedem neuen Fach von Anfang an. Unter *Einstellungen*, Fach auswählen, Abschnitt **Benotet oder nur vermerkt**, lässt sich jede Kategorie zwischen *Note* und *ohne Note* umstellen. Wer also in Deutsch nach der Vorlage der Kollegin arbeitet, in der die Hausübung mitzählt, stellt sie dort auf *Note* zurück.
+
+Fächer, in denen aus einer früheren Fassung schon Hausübungsnoten liegen, bleiben unverändert bei Noten, damit sich kein bereits angezeigter Notenschnitt rückwirkend ändert.
+
+## Grafischer Verlauf
+
+In der Schüleransicht steht über den Noten ein **Notenverlauf**: die Noten in zeitlicher Folge, oben die Eins, unten die Fünf, die strichlierte Linie ist der Schnitt. Er erscheint, sobald mindestens zwei Noten vorliegen, und steht genauso auf dem Elternsprechtag-Blatt.
+
+In der Statistik gibt es zusätzlich die **Verteilung der Noten** für die ganze Klasse, also wie oft welche Note vergeben wurde. Auch sie ist auf der Klassenübersicht mit ausgedruckt.
 
 ## Erstes und zweites Semester
 
