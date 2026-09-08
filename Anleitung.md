@@ -1,4 +1,4 @@
-# Klassenheft, Version 12
+# Klassenheft, Version 14
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -52,6 +52,83 @@ Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit eine
 **Wer gefehlt hat** bekommt das graue Feld ganz rechts in seiner Zeile.
 
 Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese Maske ist jetzt schlanker: Beurteilungsart, die fünf Notenfelder, Speichern. Der Rechner für Punkte und Prozent sowie die Gewichtung stehen darunter und stören den kurzen Weg nicht mehr.
+
+## Schularbeiten vergleichen
+
+Schularbeiten haben in der Praxis das größte Gewicht, also ist die naheliegende Frage: **Ist die erste besser ausgefallen als die zweite?**
+
+Unter *Statistik*, Fach auswählen, steht der Bereich **Schularbeit im Vergleich**, sobald es mindestens zwei Termine gibt. Er zeigt:
+
+- ein **Säulendiagramm** der Notenschnitte über die Termine, mit einer Linie bei 4,0 als Grenze zum Nicht genügend
+- eine **Tabelle** mit Termin, Thema, Schnitt, wie viele geschrieben haben, wie viele Nicht genügend, und in Worten, ob die Arbeit besser oder schlechter ausgefallen ist als die vorige
+- je Termin eine **kleine Verteilungsgrafik** mit den Zahlen darunter ausgeschrieben
+
+Darunter steht ein Satz wie: *Am besten ausgefallen ist die 1. mit 2,2, am schwächsten die 2. mit 3,8, Unterschied 1,6 Notenstufen.*
+
+Das gilt nicht nur für Schularbeiten. Jede benotete Beurteilungsart mit mindestens zwei Terminen bekommt einen eigenen Vergleich, also auch Diktate, Tests oder eine selbst angelegte Beurteilung.
+
+### Woran die App erkennt, was zusammengehört
+
+Am **Datum**. Alle Schularbeiten mit demselben Datum sind eine Arbeit. Wer über *Ganze Klasse bewerten* eingetragen wird, bekommt ohnehin denselben Tag. Ein Nachschreibtermin an einem anderen Tag zählt als eigene Arbeit — das ist beabsichtigt, denn es ist eine eigene Arbeit.
+
+Stimmt ein Datum nicht, lässt es sich in der Schüleransicht antippen und ausbessern.
+
+### Jede Schularbeit für sich
+
+Tipp in der Vergleichstabelle auf eine Zeile. Dann bekommst du diese eine Arbeit allein:
+
+- Schnitt groß, dazu wie viele geschrieben haben, wie viele gefehlt haben, wie viele Nicht genügend
+- der Vergleich zur vorigen und das Mittel aller Arbeiten
+- die Verteilung als Grafik und als **Notenspiegel**
+- beste und schwächste Note
+- **alle Noten, nach Note sortiert**, mit der Grundlage daneben, und darunter wer nicht mitgeschrieben hat
+- ein Knopf **Diese Schularbeit drucken** — ein eigenes Blatt für die Konferenz oder die Fachgruppe
+
+## Notenspiegel
+
+Überall dort, wo Noten ausgewertet werden, steht der Notenspiegel ausgeschrieben:
+
+| Note | Beurteilung | Anzahl | Anteil |
+|---|---|---|---|
+| 1 | Sehr gut | 1 | 5,9 % |
+| 2 | Gut | 6 | 35,3 % |
+| 3 | Befriedigend | 6 | 35,3 % |
+| 4 | Genügend | 3 | 17,6 % |
+| 5 | Nicht genügend | 1 | 5,9 % |
+
+Er steht in der Fachstatistik für das ganze Fach, bei jeder einzelnen Arbeit, auf dem Klassenblatt, auf dem Blatt je Arbeit und in der Word-Sicherung.
+
+## Die Schüleransicht
+
+Ganz oben steht die **allgemeine Leistungstendenz**: der Notenschnitt groß, daneben die Note in Worten und ein Pfeil, wohin sich die Leistung bewegt. Der Pfeil erscheint ab vier Noten, darunter wäre er Zufall und die App sagt das auch.
+
+Liegt der Schnitt genau dazwischen, steht das auch so da: *zwischen Befriedigend und Genügend*. Ein „eher Genügend" bei 3,5 würde eine Entscheidung behaupten, die die Zahl nicht hergibt.
+
+Darunter der **Schnitt je Beurteilungsart** — Schularbeit 3,5, Test 2,5 und so fort. Die frühere Anzeige „Anzahl der Noten" ist entfallen, sie hat nichts gesagt.
+
+Dann gleich die Knöpfe: **Leistung eintragen**, Notiz, Foto, Elternsprechtag-Blatt. Sie stehen jetzt oben, nicht mehr ganz unten, damit der häufigste Handgriff ohne Scrollen erreichbar ist.
+
+### Namen ausbessern
+
+Ein Tippfehler im Namen fällt oft erst Wochen später auf. Tippe in der Schüleransicht auf den Namen oder auf **ändern** daneben. Die Noten hängen nicht am Namen, sondern an der Person, das Umbenennen kostet also nichts.
+
+### Datum ausbessern
+
+Der Tag der Schularbeit ist selten der Tag, an dem du sie korrigierst und einträgst. Klapp die Einträge auf, tipp auf das **unterstrichene Datum** und trag den richtigen Tag ein, im Format TT.MM. Die App prüft die Eingabe und lehnt einen 32. Jänner ab.
+
+### Was-wäre-wenn
+
+Unter dem Verlauf steht ein Bereich zum Herzeigen. Tipp eine Beurteilungsart an, um sie **probeweise** aus der Rechnung zu nehmen, und du siehst sofort, was das mit der Note macht. Darunter steht ausgerechnet, welcher Schnitt herauskäme, wenn die Mitarbeit ab jetzt durchgehend die beste Stufe wäre — genau der Satz, den man einem Kind sagen will:
+
+> Bei durchgehend bester Mitarbeit: Ø 2,9 statt Ø 3,5 jetzt.
+
+**Es wird dabei nichts verändert und nichts gespeichert.** Der echte Notenschnitt bleibt, wie er ist. *Zurücksetzen* räumt die Vorschau wieder ab.
+
+### Thema einer Leistung
+
+In jeder Eingabemaske gibt es ein freiwilliges Feld **Thema**: Bruchrechnung, Gleichungen, Seite 42. Es steht danach beim Eintrag, auf dem Elternsprechtag-Blatt und in der Word-Sicherung. Leer lassen ist der Normalfall, dann steht dort wie bisher nur die Beurteilungsart.
+
+In der Sammelerfassung gilt das Thema für die ganze Runde. Du kannst es auch nachtragen, wenn schon die halbe Klasse eingetragen ist — die bereits gesetzten Zeilen ziehen mit.
 
 ## Was benotet wird und was nicht
 
