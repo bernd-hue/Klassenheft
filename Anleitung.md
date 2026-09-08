@@ -1,4 +1,4 @@
-# Klassenheft, Version 7
+# Klassenheft, Version 9
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -47,19 +47,51 @@ Ein zweiter Tipp in derselben Zeile bessert aus, es entsteht kein doppelter Eint
 
 Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit einem Tipp auf *ändern*. Die App merkt sich die zuletzt gewählte Beurteilungsart.
 
+**Punkte statt Noten.** Bei Schularbeiten und allen Beurteilungen mit Notenschlüssel gibt es oben das Feld **Punkte gesamt**. Trägst du dort zum Beispiel 40 ein, wechselt jede Zeile auf ein Punktefeld. Du tippst nur noch die erreichten Punkte ein, die App rechnet die Note aus dem Leistungsniveau der jeweiligen Person und merkt sich die Grundlage, also etwa "33 von 40 Punkten, 82,5 %". Lässt du das Feld leer, bleibt es bei den Notenfeldern zum Antippen.
+
+**Wer gefehlt hat** bekommt das graue Feld ganz rechts in seiner Zeile.
+
 Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese Maske ist jetzt schlanker: Beurteilungsart, die fünf Notenfelder, Speichern. Der Rechner für Punkte und Prozent sowie die Gewichtung stehen darunter und stören den kurzen Weg nicht mehr.
 
-## Hausübungen werden nicht benotet
+## Was benotet wird und was nicht
 
-Hausübungen sind keine Leistungsfeststellung und dürfen nicht in die Note einfließen. Die App hält sie deshalb in Stufen fest statt in Noten:
+Hausübung und Mitarbeit sind in der App **keine Noten**. Sie werden in Stufen festgehalten:
 
-**sehr gut gemacht · gut gemacht · gemacht · nicht gemacht**
+| Kategorie | Stufen | Zeichen |
+|---|---|---|
+| Mitarbeit | sehr gute Mitarbeit · gute Mitarbeit · keine Mitarbeit | + ~ − |
+| Hausübung | sehr gut gemacht · gut gemacht · gemacht · nicht gemacht | ++ + ~ − |
 
-Diese Einträge erscheinen im Verlauf, in der Statistik unter *Ohne Note*, auf dem Elternsprechtag-Blatt und in der Wochensicherung, aber sie verändern den Notenschnitt nicht. In der Schnellerfassung genügt auch hier ein Tipp je Zeile.
+Diese Einträge erscheinen im Verlauf, in der Statistik unter *Ohne Note*, auf dem Elternsprechtag-Blatt und in der Wochensicherung, aber sie verändern den Notenschnitt nicht. Ein Tipp genügt, gespeichert wird sofort.
 
-Das gilt in jedem neuen Fach von Anfang an. Unter *Einstellungen*, Fach auswählen, Abschnitt **Benotet oder nur vermerkt**, lässt sich jede Kategorie zwischen *Note* und *ohne Note* umstellen. Wer also in Deutsch nach der Vorlage der Kollegin arbeitet, in der die Hausübung mitzählt, stellt sie dort auf *Note* zurück.
+Weil es diese Einstufungen gibt, sind die früheren Knöpfe *Positiv* und *Negativ* entfallen. Die Notiz bleibt für alles, was in Worte gehört.
 
-Fächer, in denen aus einer früheren Fassung schon Hausübungsnoten liegen, bleiben unverändert bei Noten, damit sich kein bereits angezeigter Notenschnitt rückwirkend ändert.
+### Du entscheidest, was in die Note einfließt
+
+Unter *Einstellungen*, Fach auswählen, Abschnitt **Benotet oder nur vermerkt** steht bei jeder Kategorie zuerst *Note* oder *ohne Note*, und bei *ohne Note* zusätzlich *zählt nicht* oder *zählt mit*.
+
+Auf *zählt mit* gestellt, bekommen die Stufen feste Werte auf der Notenskala und lassen sich wie jede andere Kategorie gewichten:
+
+- Mitarbeit: sehr gute = 1, gute = 3, keine = 5
+- Hausübung: sehr gut gemacht = 1, gut gemacht = 2, gemacht = 3, nicht gemacht = 5
+
+Vorgabe ist *zählt nicht*. Es bleibt auch dann eine Einstufung und keine Note, die Zuordnung sagt nur, mit welchem Wert sie in die Rechnung eingeht.
+
+Das gilt für **jede** Kategorie, auch für Schularbeit, Diktat oder eine selbst angelegte Beurteilung. Du kannst also jede davon auf *ohne Note* stellen oder umgekehrt eine Einstufung mitzählen lassen. Die Einstellung gilt je Fach getrennt.
+
+Ganz oben in den Einstellungen eines Fachs steht unter **Was in die Note einfließt** immer der aktuelle Stand im Klartext, also welche Kategorien zählen und welche nur vermerkt werden.
+
+Alle Texte in der App richten sich danach: In der Schüleransicht steht neben Mitarbeit und Hausübung ein Merkzeichen *zählt mit* oder *zählt nicht*, im Notenverlauf sind mitgezählte Einstufungen als offene Punkte gezeichnet, und auf dem Elternsprechtag-Blatt steht ausgeschrieben, wie die Kategorie behandelt wird, samt der verwendeten Werte. Es wird also nirgends behauptet, etwas werde nicht benotet, wenn du es doch mitzählen lässt.
+
+Fächer, in denen aus einer früheren Fassung schon Noten in Mitarbeit oder Hausübung liegen, bleiben unverändert bei Noten, damit sich kein bereits angezeigter Notenschnitt rückwirkend ändert.
+
+## Nicht mitgeschrieben
+
+Wer bei einer Schularbeit gefehlt hat, bekommt keine Note und auch keine Lücke. In der Notenvergabe steht unter dem Speichern-Knopf **nicht mitgeschrieben, keine Note**, in der Sammelerfassung ist es das graue Feld ganz rechts in der Zeile. Der Vermerk steht im Verlauf und auf dem Elternsprechtag-Blatt, geht aber in keine Berechnung ein.
+
+## Ruhige Schüleransicht
+
+Ganz oben stehen Notenschnitt, Anzahl der Noten, der Notenverlauf und die Zusammenfassung von Mitarbeit und Hausübung. Die vollständige Liste aller Einträge liegt hinter dem Knopf **Einzelne Einträge anzeigen**, damit die Ansicht auf den ersten Blick übersichtlich bleibt.
 
 ## Grafischer Verlauf
 

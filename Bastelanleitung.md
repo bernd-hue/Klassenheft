@@ -1,6 +1,6 @@
 # Selbst ändern, ohne Daten zu verlieren
 
-Für Klassenheft ab Version 7. Diese Anleitung setzt keine Programmierkenntnisse voraus.
+Für Klassenheft ab Version 9. Diese Anleitung setzt keine Programmierkenntnisse voraus.
 
 ## Das Wichtigste zuerst: gehen die Schülerdaten verloren?
 
@@ -46,7 +46,8 @@ Das meiste geht direkt in der App unter *Einstellungen*, Fach auswählen:
 | Kompetenzenliste ändern | *Kompetenzen* |
 | Notenschlüssel-Stufe der Klasse | *Notenschlüssel* |
 | Schriftgröße | *Einstellungen*, Abschnitt *Darstellung* |
-| Eine Kategorie soll nicht in die Note zählen | *Einstellungen*, Fach, Abschnitt *Benotet oder nur vermerkt* |
+| Eine Kategorie soll nicht in die Note zählen | *Einstellungen*, Fach, Abschnitt *Benotet oder nur vermerkt*, auf *ohne Note* |
+| Mitarbeit oder Hausübung sollen doch mitzählen | derselbe Abschnitt, darunter auf *zählt mit* |
 | Name und Schuljahr auf dem Ausdruck | *Einstellungen*, *Angaben für den Ausdruck* |
 
 Wenn dein Wunsch in dieser Tabelle steht, brauchst du den Rest dieser Anleitung nicht.
@@ -63,7 +64,7 @@ Ganz oben in der Datei steht ein Block mit der Überschrift **HIER DARFST DU GEF
    Richtig: `schularbeit: "Schularbeit"` wird zu `schularbeit: "Schularbeit neu"`
    Falsch: `Schularbeit: "Schularbeit"`
 2. Kommas, geschweifte Klammern und eckige Klammern stehen lassen.
-3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "7";` wird zu `"8"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
+3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "9";` wird zu `"10"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
 
 ### Was wo steht
 
@@ -79,8 +80,14 @@ Hier liegen Allgemein, die drei Deutsch-Varianten, Mathematik und die beiden Neb
 **Notenschlüssel** (`DIKTAT_KEYS` und `PROZENT_KEYS`)
 Je Zeile ein Paar: Grenzwert und Note. Bei `DIKTAT_KEYS` bedeutet `[5,1]`: bis fünf Fehler gibt es eine Eins. Bei `PROZENT_KEYS` bedeutet `[90,1]`: ab neunzig Prozent gibt es eine Eins. `stufe1` ist die erste Klasse, `ahs` das Leistungsniveau Standard AHS, `standard` das Niveau Standard.
 
-**Stufen der Hausübung** (`STUFEN_LISTEN`)
-Die vier Stufen von der besten zur schwächsten. Änderst du hier die Texte, gelten sie für alle Fächer, in denen die Hausübung ohne Note läuft. `STUFEN_VORGABE` bestimmt, welche Kategorien in einem neuen Fach von Anfang an ohne Note laufen.
+**Stufen für Hausübung und Mitarbeit** (`STUFEN_LISTEN`)
+Die Stufen von der besten zur schwächsten. Änderst du hier die Texte, gelten sie für alle Fächer, in denen die Kategorie ohne Note läuft. Daneben stehen drei zusammengehörige Listen, die dieselbe Reihenfolge haben müssen:
+
+- `STUFEN_ZEICHEN` die Kurzzeichen (+, ~, −), die in der Sammelerfassung auf den Feldern stehen
+- `STUFEN_WERTE` die Werte auf der Notenskala, falls du eine Kategorie auf *zählt mit* stellst
+- `STUFEN_VORGABE` welche Kategorien in einem neuen Fach von Anfang an ohne Note laufen
+
+Wenn du `STUFEN_VORGABE` änderst, zähle zusätzlich `STUFEN_STAND` um eins hoch. Dann ziehen bestehende Fächer die neue Vorgabe genau einmal nach, ohne das zu überschreiben, was du in einem Fach von Hand eingestellt hast.
 
 **Farben für eigene Beurteilungen** (`CUSTOM_COLORS`)
 Die sechs Farbpunkte, die beim Anlegen einer eigenen Beurteilung zur Wahl stehen.
