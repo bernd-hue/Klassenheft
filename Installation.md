@@ -1,6 +1,6 @@
 # Klassenheft auf iPhone und MacBook installieren
 
-Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 28.08.2026, Version 9.
+Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 08.09.2026, Version 12.
 
 ---
 
@@ -14,31 +14,39 @@ Das heißt **nicht**, dass deine Daten ins Internet wandern. Auf der Adresse lie
 
 ## Schritt 1: Die App ins Netz stellen
 
-Du hast bereits eine Adresse: **bernd-hue.github.io/Klassenheft**. Dort liegt noch die alte Fassung mit dem PIN-Login. Die wird jetzt ersetzt.
+Du hast bereits eine Adresse: **bernd-hue.github.io/Klassenheft**. Dort liegt eine ältere Fassung. Die wird jetzt ersetzt.
+
+**Du brauchst dafür den Ordner `Klassenheft_App`.** Er kommt als ZIP-Datei. Zuerst im Finder darauf doppelklicken, dann liegt der entpackte Ordner daneben. Darin müssen dreizehn Dateien liegen, unter anderem `index.html`, `sw.js` und `manifest.webmanifest`.
 
 1. Am MacBook **github.com/bernd-hue/Klassenheft** öffnen und anmelden.
 2. Oben auf **Add file**, dann **Upload files**.
-3. Im Finder den Ordner **Klassenheft_App** öffnen (liegt auf dem Schreibtisch unter `Bernd/Claude/`).
-4. Dort alle Dateien markieren, mit **Cmd + A**, und mit der Maus in das GitHub-Fenster ziehen.
-5. Unten ins Textfeld **Version 9** schreiben und auf **Commit changes** klicken.
+3. Im Finder den entpackten Ordner **Klassenheft_App** öffnen.
+4. Dort alle Dateien markieren, mit **Cmd + A**, und mit der Maus in das GitHub-Fenster ziehen. **Nicht den Ordner selbst hineinziehen, sondern seinen Inhalt** — sonst landet alles in einem Unterordner und die Adresse zeigt weiter die alte Fassung.
+5. Unten ins Textfeld **Version 12** schreiben und auf **Commit changes** klicken.
 6. Ein bis zwei Minuten warten. GitHub braucht kurz, bis die neue Fassung ausgeliefert wird.
 
-Fertig. Die alten Dateien mit gleichem Namen werden dabei überschrieben, das ist so gewollt.
+Die alten Dateien mit gleichem Namen werden dabei überschrieben, das ist so gewollt.
+
+**Woran du erkennst, dass es geklappt hat:** In der Dateiliste bei GitHub steht `index.html` direkt in der obersten Ebene, nicht in einem Unterordner, und das Datum daneben ist von heute.
 
 ---
 
 ## Schritt 2: Nachsehen, ob die neue Fassung da ist
 
-Am MacBook **bernd-hue.github.io/Klassenheft** aufrufen.
+Am MacBook **bernd-hue.github.io/Klassenheft** aufrufen, dann unten auf **Einstellungen** und ganz nach unten scrollen. Dort steht seit Version 12 ein eigener Abschnitt **FASSUNG**.
 
-Richtig ist es, wenn du unten drei Reiter siehst: **Home**, **Statistik**, **Einstellungen**, und unter Einstellungen ganz unten **Klassenheft, Version 9** steht.
+**Die App sagt dir selbst, woran du bist:**
 
-Erscheint noch die alte Fassung mit der PIN-Abfrage, dann liegt sie noch im Zwischenspeicher des Browsers:
+- *"Geladen ist Klassenheft, Version 12. Das ist die Fassung, die auch auf der Adresse liegt."* → alles in Ordnung, weiter mit Schritt 3.
+- *"Geladen ist Klassenheft, Version 9. Auf der Adresse liegt bereits Version 12."* → dein Browser zeigt noch die alte Fassung aus seinem Zwischenspeicher. Darunter steht ein Knopf **Version 12 jetzt laden**. Einmal darauf tippen, fertig. **Deine Klassen und Noten bleiben dabei erhalten**, sie liegen in einem eigenen Speicher, den das Aktualisieren nicht berührt.
 
-1. Zuerst die Seite mit **Umschalt + Neu laden** aufrufen.
-2. Hilft das nicht: in Chrome auf das Schloss-Symbol links in der Adresszeile, dann **Cookies und Websitedaten**, dann **Daten löschen**. Danach neu laden.
+Der Knopf ist der zuverlässige Weg. Er leert den Zwischenspeicher, meldet den Hintergrunddienst ab und lädt neu. Das ist genau das, was man sonst von Hand machen müsste.
 
-**Wichtig:** Diesen zweiten Schritt nur jetzt machen, bevor du eigene Daten eingibst. Später würde er deine Noten mitlöschen.
+### Wenn gar nichts hilft
+
+Zeigt die App weiterhin die alte Nummer und es erscheint kein Knopf, dann liegt die neue Fassung noch nicht auf der Adresse. Dann ist beim Hochladen etwas schiefgegangen. Sieh bei GitHub nach, ob `index.html` wirklich in der obersten Ebene liegt und ob das Datum von heute ist.
+
+Der harte Weg, nur wenn du **noch keine eigenen Daten** eingetragen hast: in Chrome auf das Schloss-Symbol links in der Adresszeile, dann **Cookies und Websitedaten**, dann **Daten löschen**, danach neu laden. **Später würde dieser Weg deine Noten mitlöschen** — dann nimm ausschließlich den Knopf in den Einstellungen.
 
 ---
 
@@ -110,7 +118,7 @@ Dann lade ich dir eine neue `index.html`, du lädst sie wie in Schritt 1 bei Git
 ## Kurzfassung zum Abhaken
 
 - [ ] Dateien bei GitHub hochgeladen
-- [ ] Am MacBook geprüft, dass Version 9 erscheint
+- [ ] Am MacBook unter Einstellungen, Abschnitt FASSUNG, geprüft, dass Version 12 geladen ist
 - [ ] Am MacBook in Chrome installiert
 - [ ] Am iPhone in Safari zum Home-Bildschirm hinzugefügt
 - [ ] Am iPhone ab jetzt nur noch das Symbol verwenden

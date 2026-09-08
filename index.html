@@ -119,9 +119,9 @@
   .feinbereich{padding:10px 16px; border-top:1px solid #000000;}
   .feinzeile{display:flex; align-items:center; gap:10px;}
   .feinlabel{font-size:12px; font-weight:bold; white-space:nowrap;}
-  .stufe-zeichen{display:inline-block; min-width:26px; margin-right:8px; font-size:17px;}
+  .stufe-zeichen{display:inline-block; min-width:38px; margin-right:10px; font-size:22px; letter-spacing:-1px;}
   .stufe-btn{
-    border:1.5px solid #000000; border-radius:8px; padding:14px 12px; margin-bottom:8px;
+    border:2px solid #000000; border-radius:8px; padding:15px 12px; margin-bottom:8px;
     font-size:15px; font-weight:bold; text-align:center; cursor:pointer;
   }
 
@@ -140,8 +140,9 @@
   .schnell-ergebnis{width:26px; text-align:center; font-size:17px; font-weight:bold; flex-shrink:0;}
   .schnell-fehlt{flex-shrink:0;}
   .schnell-stufe{
-    min-width:40px; height:34px; padding:0 8px; border-radius:6px; border:1.5px solid #000000;
-    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer;
+    min-width:40px; height:34px; padding:0 8px; border-radius:6px; border:2px solid #000000;
+    display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:bold;
+    letter-spacing:-1px; cursor:pointer;
   }
 
   /* Diagramme */
@@ -235,7 +236,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "9";
+const APP_FASSUNG = "12";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -381,14 +382,14 @@ const PROZENT_KEYS = {
    umstellen. */
 const STUFEN_LISTEN = {
   hausuebung: ["sehr gut gemacht", "gut gemacht", "gemacht", "nicht gemacht"],
-  mitarbeit:  ["sehr gute Mitarbeit", "gute Mitarbeit", "keine Mitarbeit"]
+  mitarbeit:  ["sehr gute Mitarbeit", "gute Mitarbeit", "wenig Mitarbeit", "keine Mitarbeit"]
 };
 
 /* Kurzzeichen zu den Stufen, in derselben Reihenfolge. Sie stehen auf den
    schmalen Feldern der Schnellerfassung und im Verlauf vor dem Text. */
 const STUFEN_ZEICHEN = {
   hausuebung: ["++", "+", "~", "\u2212"],
-  mitarbeit:  ["+", "~", "\u2212"]
+  mitarbeit:  ["++", "+", "~", "\u2212"]
 };
 
 /* Wert auf der Notenskala, falls eine Stufen-Kategorie ausnahmsweise doch in
@@ -396,7 +397,7 @@ const STUFEN_ZEICHEN = {
    standardmäßig aus. */
 const STUFEN_WERTE = {
   hausuebung: [1, 2, 3, 5],
-  mitarbeit:  [1, 3, 5]
+  mitarbeit:  [1, 2, 3, 5]
 };
 
 /* Kategorien, die in einem neuen Fach von Anfang an in Stufen laufen.
@@ -405,7 +406,31 @@ const STUFEN_VORGABE = ["hausuebung", "mitarbeit"];
 
 /* Wird hochgezählt, sobald sich die Vorgabe oben ändert. Bestehende Fächer
    ziehen die neue Vorgabe dann genau einmal nach. */
-const STUFEN_STAND = 2;
+const STUFEN_STAND = 4;
+
+/* ---------- MITARBEIT ALS BONUS ----------
+   Mitarbeit soll die Note verbessern, je mehr desto besser, darf aber nie
+   über allem stehen. Deshalb ein dritter Weg neben "zählt nicht" und
+   "zählt mit": die Einstufungen wirken als Bonus auf den Notenschnitt aus
+   den übrigen Kategorien.
+
+   Die Werte unten werden aufsummiert, nicht gemittelt. Wer öfter gut
+   mitarbeitet, sammelt also mehr Bonus. Die Summe wird anschließend auf
+   den Höchstwert je Fach begrenzt (Vorgabe eine halbe Note), damit die
+   Mitarbeit den Schnitt nie beherrschen kann. Ohne Noten in den übrigen
+   Kategorien gibt es überhaupt keinen Schnitt, also auch keinen Bonus.
+
+   Minus verbessert die Note, Plus verschlechtert sie. */
+const STUFEN_BONUS = {
+  mitarbeit:  [-0.15, -0.05, 0.05, 0.15],
+  hausuebung: [-0.10, -0.05, 0, 0.10]
+};
+
+/* Wie viel der Bonus insgesamt höchstens ausmachen darf, in Notenstufen */
+const BONUS_MAX_VORGABE = 0.5;
+
+/* Kategorien, die in einem neuen Fach von Anfang an als Bonus wirken */
+const STUFEN_BONUS_VORGABE = ["mitarbeit"];
 
 const NIVEAU_LABELS = { ahs: "Standard AHS", standard: "Standard" };
 
@@ -560,15 +585,107 @@ function stufenText(sub, e){
   return liste[e.stufe] || e.label || "Stufe";
 }
 
-function stufenZeichen(cat, index){
+/* Fällt die Kategorie nicht unter STUFEN_ZEICHEN oder hat sie nach dem
+   Umbenennen eine andere Anzahl an Stufen, kommen die Zeichen aus diesem
+   Muster. Sonst stünden dort nackte Ziffern, die wie Noten aussehen. */
+const STUFEN_ZEICHEN_MUSTER = {
+  2: ["+", "\u2212"],
+  3: ["+", "~", "\u2212"],
+  4: ["++", "+", "~", "\u2212"],
+  5: ["++", "+", "~", "\u2212", "\u2212\u2212"]
+};
+
+/* ---------- FARBEN DER STUFENFELDER ----------
+   gradeColor kennt nur drei Zustände, damit lassen sich vier Stufen nicht
+   auseinanderhalten: die beiden besten sahen gleich grün aus. Deshalb eine
+   eigene Skala von der besten zur schwächsten Stufe, fünf Haltepunkte, aus
+   denen je nach Anzahl gleichmäßig ausgewählt wird.
+
+   Die Farbe ist bewusst nur die Verstärkung. Getragen wird der Unterschied
+   vom Zeichen (++ + ~ −) und vom ausgeschriebenen Text daneben, damit die
+   Felder auch bei Farbenblindheit und im Schwarz-Weiß-Ausdruck eindeutig
+   bleiben. */
+const STUFEN_FARBEN = [
+  { fg:"#2A6B2E", bg:"#E4F1E2" },   /* beste Stufe, kräftiges Grün */
+  { fg:"#4E6B12", bg:"#EFF5DF" },   /* gut, Grüngelb */
+  { fg:"#7A6B10", bg:"#F5F1DC" },   /* Mitte, Oliv */
+  { fg:"#855A0C", bg:"#F9F0DD" },   /* schwach, Bernstein */
+  { fg:"#B3241C", bg:"#FBEAEA" }    /* schwächste Stufe, Rot */
+];
+
+function stufenFarbe(index, anzahl){
+  if(anzahl < 2) return STUFEN_FARBEN[2];
+  const anteil = index / (anzahl - 1);
+  const stelle = Math.round(anteil * (STUFEN_FARBEN.length - 1));
+  return STUFEN_FARBEN[Math.min(STUFEN_FARBEN.length - 1, Math.max(0, stelle))];
+}
+
+function stufenZeichen(cat, index, anzahl){
   const liste = STUFEN_ZEICHEN[cat];
-  if(liste && liste[index]) return liste[index];
+  if(liste && (!anzahl || liste.length === anzahl) && liste[index]) return liste[index];
+  const muster = STUFEN_ZEICHEN_MUSTER[anzahl || (liste ? liste.length : 0)];
+  if(muster && muster[index]) return muster[index];
   return String(index + 1);
 }
 
-/* Zählt diese Stufen-Kategorie ausnahmsweise doch in den Notenschnitt? */
+/* Zählt diese Stufen-Kategorie mit einem eigenen Anteil in den Notenschnitt? */
 function stufeZaehlt(sub, cat){
   return !!(sub && Array.isArray(sub.stufenZaehlt) && sub.stufenZaehlt.indexOf(cat) !== -1);
+}
+
+/* Wirkt diese Stufen-Kategorie als Bonus auf den Notenschnitt? */
+function istBonusCat(sub, cat){
+  return !!(sub && Array.isArray(sub.stufenBonus) && sub.stufenBonus.indexOf(cat) !== -1);
+}
+
+function bonusMax(sub){
+  return (sub && typeof sub.bonusMax === "number") ? sub.bonusMax : BONUS_MAX_VORGABE;
+}
+
+/* Bonuswert einer einzelnen Stufe. Minus verbessert. */
+function bonusWert(sub, cat, index){
+  const eigene = sub && sub.bonusWerte && Array.isArray(sub.bonusWerte[cat]) ? sub.bonusWerte[cat] : null;
+  const liste = eigene || STUFEN_BONUS[cat];
+  if(liste && typeof liste[index] === "number") return liste[index];
+  /* Ohne eigene Vorgabe: die beste Stufe verbessert, die schwächste verschlechtert */
+  const anzahl = stufenListe(sub, cat).length;
+  if(anzahl < 2) return 0;
+  return -0.15 + (0.3 * index) / (anzahl - 1);
+}
+
+/* Summe aller Boni einer Person, aufgeteilt nach Kategorie und insgesamt
+   auf den Höchstwert des Fachs begrenzt. */
+function bonusSumme(sub, studentId, sem){
+  const cats = activeCats(sub).filter(k => istBonusCat(sub, k));
+  if(!cats.length) return { wert: 0, roh: 0, gedeckelt: false, teile: [] };
+  const alle = entriesOf(sub, studentId, sem).filter(e => e.type === "stufe");
+  const teile = [];
+  let roh = 0;
+  cats.forEach(cat => {
+    const drin = alle.filter(e => e.cat === cat);
+    if(!drin.length) return;
+    let summe = 0;
+    drin.forEach(e => { summe += bonusWert(sub, cat, e.stufe); });
+    roh += summe;
+    teile.push({ cat: cat, label: catLabel(sub, cat), anzahl: drin.length, wert: summe });
+  });
+  const grenze = bonusMax(sub);
+  const wert = Math.max(-grenze, Math.min(grenze, roh));
+  return { wert: wert, roh: roh, gedeckelt: Math.abs(roh) > grenze + 0.0001, teile: teile };
+}
+
+/* Wie der Bonus im Text aussieht: minus verbessert, plus verschlechtert */
+/* Kurzform für das Merkzeichen neben einer Bonus-Kategorie */
+function bonusTeilText(bonus, cat){
+  const teil = bonus.teile.find(t => t.cat === cat);
+  if(!teil || Math.abs(teil.wert) < 0.005) return "0";
+  return (teil.wert < 0 ? "\u2212" : "+") + fmtB(Math.abs(teil.wert));
+}
+
+function bonusText(wert){
+  if(Math.abs(wert) < 0.005) return "keine Auswirkung";
+  const betrag = fmtB(Math.abs(wert));
+  return (wert < 0 ? "verbessert um " : "verschlechtert um ") + betrag;
 }
 
 /* Wert einer Stufe auf der Notenskala */
@@ -699,9 +816,36 @@ function normaliseClass(cls){
         if(sub.entries.some(e => e.type === "note" && e.cat === k)) return;
         sub.stufenCats.push(k);
       });
+      /* Mitarbeit wirkt ab Stand 3 als Bonus, aber nur dort, wo sie bisher
+         gar nichts bewirkt hat. Wer sie schon ausdrücklich auf "zählt mit"
+         gestellt hat, behält das. */
+      if(!Array.isArray(sub.stufenBonus)) sub.stufenBonus = [];
+      if(!Array.isArray(sub.stufenZaehlt)) sub.stufenZaehlt = [];
+      STUFEN_BONUS_VORGABE.forEach(k => {
+        if(sub.stufenCats.indexOf(k) === -1) return;
+        if(sub.stufenZaehlt.indexOf(k) !== -1) return;
+        if(sub.stufenBonus.indexOf(k) !== -1) return;
+        sub.stufenBonus.push(k);
+      });
+      /* Ab Stand 4 hat die Mitarbeit vier Stufen statt drei, neu ist "wenig
+         Mitarbeit" an dritter Stelle. Bestehende Einträge zeigen auf eine
+         Position, nicht auf einen Text. Aus der alten "keine Mitarbeit"
+         (Position 2) würde sonst stillschweigend "wenig Mitarbeit". Deshalb
+         rückt die letzte Stufe eine Position weiter. Nur dort, wo die Texte
+         nicht von Hand geändert wurden, sonst wäre die Zuordnung geraten. */
+      if((sub.stufenStand || 0) < 4 && !(sub.stufenTexte && Array.isArray(sub.stufenTexte.mitarbeit))){
+        sub.entries.forEach(e => {
+          if(e.type === "stufe" && e.cat === "mitarbeit" && e.stufe === 2){
+            e.stufe = 3;
+            if(e.label) e.label = STUFEN_LISTEN.mitarbeit[3];
+          }
+        });
+      }
       sub.stufenStand = STUFEN_STAND;
     }
     if(!Array.isArray(sub.stufenZaehlt)) sub.stufenZaehlt = [];
+    if(!Array.isArray(sub.stufenBonus)) sub.stufenBonus = [];
+    if(typeof sub.bonusMax !== "number") sub.bonusMax = BONUS_MAX_VORGABE;
     if(!sub.stufenTexte || typeof sub.stufenTexte !== "object") sub.stufenTexte = {};
     if(!sub.stufenWerte || typeof sub.stufenWerte !== "object") sub.stufenWerte = {};
     sub.entries.forEach(e => {
@@ -823,7 +967,12 @@ let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, no
                  newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                  zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null };
 let statView = { screen:"list", classId:null, subjectId:null };
-let settingsView = { screen:"list", classId:null, subjectId:null };
+let settingsView = { screen:"list", classId:null, subjectId:null, stufenOffen:null };
+
+/* Fassung, die auf der Adresse liegt, falls sie von der geladenen abweicht.
+   Wird von fassungPruefen() ganz am Ende gesetzt. Muss hier oben stehen,
+   weil der Einstellungsbildschirm sie liest, bevor das Skript durch ist. */
+let neuereFassung = null;
 
 function today(){
   const d = new Date();
@@ -885,8 +1034,25 @@ function wertendeNoten(sub, studentId, sem){
   }).filter(Boolean);
 }
 
-function computeSchnitt(sub, studentId, sem){
+/* Der Notenschnitt aus Noten und mitzählenden Einstufungen, noch ohne Bonus */
+function schnittOhneBonus(sub, studentId, sem){
   const notes = wertendeNoten(sub, studentId, sem);
+  if(notes.length === 0) return null;
+  return schnittAus(sub, notes);
+}
+
+/* Der Notenschnitt, wie er überall angezeigt wird: mit Bonus, begrenzt auf
+   die Skala von 1 bis 5. Ohne Noten gibt es keinen Schnitt und damit auch
+   keinen Bonus, die Mitarbeit kann also nie allein stehen. */
+function computeSchnitt(sub, studentId, sem){
+  const grund = schnittOhneBonus(sub, studentId, sem);
+  if(grund === null) return null;
+  const bonus = bonusSumme(sub, studentId, sem).wert;
+  if(!bonus) return grund;
+  return Math.max(1, Math.min(5, grund + bonus));
+}
+
+function schnittAus(sub, notes){
   if(notes.length === 0) return null;
 
   if(isProzentMode(sub)){
@@ -919,6 +1085,11 @@ function countPosNeg(sub, studentId, sem){
 
 function fmt(n){ return n === null ? "-" : n.toFixed(1).replace(".", ","); }
 function fmtO(n){ return n === null ? "-" : "Ø " + fmt(n); }
+/* Für Bonuswerte: Viertelstufen wie 0,25 dürfen nicht auf 0,3 gerundet werden */
+function fmtB(n){
+  if(n === null || n === undefined || isNaN(n)) return "-";
+  return n.toFixed(2).replace(/0$/, "").replace(/\.$/, "").replace(".", ",");
+}
 function fmtPct(n){
   if(n === null || isNaN(n)) return "0";
   return (Math.round(n * 10) % 10 === 0 ? String(Math.round(n)) : n.toFixed(1).replace(".", ","));
@@ -1299,6 +1470,8 @@ function renderStudent(){
   const verlauf = eigene.filter(e => e.type !== "note").slice().reverse();
 
   const anzahlNoten = wertendeNoten(sub, s.id).length;
+  const bonus = bonusSumme(sub, s.id);
+  const grundschnitt = schnittOhneBonus(sub, s.id);
   const anzahlFehlt = eigene.filter(e => e.type === "fehlt").length;
   const verlauf2 = verlaufSvg(sub, s.id);
   const bilanz = stufenBilanz(sub, s.id);
@@ -1307,7 +1480,8 @@ function renderStudent(){
     return `<div class="entry">
       <span class="catdot" style="background:${c.fg};"></span>
       <div class="txt"><b>${esc(b.label)}</b> &middot; ${esc(b.teile.join(", "))}</div>
-      <span class="badge" style="border-color:${c.fg}; color:${c.fg}; background:${c.bg};">${b.zaehlt ? "zählt mit" : "zählt nicht"}</span>
+      <span class="badge" style="border-color:${c.fg}; color:${c.fg}; background:${c.bg};">${
+        b.bonus ? "Bonus " + (bonusTeilText(bonus, b.cat)) : (b.zaehlt ? "zählt mit" : "zählt nicht")}</span>
     </div>`;
   }).join("") : "";
 
@@ -1351,7 +1525,7 @@ function renderStudent(){
       const c = catCol(sub, e.cat);
       return `<div class="entry">
         <span class="catdot" style="background:${c.fg};"></span>
-        <div class="txt"><b>${esc(stufenZeichen(e.cat, e.stufe))}</b> ${esc(catLabel(sub, e.cat))}: ${esc(stufenText(sub, e))}</div>
+        <div class="txt"><b>${esc(stufenZeichen(e.cat, e.stufe, stufenListe(sub, e.cat).length))}</b> ${esc(catLabel(sub, e.cat))}: ${esc(stufenText(sub, e))}</div>
         <span class="date">${e.date}</span>${del}</div>`;
     }
     if(e.type === "fehlt"){
@@ -1403,7 +1577,7 @@ function renderStudent(){
     </div>
     ${niveauZeile}
     <div class="stats">
-      <div class="stat"><div class="val ${schnitt !== null && schnitt >= 4 ? "red" : ""}">${fmtO(schnitt)}</div><div class="lbl">Notenschnitt</div></div>
+      <div class="stat"><div class="val ${schnitt !== null && schnitt >= 4 ? "red" : ""}">${fmtO(schnitt)}</div><div class="lbl">Notenschnitt${(schnitt !== null && bonus.wert) ? "<br>" + fmt(grundschnitt) + " " + (bonus.wert < 0 ? "&minus;" : "+") + " " + fmtB(Math.abs(bonus.wert)) + " Bonus" : ""}</div></div>
       <div class="stat"><div class="val">${anzahlNoten}</div><div class="lbl">${anzahlNoten === 1 ? "Note" : "Noten"}${anzahlFehlt ? " &middot; " + anzahlFehlt + "× nicht mitgeschrieben" : ""}</div></div>
     </div>
     ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
@@ -1596,7 +1770,31 @@ function renderNewNote(){
     return `<div class="chip" style="${style}" onclick="selectNoteCat('${k}')">${catShort(sub,k)}</div>`;
   }).join("");
 
-  /* Kompetenz-Check bleibt eine Checkliste */
+  /* Stufen statt Noten, zum Beispiel bei der Hausübung. Steht bewusst VOR
+     dem Kompetenz-Check: wer eine Kategorie auf "ohne Note" stellt, muss auch
+     dort die Stufen bekommen, sonst wird seine Einstellung stillschweigend
+     übergangen. Ein Tipp auf eine Stufe speichert sofort. */
+  if(istStufenCat(sub, cat)){
+    const stufen = stufenListe(sub, cat).map((t, i) => {
+      const g = stufenFarbe(i, stufenListe(sub, cat).length);
+      return `<div class="stufe-btn" style="background:${g.bg}; border-color:${g.fg}; color:${g.fg};"
+                   onclick="createStufe(${i})"><span class="stufe-zeichen">${stufenZeichen(cat, i, stufenListe(sub, cat).length)}</span>${esc(t)}</div>`;
+    }).join("");
+    return `
+      <div class="header" style="${headerStyle("home")}">
+        <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
+        <span class="title" style="${titleStyle("home")}">${catLabel(sub, cat)} eintragen</span>
+        <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
+      </div>
+      <div class="chips">${chips}</div>
+      <div class="label" style="color:${col.fg};">EINTRAG, EIN TIPP GENÜGT</div>
+      <div style="padding:0 16px 12px;">${stufen}</div>
+      <div class="helptext">${catLabel(sub, cat)}: ${esc(zaehltText(sub, cat))}. Der Eintrag wird sofort gespeichert.
+        <button class="ghost" onclick="zurBewertung()">ändern</button></div>
+    `;
+  }
+
+  /* Kompetenz-Check bleibt eine Checkliste, solange er benotet wird */
   if(cat === "kompetenz"){
     const boxen = sub.competencies.map(name =>
       `<label class="comp-check"><input type="checkbox" class="compCheck" value="${name}"> ${name}</label>`).join("");
@@ -1620,29 +1818,6 @@ function renderNewNote(){
         </div>
         ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">` : ""}
       </div>
-    `;
-  }
-
-  /* Stufen statt Noten, zum Beispiel bei der Hausübung.
-     Ein Tipp auf eine Stufe speichert sofort, das ist der kürzeste Weg. */
-  if(istStufenCat(sub, cat)){
-    const stufen = stufenListe(sub, cat).map((t, i) => {
-      const anteil = i / Math.max(1, stufenListe(sub, cat).length - 1);
-      const g = anteil <= 0.34 ? gradeColor(1) : (anteil >= 0.99 ? gradeColor(5) : gradeColor(3));
-      return `<div class="stufe-btn" style="background:${g.bg}; border-color:${g.fg}; color:${g.fg};"
-                   onclick="createStufe(${i})"><span class="stufe-zeichen">${stufenZeichen(cat, i)}</span>${esc(t)}</div>`;
-    }).join("");
-    return `
-      <div class="header" style="${headerStyle("home")}">
-        <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
-        <span class="title" style="${titleStyle("home")}">${catLabel(sub, cat)} eintragen</span>
-        <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
-      </div>
-      <div class="chips">${chips}</div>
-      <div class="label" style="color:${col.fg};">EINTRAG, EIN TIPP GENÜGT</div>
-      <div style="padding:0 16px 12px;">${stufen}</div>
-      <div class="helptext">${catLabel(sub, cat)}: ${esc(zaehltText(sub, cat))}. Der Eintrag wird sofort gespeichert.
-        <button class="ghost" onclick="zurBewertung()">ändern</button></div>
     `;
   }
 
@@ -1875,13 +2050,12 @@ function renderSchnell(){
 
     if(stufenModus){
       felder = `<div class="schnell-stufen">` + stufen.map((t, i) => {
-        const anteil = i / Math.max(1, stufen.length - 1);
-        const g = anteil <= 0.34 ? gradeColor(1) : (anteil >= 0.99 ? gradeColor(5) : gradeColor(3));
+        const g = stufenFarbe(i, stufen.length);
         const sel = eintrag && eintrag.stufe === i;
         const style = sel
           ? `background:${g.fg}; border-color:${g.fg}; color:#fff;`
           : `background:${g.bg}; border-color:${g.fg}; color:${g.fg};`;
-        return `<div class="schnell-stufe" style="${style}" title="${esc(t)}" onclick="schnellStufe('${s.id}',${i})">${esc(stufenZeichen(cat, i))}</div>`;
+        return `<div class="schnell-stufe" style="${style}" title="${esc(t)}" onclick="schnellStufe('${s.id}',${i})">${esc(stufenZeichen(cat, i, stufen.length))}</div>`;
       }).join("") + `</div>`;
 
     } else if(punkteModus){
@@ -2007,7 +2181,7 @@ function createNote(ev){
   const cat = homeView.newNoteCat;
   const w = typeof homeView.noteWeight === "number" ? homeView.noteWeight : 1;
 
-  if(cat === "kompetenz"){
+  if(cat === "kompetenz" && !istStufenCat(sub, cat)){
     const angehakt = Array.from(document.querySelectorAll(".compCheck:checked")).map(el => el.value);
     const gesamt = sub.competencies.length;
     sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
@@ -2300,6 +2474,9 @@ function wordDokument(){
             ]);
             body += wTable(["Datum","Beurteilung","Grundlage","Gewicht","Note"], zeilen, [1100,2400,2900,1100,900]);
           }
+
+          const bSatz = bonusSatz(sub, s.id, sem);
+          if(bSatz) body += wP(bSatz, { size:16, after:40 });
 
           const stufen = eigene.filter(e => e.type === "stufe");
           if(stufen.length){
@@ -2618,6 +2795,22 @@ function mergeState(basis, fremd){
           customCats: (fsub.customCats || []).map(c => Object.assign({}, c)),
           competencies: (fsub.competencies || []).slice(), entries: []
         };
+        /* Die Einstellungen zu den Stufen müssen mitkommen, sonst bekommt das
+           Fach auf dem anderen Gerät wieder die Vorgaben und die Entscheidung
+           der Lehrkraft ist weg. Schlimmer noch: ohne stufenStand hält
+           normaliseClass das Fach für alt und zieht eine einmalige Umstellung
+           ein zweites Mal nach, die auf diese Daten längst angewendet wurde. */
+        if(Array.isArray(fsub.stufenCats))   bsub.stufenCats   = fsub.stufenCats.slice();
+        if(Array.isArray(fsub.stufenZaehlt)) bsub.stufenZaehlt = fsub.stufenZaehlt.slice();
+        if(Array.isArray(fsub.stufenBonus))  bsub.stufenBonus  = fsub.stufenBonus.slice();
+        if(typeof fsub.bonusMax === "number") bsub.bonusMax    = fsub.bonusMax;
+        if(typeof fsub.stufenStand === "number") bsub.stufenStand = fsub.stufenStand;
+        if(fsub.stufenTexte && typeof fsub.stufenTexte === "object"){
+          bsub.stufenTexte = JSON.parse(JSON.stringify(fsub.stufenTexte));
+        }
+        if(fsub.stufenWerte && typeof fsub.stufenWerte === "object"){
+          bsub.stufenWerte = JSON.parse(JSON.stringify(fsub.stufenWerte));
+        }
         bc.subjects.push(bsub);
         bericht.faecher++;
       } else {
@@ -2628,6 +2821,16 @@ function mergeState(basis, fremd){
             if((bsub.cats || []).indexOf(c.key) === -1) bsub.cats.push(c.key);
           }
         });
+        /* Beim bestehenden Fach gilt die Einstellung dieses Geräts. Nur was
+           hier noch gar nicht gesetzt ist, wird vom anderen Gerät übernommen. */
+        if(!Array.isArray(bsub.stufenCats) && Array.isArray(fsub.stufenCats)) bsub.stufenCats = fsub.stufenCats.slice();
+        if(typeof bsub.stufenStand !== "number" && typeof fsub.stufenStand === "number") bsub.stufenStand = fsub.stufenStand;
+        if(fsub.stufenTexte){
+          if(!bsub.stufenTexte) bsub.stufenTexte = {};
+          Object.keys(fsub.stufenTexte).forEach(k => {
+            if(!Array.isArray(bsub.stufenTexte[k])) bsub.stufenTexte[k] = fsub.stufenTexte[k].slice();
+          });
+        }
       }
 
       (fsub.entries || []).forEach(fe => {
@@ -2785,7 +2988,7 @@ function ansichtenZuruecksetzen(){
                newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null };
   statView = { screen:"list", classId:null, subjectId:null };
-  settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null };
+  settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null, stufenOffen:null };
 }
 
 document.getElementById("importInput").addEventListener("change", function(ev){
@@ -2879,17 +3082,34 @@ function verlaufSvg(sub, studentId, sem, breite, hoehe){
   const ersteBeschriftung = `<text x="${links}" y="${h - 6}" font-size="10" fill="#666666">${svgEsc(noten[0].date)}</text>`;
   const letzteBeschriftung = `<text x="${b - rechts}" y="${h - 6}" text-anchor="end" font-size="10" fill="#666666">${svgEsc(noten[noten.length - 1].date)}</text>`;
 
+  /* Die strichlierte Linie liegt beim Schnitt der gezeichneten Punkte, sonst
+     würde sie außerhalb aller Punkte hängen. Kommt ein Bonus dazu, steht die
+     Endnote als zweite, feiner strichlierte Linie daneben. */
+  const grund = schnittOhneBonus(sub, studentId, sem);
   const schnitt = computeSchnitt(sub, studentId, sem);
-  const mittellinie = schnitt === null ? "" :
-    `<line x1="${links}" y1="${y(schnitt).toFixed(1)}" x2="${b - rechts}" y2="${y(schnitt).toFixed(1)}" stroke="#000000" stroke-width="1" stroke-dasharray="4 3" opacity="0.45"/>`;
+  const bonus = bonusSumme(sub, studentId, sem);
+  const zeigeBonus = grund !== null && schnitt !== null && Math.abs(schnitt - grund) > 0.005;
 
-  const hinweis = hatStufen
-    ? `<div class="chart-hinweis">Gefüllte Punkte sind Noten, offene Punkte sind Einstufungen, die du mitzählen lässt.</div>`
-    : "";
+  const mittellinie = grund === null ? "" :
+    `<line x1="${links}" y1="${y(grund).toFixed(1)}" x2="${b - rechts}" y2="${y(grund).toFixed(1)}" stroke="#000000" stroke-width="1" stroke-dasharray="4 3" opacity="0.45"><title>Schnitt der Noten ${svgEsc(fmt(grund))}</title></line>`;
+  const bonuslinie = !zeigeBonus ? "" :
+    `<line x1="${links}" y1="${y(schnitt).toFixed(1)}" x2="${b - rechts}" y2="${y(schnitt).toFixed(1)}" stroke="#000000" stroke-width="1.5" stroke-dasharray="1 3" opacity="0.8"><title>mit Bonus ${svgEsc(fmt(schnitt))}</title></line>`;
+
+  const hinweisTeile = [];
+  if(hatStufen) hinweisTeile.push("Gefüllte Punkte sind Noten, offene Punkte sind Einstufungen, die du mitzählen lässt.");
+  if(zeigeBonus){
+    const woher = bonus.teile.map(t => t.label).join(" und ");
+    const wieOft = bonus.teile.map(t => t.label + " " + t.anzahl + "\u00d7").join(", ");
+    hinweisTeile.push("Lange Striche: Schnitt der Noten " + fmt(grund) + ". Kurze Striche: " +
+      (wieOft || "Bonus") + " " + bonusText(bonus.wert) + " auf " + fmt(schnitt) +
+      (bonus.gedeckelt ? ", begrenzt auf höchstens " + fmtB(bonusMax(sub)) + " Notenstufen" : "") + ".");
+  }
+  const hinweis = hinweisTeile.length
+    ? `<div class="chart-hinweis">${esc(hinweisTeile.join(" "))}</div>` : "";
 
   return `<svg viewBox="0 0 ${b} ${h}" width="100%" height="${h}" role="img" preserveAspectRatio="xMidYMid meet"
       aria-label="Notenverlauf mit ${noten.length} Werten, Schnitt ${fmt(schnitt)}">
-    ${gitter}${mittellinie}${linie}${marken}${ersteBeschriftung}${letzteBeschriftung}
+    ${gitter}${mittellinie}${bonuslinie}${linie}${marken}${ersteBeschriftung}${letzteBeschriftung}
   </svg>${hinweis}`;
 }
 
@@ -2933,6 +3153,14 @@ function verteilungSvg(sub, sem, breite, hoehe){
    nichts behauptet wird, was nicht stimmt. */
 function zaehltText(sub, cat){
   if(!istStufenCat(sub, cat)) return "wird benotet";
+  if(istBonusCat(sub, cat)){
+    const liste = stufenListe(sub, cat).map((t, i) => {
+      const v = bonusWert(sub, cat, i);
+      return t + " = " + (v === 0 ? "0" : (v < 0 ? "\u2212" : "+") + fmtB(Math.abs(v)));
+    }).join(", ");
+    return "keine Note, wirkt als Bonus auf den Notenschnitt, höchstens " +
+      fmtB(bonusMax(sub)) + " Notenstufen (" + liste + ")";
+  }
   if(!stufeZaehlt(sub, cat)) return "wird nicht benotet und zählt nicht in den Notenschnitt";
   const anteil = isProzentMode(sub)
     ? "mit " + fmtPct(sub.weights[cat] ?? 0) + " % Anteil"
@@ -2955,6 +3183,7 @@ function stufenBilanz(sub, studentId, sem){
     cat: cat,
     label: catLabel(sub, cat),
     zaehlt: stufeZaehlt(sub, cat),
+    bonus: istBonusCat(sub, cat),
     hinweis: zaehltText(sub, cat),
     teile: stufenListe(sub, cat).filter(t => cats[cat][t]).map(t => cats[cat][t] + "× " + t)
   }));
@@ -3017,6 +3246,28 @@ function noteTabelle(sub, studentId){
 
 /* Stufeneinträge, zum Beispiel Hausübungen. Sie werden nicht benotet und
    erscheinen deshalb getrennt von der Notentabelle. */
+/* Sagt in einem Satz, wie sich der Bonus bei genau dieser Person ausgewirkt
+   hat. Nur wenn er tatsächlich etwas verändert, sonst wäre es nur Ballast. */
+function bonusSatz(sub, studentId, sem){
+  const grund = schnittOhneBonus(sub, studentId, sem);
+  const schnitt = computeSchnitt(sub, studentId, sem);
+  if(grund === null || schnitt === null) return "";
+  const bonus = bonusSumme(sub, studentId, sem);
+  if(!bonus.teile.length) return "";
+  const woher = bonus.teile.map(t => t.label + " " + t.anzahl + "×").join(", ");
+  if(Math.abs(schnitt - grund) < 0.005){
+    return "Schnitt der Noten " + fmt(grund) + ". " + woher + " wurde eingetragen, verändert den Schnitt aber nicht.";
+  }
+  return "Schnitt der Noten " + fmt(grund) + ", " + woher + " " + bonusText(bonus.wert) +
+    " auf " + fmt(schnitt) + (bonus.gedeckelt
+      ? " (mehr als " + fmtB(bonusMax(sub)) + " Notenstufen kann die Mitarbeit nie ausmachen)" : "") + ".";
+}
+
+function bonusZeile(sub, studentId, sem){
+  const satz = bonusSatz(sub, studentId, sem);
+  return satz ? `<div class="pr-note" style="margin-top:2mm;">${esc(satz)}</div>` : "";
+}
+
 function stufenTabelle(sub, studentId){
   const liste = stufenOf(sub, studentId);
   if(!liste.length) return "";
@@ -3061,6 +3312,7 @@ function blattSchueler(cls, s){
           : '<div><div class="v">' + entriesOf(sub, s.id).filter(e => e.type === "fehlt").length + '</div><div class="l">nicht mitgeschrieben</div></div>'}
       </div>
       ${grafik ? '<div class="pr-chart">' + grafik + "</div>" : ""}
+      ${grafik ? "" : bonusZeile(sub, s.id)}
       ${noteTabelle(sub, s.id)}
       ${stufenTabelle(sub, s.id)}
       ${verlaufTabelle(sub, s.id)}
@@ -3276,6 +3528,12 @@ function renderStatDetail(){
 /* ---------- EINSTELLUNGEN ---------- */
 
 function goSettings(screen, classId, subjectId){
+  /* Ein anderes Fach oder ein Wechsel des Bildschirms klappt die Benennung
+     der Stufen wieder zu. Sonst stünde sie beim nächsten Öffnen offen da,
+     ohne dass man weiß, warum. */
+  if(screen !== settingsView.screen || (subjectId !== undefined && subjectId !== settingsView.subjectId)){
+    settingsView.stufenOffen = null;
+  }
   settingsView.screen = screen;
   if(classId !== undefined && classId !== null) settingsView.classId = classId;
   if(subjectId !== undefined && subjectId !== null) settingsView.subjectId = subjectId;
@@ -3365,7 +3623,21 @@ function renderSettingsList(){
     <div class="helptext">${kopieText}</div>
     ${kopie ? '<div class="footer"><button onclick="sicherheitskopieZurueck()">Sicherheitskopie zurückholen</button></div>' : ""}
 
-    <div class="helptext" style="border-top:2px solid #000;">Klassenheft, Version ${APP_FASSUNG}, Testfassung. Alle Daten bleiben lokal auf diesem Gerät, kein Internet und keine Cloud nötig. Vor einem Gerätewechsel oder dem Löschen der Browserdaten unbedingt eine Sicherung erstellen.</div>
+    <div class="label" style="border-top:2px solid #000;">FASSUNG</div>
+    <div class="helptext">Geladen ist <b>Klassenheft, Version ${APP_FASSUNG}</b>.${
+      neuereFassung
+        ? " Auf der Adresse liegt bereits <b>Version " + esc(neuereFassung) +
+          "</b>. Dein Browser zeigt noch die alte, weil er sie zwischengespeichert hat."
+        : (location.protocol.indexOf("http") === 0
+            ? " Das ist die Fassung, die auch auf der Adresse liegt."
+            : " Geöffnet als Datei, nicht über eine Adresse.")
+    }</div>
+    ${neuereFassung
+      ? '<div class="footer"><button class="gross" onclick="neueFassungHolen()">Version ' + esc(neuereFassung) + ' jetzt laden</button></div>' +
+        '<div class="helptext">Deine Klassen und Noten bleiben dabei erhalten. Sie liegen in einem eigenen Speicher, den das Aktualisieren nicht berührt.</div>'
+      : ""}
+
+    <div class="helptext" style="border-top:2px solid #000;">Testfassung. Alle Daten bleiben lokal auf diesem Gerät, kein Internet und keine Cloud nötig. Vor einem Gerätewechsel oder dem Löschen der Browserdaten unbedingt eine Sicherung erstellen.</div>
   `;
 }
 
@@ -3428,28 +3700,72 @@ function renderSettingsDetail(){
 
   /* Stufen-Kategorien haben kein Gewicht, sie zählen nicht in den Schnitt */
   const zaehlendeListe = notenCats(sub).map(k => catLabel(sub, k)).join(", ");
-  const nurVermerktListe = cats.filter(k => istStufenCat(sub, k) && !stufeZaehlt(sub, k))
+  const bonusListe = cats.filter(k => istBonusCat(sub, k)).map(k => catLabel(sub, k)).join(", ");
+  const nurVermerktListe = cats.filter(k => istStufenCat(sub, k) && !stufeZaehlt(sub, k) && !istBonusCat(sub, k))
     .map(k => catLabel(sub, k)).join(", ");
 
-  const artZeilen = cats.map(k => {
+  /* Bewusst ALLE Kategorien, nicht nur die eingeschalteten. Sonst fehlt zum
+     Beispiel der Kompetenz-Check in jeder Vorlage außer "Allgemein" hier
+     völlig, und man sucht eine Einstellung, die es scheinbar nicht gibt. */
+  const artZeilen = allCatKeys(sub).map(k => {
     const c = catCol(sub, k);
+    const anAus = cats.indexOf(k) !== -1;
+    if(!anAus){
+      return `<div style="padding:8px 16px; border-bottom:1px solid #000000; display:flex; align-items:center; gap:8px; flex-wrap:wrap; opacity:0.55;">
+        <span class="catdot" style="background:${c.fg};"></span>
+        <span style="flex:1; min-width:120px; font-size:13px;">${esc(catLabel(sub,k))}</span>
+        <span style="font-size:11px;">nicht in Verwendung</span>
+        <button class="ghost" onclick="toggleCat('${k}', true)">einschalten</button>
+      </div>`;
+    }
     const stufig = istStufenCat(sub, k);
     const chip = (an, lbl, wert) => `<div class="chip" style="${an
       ? "background:#000; border-color:#000; color:#fff;"
       : "background:#fff; border-color:#000; color:#000;"}" onclick="setStufenCat('${k}',${wert})">${lbl}</div>`;
-    const zaehlChip = (an, lbl, wert) => `<div class="chip" style="${an
+    const wirkung = istBonusCat(sub, k) ? "bonus" : (stufeZaehlt(sub, k) ? "anteil" : "nichts");
+    const wirkChip = (wert, lbl) => `<div class="chip" style="${wirkung === wert
       ? "background:#000; border-color:#000; color:#fff;"
-      : "background:#fff; border-color:#000; color:#000;"}" onclick="setStufeZaehlt('${k}',${wert})">${lbl}</div>`;
+      : "background:#fff; border-color:#000; color:#000;"}" onclick="setStufenWirkung('${k}','${wert}')">${lbl}</div>`;
     const zaehlZeile = stufig ? `
       <div style="width:100%; display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-left:18px;">
-        <span style="font-size:11px; flex:1; min-width:120px;">In den Notenschnitt einrechnen?</span>
-        ${zaehlChip(!stufeZaehlt(sub,k), "zählt nicht", false)}${zaehlChip(stufeZaehlt(sub,k), "zählt mit", true)}
-      </div>` : "";
+        <span style="font-size:11px; flex:1; min-width:120px;">Wirkung auf den Notenschnitt</span>
+        ${wirkChip("nichts", "keine")}${wirkChip("bonus", "Bonus")}${wirkChip("anteil", "eigener Anteil")}
+      </div>
+      <div style="width:100%; padding-left:18px; font-size:11px;">${esc(zaehltText(sub, k))}</div>` : "";
+
+    /* Die Stufen selbst benennen. Aufgeklappt immer nur eine Kategorie,
+       sonst wird der Bildschirm zur Formularwüste. */
+    const offen = settingsView.stufenOffen === k;
+    const liste = stufenListe(sub, k);
+    const eigene = hatEigeneStufenTexte(sub, k);
+    const textFelder = !offen ? "" : `
+      <div style="width:100%; padding-left:18px;">
+        ${liste.map((t, i) => `
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <span style="width:26px; text-align:center; font-weight:bold;">${esc(stufenZeichen(k, i, liste.length))}</span>
+            <input type="text" id="stufenText_${k}_${i}" value="${esc(t)}" style="margin-bottom:0; flex:1;"
+                   onchange="setStufenText('${k}',${i},this.value)">
+          </div>`).join("")}
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+          <button class="ghost" onclick="setStufenAnzahl('${k}',1)">+ Stufe</button>
+          <button class="ghost" onclick="setStufenAnzahl('${k}',-1)">&minus; Stufe</button>
+          ${eigene ? `<button class="ghost" onclick="stufenTexteZuruecksetzen('${k}')">Vorgabe zurückholen</button>` : ""}
+        </div>
+        <div class="helptext" style="padding-left:0;">Von der besten zur schwächsten Stufe. Bereits eingetragene Einträge hängen an der Position, nicht am Text, Umbenennen kostet also keine Daten. Ein leeres Feld holt die Vorgabe für diese Stufe zurück.</div>
+      </div>`;
+
+    const benennZeile = !stufig ? "" : `
+      <div style="width:100%; display:flex; align-items:center; gap:8px; padding-left:18px;">
+        <span style="font-size:11px; flex:1; min-width:120px;">Stufen: ${esc(liste.join(" · "))}</span>
+        <button class="ghost" onclick="toggleStufenTexte('${k}')">${offen ? "fertig" : "benennen"}</button>
+      </div>${textFelder}`;
+
     return `<div style="padding:8px 16px; border-bottom:1px solid #000000; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
       <span class="catdot" style="background:${c.fg};"></span>
       <span style="flex:1; min-width:120px; font-size:13px; font-weight:bold;">${esc(catLabel(sub,k))}</span>
       ${chip(!stufig, "Note", false)}${chip(stufig, "ohne Note", true)}
       ${zaehlZeile}
+      ${benennZeile}
     </div>`;
   }).join("");
 
@@ -3508,7 +3824,8 @@ function renderSettingsDetail(){
     <div class="label">WAS IN DIE NOTE EINFLIESST</div>
     <div class="helptext">
       ${zaehlendeListe ? "<b>Zählt in den Notenschnitt:</b> " + esc(zaehlendeListe) + "<br>" : ""}
-      ${nurVermerktListe ? "<b>Nur vermerkt, ohne Note:</b> " + esc(nurVermerktListe) : "Alle Kategorien zählen in den Notenschnitt."}
+      ${bonusListe ? "<b>Wirkt als Bonus, höchstens " + fmtB(bonusMax(sub)) + " Notenstufen:</b> " + esc(bonusListe) + "<br>" : ""}
+      ${nurVermerktListe ? "<b>Nur vermerkt, ohne Wirkung:</b> " + esc(nurVermerktListe) : ""}
       <br>Ändern kannst du das weiter unten unter <b>Benotet oder nur vermerkt</b>. Die Entscheidung liegt bei dir, in jedem Fach getrennt.
     </div>
 
@@ -3528,8 +3845,22 @@ function renderSettingsDetail(){
     <div style="padding:0 16px 8px;">${catToggles}</div>
 
     <div class="label" style="border-top:2px solid #000;">BENOTET ODER NUR VERMERKT</div>
-    <div class="helptext">Hier entscheidest du für jede Kategorie selbst. Erste Zeile: <b>Note</b> bedeutet Ziffernnoten von 1 bis 5, <b>ohne Note</b> bedeutet Stufen wie sehr gute Mitarbeit oder nicht gemacht. Zweite Zeile bei »ohne Note«: <b>zählt nicht</b> lässt die Einträge aus dem Notenschnitt heraus, <b>zählt mit</b> nimmt sie mit einem festen Wert auf der Notenskala hinein und du kannst sie darunter gewichten. Vorgabe für Hausübung und Mitarbeit ist »ohne Note, zählt nicht«, weil sie keine Leistungsfeststellung sind. Ändern darfst du das jederzeit.</div>
+    <div class="helptext">Hier stehen <b>alle</b> Beurteilungsarten, auch die, die in diesem Fach gerade nicht in Verwendung sind. Die schaltest du mit einem Tipp ein. <b>Note</b> heißt Ziffern von 1 bis 5, <b>ohne Note</b> heißt Stufen wie sehr gute Mitarbeit. Bei »ohne Note« wählst du darunter die Wirkung:
+      <b>keine</b> nur vermerken, <b>Bonus</b> verschiebt den Schnitt, höchstens um die Obergrenze weiter unten, <b>eigener Anteil</b> zählt wie eine Note mit eigenem Regler.
+      Unter jeder Kategorie steht im Klartext, was gerade gilt.
+      <a href="#" onclick="toggleHilfe('hilfeWirkung'); return false;">Mehr dazu</a>
+      <span id="hilfeWirkung" style="display:none;"><br><br>
+      <b>Bonus</b> zählt die Einstufungen zusammen: jede gute Mitarbeit verbessert ein wenig, jede fehlende verschlechtert ein wenig. Mehr Mitarbeit bringt also immer mehr, aber insgesamt nie mehr als die Obergrenze. Damit kann die Mitarbeit eine knappe Note kippen, steht aber nie über den Leistungsfeststellungen. Ohne Noten in den übrigen Kategorien gibt es keinen Schnitt und damit auch keinen Bonus.<br><br>
+      <b>Eigener Anteil</b> gibt der Kategorie feste Werte auf der Notenskala und einen eigenen Gewichtungsregler. Achtung: solange in den übrigen Kategorien noch keine Note steht, trägt sie allein den ganzen Anteil. Dann kann eine einzige Mitarbeit den Schnitt bestimmen.<br><br>
+      Vorgabe ist bei der Mitarbeit <b>Bonus</b> und bei der Hausübung <b>keine</b>, änderbar jederzeit und in jedem Fach getrennt.</span></div>
     ${artZeilen}
+
+    ${cats.some(k => istBonusCat(sub, k)) ? `
+      <div class="slider-row">
+        <div class="top"><span>Bonus höchstens</span><span id="bonusMaxVal">${fmtB(bonusMax(sub))} Notenstufen</span></div>
+        <input type="range" min="0.25" max="1" step="0.25" value="${bonusMax(sub)}" oninput="setBonusMax(this.value)">
+      </div>
+      <div class="helptext">Damit ist gedeckelt, wie stark der Bonus den Notenschnitt überhaupt bewegen kann. Bei einer halben Notenstufe kann er eine Note kippen, die knapp dazwischen liegt, aber nie mehr.</div>` : ""}
 
     <div class="label" style="border-top:2px solid #000;">EIGENE BEURTEILUNGEN</div>
     <div class="helptext">Fehlt eine Beurteilungsart, legst du sie hier selbst an, zum Beispiel Referat, Portfolio, Lernzielkontrolle oder Mitschrift. Sie erscheint danach wie jede andere Kategorie bei der Notenvergabe und in der Gewichtung.</div>
@@ -3642,23 +3973,61 @@ function reapplyTemplate(){
 /* Eine Stufen-Kategorie zusätzlich in den Notenschnitt einrechnen.
    Die Stufen bekommen dafür feste Werte auf der Notenskala, es bleibt aber
    eine Einstufung und keine Note. */
-function setStufeZaehlt(cat, an){
+/* Drei Zustände einer Kategorie ohne Note: keine Wirkung, Bonus, eigener
+   Anteil. Immer nur einer davon ist gesetzt. */
+function setStufenWirkung(cat, wirkung){
   const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
   if(!sub) return;
   if(!Array.isArray(sub.stufenZaehlt)) sub.stufenZaehlt = [];
-  if(stufeZaehlt(sub, cat) === !!an) return;
-  if(an){
-    const werte = (sub.stufenWerte && sub.stufenWerte[cat]) || STUFEN_WERTE[cat] || [];
-    const text = stufenListe(sub, cat).map((t, i) => t + " = " + (werte[i] !== undefined ? werte[i] : "?")).join(", ");
-    if(!confirm(catLabel(sub, cat) + " ab jetzt in den Notenschnitt einrechnen?\n\n" + text +
-                "\n\nDie Gewichtung stellst du darunter ein.")) { render(); return; }
-    sub.stufenZaehlt = sub.stufenZaehlt.concat([cat]);
+  if(!Array.isArray(sub.stufenBonus)) sub.stufenBonus = [];
+  const jetzt = istBonusCat(sub, cat) ? "bonus" : (stufeZaehlt(sub, cat) ? "anteil" : "nichts");
+  if(jetzt === wirkung) return;
+
+  if(wirkung === "anteil"){
+    const werte = stufenListe(sub, cat).map((t, i) =>
+      t + " = " + fmt(stufenWert(sub, { cat: cat, stufe: i }))).join(", ");
+    if(!confirm(catLabel(sub, cat) + " mit einem eigenen Anteil in den Notenschnitt einrechnen?\n\n" +
+                werte + "\n\nAchtung: Solange in den übrigen Kategorien noch keine Note steht, " +
+                "trägt diese Kategorie allein den ganzen Anteil. Wenn du das nicht möchtest, nimm Bonus.")){ render(); return; }
+  }
+  if(wirkung === "bonus"){
+    if(!confirm(catLabel(sub, cat) + " als Bonus wirken lassen?\n\n" +
+                "Die Einstufungen werden zusammengezählt und verbessern oder verschlechtern den Notenschnitt, " +
+                "höchstens um " + fmtB(bonusMax(sub)) + " Notenstufen. Ohne Noten in den übrigen Kategorien gibt es keinen Schnitt und damit auch keinen Bonus.")){ render(); return; }
+  }
+
+  sub.stufenZaehlt = sub.stufenZaehlt.filter(k => k !== cat);
+  sub.stufenBonus = sub.stufenBonus.filter(k => k !== cat);
+  if(wirkung === "anteil"){
+    sub.stufenZaehlt.push(cat);
     if(typeof sub.weights[cat] !== "number") sub.weights[cat] = isProzentMode(sub) ? 10 : 1;
-  } else {
-    sub.stufenZaehlt = sub.stufenZaehlt.filter(k => k !== cat);
+  } else if(wirkung === "bonus"){
+    sub.stufenBonus.push(cat);
   }
   save();
   render();
+}
+
+/* Ausführliche Erklärung erst auf Wunsch aufklappen. Die Einstellungen
+   sollen kurz aussehen, die Begründung soll trotzdem greifbar sein. */
+function toggleHilfe(id){
+  const el = document.getElementById(id);
+  if(el) el.style.display = (el.style.display === "none") ? "inline" : "none";
+}
+
+function setBonusMax(wert){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  sub.bonusMax = parseFloat(wert);
+  const el = document.getElementById("bonusMaxVal");
+  if(el) el.textContent = fmtB(sub.bonusMax) + " Notenstufen";
+  save();
+}
+
+/* Altbestand aus Fassung 8, als es nur zwei Zustände gab.  Führt auf
+   setStufenWirkung, damit nie beides gleichzeitig gesetzt sein kann. */
+function setStufeZaehlt(cat, an){
+  setStufenWirkung(cat, an ? "anteil" : "nichts");
 }
 
 function setStufenCat(cat, aufStufen){
@@ -3676,10 +4045,93 @@ function setStufenCat(cat, aufStufen){
   sub.stufenCats = aufStufen
     ? sub.stufenCats.concat([cat])
     : sub.stufenCats.filter(k => k !== cat);
-  if(!aufStufen && Array.isArray(sub.stufenZaehlt)) sub.stufenZaehlt = sub.stufenZaehlt.filter(k => k !== cat);
+  if(!aufStufen){
+    if(Array.isArray(sub.stufenZaehlt)) sub.stufenZaehlt = sub.stufenZaehlt.filter(k => k !== cat);
+    if(Array.isArray(sub.stufenBonus)) sub.stufenBonus = sub.stufenBonus.filter(k => k !== cat);
+  }
   if(!aufStufen && typeof sub.weights[cat] !== "number") sub.weights[cat] = isProzentMode(sub) ? 10 : 1;
   save();
   render();
+}
+
+/* ---------- STUFEN SELBST BENENNEN ----------
+   Die Vorgabetexte passen für Hausübung und Mitarbeit, aber nicht für jede
+   Kategorie, die eine Lehrkraft auf "ohne Note" stellt. Deshalb lässt sich
+   jede Stufe je Fach umbenennen. Die Einträge hängen am Stufenindex, nicht
+   am Text, Umbenennen kostet also keine Daten. */
+function toggleStufenTexte(cat){
+  settingsView.stufenOffen = (settingsView.stufenOffen === cat) ? null : cat;
+  render();
+}
+
+function setStufenText(cat, index, text){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  if(!sub.stufenTexte || typeof sub.stufenTexte !== "object") sub.stufenTexte = {};
+  const liste = stufenListe(sub, cat).slice();
+  const neu = String(text || "").trim();
+  if(!neu){
+    /* Leeres Feld heißt: die Vorgabe für diese eine Stufe zurückholen */
+    const vorgabe = STUFEN_LISTEN[cat] || STUFEN_LISTEN.hausuebung;
+    liste[index] = vorgabe[index] || ("Stufe " + (index + 1));
+  } else {
+    liste[index] = neu;
+  }
+  sub.stufenTexte[cat] = liste;
+  save();
+  render();
+}
+
+/* Eine Stufe mehr oder weniger. Beim Entfernen wandern vorhandene Einträge
+   der letzten Stufe nicht mit, deshalb die Rückfrage. */
+function setStufenAnzahl(cat, richtung){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  if(!sub.stufenTexte || typeof sub.stufenTexte !== "object") sub.stufenTexte = {};
+  const liste = stufenListe(sub, cat).slice();
+  if(richtung > 0){
+    if(liste.length >= 5){ alert("Mehr als fünf Stufen werden beim Eintragen unübersichtlich."); return; }
+    liste.splice(liste.length - 1, 0, "neue Stufe");
+  } else {
+    if(liste.length <= 2){ alert("Weniger als zwei Stufen ergeben keine Auswahl."); return; }
+    const letzte = liste.length - 1;
+    const betroffen = sub.entries.filter(e => e.type === "stufe" && e.cat === cat && e.stufe >= letzte).length;
+    if(betroffen && !confirm(betroffen + " Eintrag/Einträge liegen auf der letzten Stufe. Sie rücken auf die neue letzte Stufe. Trotzdem entfernen?")){ render(); return; }
+    liste.splice(letzte - 1, 1);
+    sub.entries.forEach(e => {
+      if(e.type === "stufe" && e.cat === cat && e.stufe >= liste.length) e.stufe = liste.length - 1;
+    });
+  }
+  sub.stufenTexte[cat] = liste;
+  save();
+  render();
+}
+
+function stufenTexteZuruecksetzen(cat){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub || !sub.stufenTexte) return;
+  const vorgabe = STUFEN_LISTEN[cat] || STUFEN_LISTEN.hausuebung;
+  const jetzt = stufenListe(sub, cat);
+  if(jetzt.length !== vorgabe.length){
+    const zuViel = sub.entries.filter(e => e.type === "stufe" && e.cat === cat && e.stufe >= vorgabe.length).length;
+    if(zuViel && !confirm("Die Vorgabe hat " + vorgabe.length + " Stufen, aktuell sind es " + jetzt.length +
+       ". " + zuViel + " Eintrag/Einträge rücken auf die letzte Stufe. Zurücksetzen?")){ render(); return; }
+    sub.entries.forEach(e => {
+      if(e.type === "stufe" && e.cat === cat && e.stufe >= vorgabe.length) e.stufe = vorgabe.length - 1;
+    });
+  }
+  delete sub.stufenTexte[cat];
+  save();
+  render();
+}
+
+/* Weichen die Texte von der Vorgabe ab? Steuert den Zurücksetzen-Knopf. */
+function hatEigeneStufenTexte(sub, cat){
+  if(!sub || !sub.stufenTexte || !Array.isArray(sub.stufenTexte[cat])) return false;
+  const vorgabe = STUFEN_LISTEN[cat] || STUFEN_LISTEN.hausuebung;
+  const jetzt = sub.stufenTexte[cat];
+  if(jetzt.length !== vorgabe.length) return true;
+  return jetzt.some((t, i) => t !== vorgabe[i]);
 }
 
 function setNewCatColor(fg){
@@ -3803,9 +4255,68 @@ if(kannOrdner()){
 
 /* Service Worker macht die App am Homescreen startbar und offline nutzbar.
    Läuft nur, wenn die Datei über http oder https geöffnet wird. */
+/* ---------- NEUE FASSUNG AUF DER ADRESSE ----------
+   Wenn die App über eine Webadresse läuft, hält der Zwischenspeicher des
+   Browsers gern die alte Fassung fest. Man sieht dann eine Nummer und weiß
+   nicht, ob sie stimmt. Deshalb sieht die App selbst nach, welche Fassung
+   auf der Adresse liegt, und sagt es, statt es die Lehrkraft raten zu lassen.
+
+   ACHTUNG beim Benennen: fassungPruefen() gibt es schon, das legt beim
+   Fassungswechsel die Sicherheitskopie an. Diese Funktion heißt deshalb
+   anders. */
+function adressFassungPruefen(){
+  if(location.protocol.indexOf("http") !== 0) return;
+  if(typeof fetch !== "function") return;
+  fetch("index.html?fassungspruefung=" + Date.now(), { cache: "no-store" })
+    .then(function(a){ return a.ok ? a.text() : null; })
+    .then(function(text){
+      if(!text) return;
+      const treffer = text.match(/APP_FASSUNG\s*=\s*"([^"]+)"/);
+      if(!treffer) return;
+      if(treffer[1] !== APP_FASSUNG){
+        neuereFassung = treffer[1];
+        render();
+      }
+    })
+    .catch(function(){});
+}
+
+/* Holt die neue Fassung wirklich: Zwischenspeicher leeren, Service Worker
+   abmelden, dann neu laden. Die Noten bleiben davon unberührt, sie liegen
+   in einem anderen Speicher. */
+function neueFassungHolen(){
+  if(!confirm("Die neue Fassung " + (neuereFassung || "") + " wird geladen.\n\n" +
+              "Deine Klassen und Noten bleiben erhalten, sie liegen in einem eigenen Speicher.\n\n" +
+              "Fortfahren?")) return;
+  const fertig = function(){ location.reload(true); };
+  const aufgaben = [];
+  if("caches" in window){
+    aufgaben.push(caches.keys().then(function(n){
+      return Promise.all(n.map(function(k){ return caches.delete(k); }));
+    }).catch(function(){}));
+  }
+  if("serviceWorker" in navigator){
+    aufgaben.push(navigator.serviceWorker.getRegistrations().then(function(regs){
+      return Promise.all(regs.map(function(r){ return r.unregister(); }));
+    }).catch(function(){}));
+  }
+  Promise.all(aufgaben).then(fertig, fertig);
+  setTimeout(fertig, 3000);
+}
+
 if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
   navigator.serviceWorker.register("sw.js").catch(function(){});
 }
+
+/* Beim Start nachsehen, und noch einmal, sobald wieder Netz da ist oder die
+   App nach vorne geholt wird. Ohne das bliebe der Hinweis aus, wenn die App
+   gerade offline gestartet wurde, und genau dann liefert der Zwischenspeicher
+   ja die alte Fassung. */
+adressFassungPruefen();
+window.addEventListener("online", adressFassungPruefen);
+document.addEventListener("visibilitychange", function(){
+  if(!document.hidden) adressFassungPruefen();
+});
 
 /* Nachsehen, ob die App gerade über das Übertragungsprogramm läuft */
 uebertragungPruefen();

@@ -1,6 +1,6 @@
 # Selbst ändern, ohne Daten zu verlieren
 
-Für Klassenheft ab Version 9. Diese Anleitung setzt keine Programmierkenntnisse voraus.
+Für Klassenheft ab Version 12. Diese Anleitung setzt keine Programmierkenntnisse voraus.
 
 ## Das Wichtigste zuerst: gehen die Schülerdaten verloren?
 
@@ -47,7 +47,12 @@ Das meiste geht direkt in der App unter *Einstellungen*, Fach auswählen:
 | Notenschlüssel-Stufe der Klasse | *Notenschlüssel* |
 | Schriftgröße | *Einstellungen*, Abschnitt *Darstellung* |
 | Eine Kategorie soll nicht in die Note zählen | *Einstellungen*, Fach, Abschnitt *Benotet oder nur vermerkt*, auf *ohne Note* |
-| Mitarbeit oder Hausübung sollen doch mitzählen | derselbe Abschnitt, darunter auf *zählt mit* |
+| Mitarbeit oder Hausübung sollen die Note verbessern können | derselbe Abschnitt, Wirkung auf *Bonus* |
+| Der Bonus soll stärker oder schwächer wirken | derselbe Abschnitt, Regler *Bonus höchstens*, 0,25 bis 1,0 Notenstufen |
+| Mitarbeit oder Hausübung sollen wie eine Note zählen | derselbe Abschnitt, Wirkung auf *eigener Anteil* |
+| Kompetenz-Check ohne Note, mit Stufen zum Antippen | derselbe Abschnitt, beim Kompetenz-Check auf *ohne Note* |
+| Andere Bezeichnungen für die Stufen | derselbe Abschnitt, unter der Kategorie auf *benennen*. Gilt je Fach, kostet keine Daten |
+| Eine Stufe mehr oder weniger | dort auf *+ Stufe* bzw. *− Stufe*, zwischen zwei und fünf |
 | Name und Schuljahr auf dem Ausdruck | *Einstellungen*, *Angaben für den Ausdruck* |
 
 Wenn dein Wunsch in dieser Tabelle steht, brauchst du den Rest dieser Anleitung nicht.
@@ -64,7 +69,7 @@ Ganz oben in der Datei steht ein Block mit der Überschrift **HIER DARFST DU GEF
    Richtig: `schularbeit: "Schularbeit"` wird zu `schularbeit: "Schularbeit neu"`
    Falsch: `Schularbeit: "Schularbeit"`
 2. Kommas, geschweifte Klammern und eckige Klammern stehen lassen.
-3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "9";` wird zu `"10"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
+3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "12";` wird zu `"13"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
 
 ### Was wo steht
 
@@ -81,11 +86,16 @@ Hier liegen Allgemein, die drei Deutsch-Varianten, Mathematik und die beiden Neb
 Je Zeile ein Paar: Grenzwert und Note. Bei `DIKTAT_KEYS` bedeutet `[5,1]`: bis fünf Fehler gibt es eine Eins. Bei `PROZENT_KEYS` bedeutet `[90,1]`: ab neunzig Prozent gibt es eine Eins. `stufe1` ist die erste Klasse, `ahs` das Leistungsniveau Standard AHS, `standard` das Niveau Standard.
 
 **Stufen für Hausübung und Mitarbeit** (`STUFEN_LISTEN`)
-Die Stufen von der besten zur schwächsten. Änderst du hier die Texte, gelten sie für alle Fächer, in denen die Kategorie ohne Note läuft. Daneben stehen drei zusammengehörige Listen, die dieselbe Reihenfolge haben müssen:
+Die Stufen von der besten zur schwächsten. Änderst du hier die Texte, gelten sie als **Vorgabe** für alle Fächer, in denen die Kategorie ohne Note läuft. Für ein einzelnes Fach brauchst du den Code nicht: dort geht es direkt in der App über *benennen*. Kategorien ohne eigenen Eintrag in dieser Liste, etwa der Kompetenz-Check, erben die Stufen der Hausübung. Daneben stehen drei zusammengehörige Listen, die dieselbe Reihenfolge haben müssen:
 
 - `STUFEN_ZEICHEN` die Kurzzeichen (+, ~, −), die in der Sammelerfassung auf den Feldern stehen
-- `STUFEN_WERTE` die Werte auf der Notenskala, falls du eine Kategorie auf *zählt mit* stellst
+- `STUFEN_WERTE` die Werte auf der Notenskala, falls du eine Kategorie auf *eigener Anteil* stellst
 - `STUFEN_VORGABE` welche Kategorien in einem neuen Fach von Anfang an ohne Note laufen
+
+**Bonus für die Mitarbeit** (`STUFEN_BONUS`, `BONUS_MAX_VORGABE`, `STUFEN_BONUS_VORGABE`)
+In `STUFEN_BONUS` steht je Kategorie, um wie viel eine einzelne Einstufung den Notenschnitt verschiebt, in derselben Reihenfolge wie die Stufen. **Minus verbessert, Plus verschlechtert.** Die Werte werden zusammengezählt, nicht gemittelt, deshalb bringt mehr Mitarbeit auch mehr. `BONUS_MAX_VORGABE` ist die Obergrenze für neue Fächer, in bestehenden Fächern stellst du sie über den Regler ein. `STUFEN_BONUS_VORGABE` sagt, welche Kategorien in einem neuen Fach gleich als Bonus laufen; Vorgabe ist nur die Mitarbeit.
+
+Halte die Einzelwerte klein. Bei 0,15 je Eintrag und einer Obergrenze von 0,5 braucht es vier gute Mitarbeiten für die volle Wirkung, das fühlt sich beim Eintragen richtig an. Werte über 0,3 machen die Obergrenze nach zwei Einträgen wirkungslos.
 
 Wenn du `STUFEN_VORGABE` änderst, zähle zusätzlich `STUFEN_STAND` um eins hoch. Dann ziehen bestehende Fächer die neue Vorgabe genau einmal nach, ohne das zu überschreiben, was du in einem Fach von Hand eingestellt hast.
 

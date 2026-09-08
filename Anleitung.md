@@ -1,4 +1,4 @@
-# Klassenheft, Version 9
+# Klassenheft, Version 12
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -59,31 +59,91 @@ Hausübung und Mitarbeit sind in der App **keine Noten**. Sie werden in Stufen f
 
 | Kategorie | Stufen | Zeichen |
 |---|---|---|
-| Mitarbeit | sehr gute Mitarbeit · gute Mitarbeit · keine Mitarbeit | + ~ − |
+| Mitarbeit | sehr gute Mitarbeit · gute Mitarbeit · wenig Mitarbeit · keine Mitarbeit | ++ + ~ − |
 | Hausübung | sehr gut gemacht · gut gemacht · gemacht · nicht gemacht | ++ + ~ − |
+| Kompetenz-Check und alle anderen | wie die Hausübung, umbenennbar | ++ + ~ − |
 
-Diese Einträge erscheinen im Verlauf, in der Statistik unter *Ohne Note*, auf dem Elternsprechtag-Blatt und in der Wochensicherung, aber sie verändern den Notenschnitt nicht. Ein Tipp genügt, gespeichert wird sofort.
+**Alle Kategorien ohne Note haben dieselben vier Stufen und dieselben vier Zeichen.** Das ist Absicht: Die Felder liegen dann immer an derselben Stelle, egal welche Beurteilungsart offen ist, und du musst beim Eintragen nicht mehr hinsehen. Die vier Felder sind zusätzlich farblich abgestuft, von Grün über Oliv und Bernstein zu Rot.
+
+Diese Einträge erscheinen im Verlauf, in der Statistik unter *Nur vermerkt, ohne Note*, auf dem Elternsprechtag-Blatt und in der Wochensicherung. Ein Tipp genügt, gespeichert wird sofort.
 
 Weil es diese Einstufungen gibt, sind die früheren Knöpfe *Positiv* und *Negativ* entfallen. Die Notiz bleibt für alles, was in Worte gehört.
 
+### Wo du das einstellst
+
+*Einstellungen*, Fach auswählen, Abschnitt **Benotet oder nur vermerkt**. Dort stehen **alle** Beurteilungsarten, auch die, die in diesem Fach gerade nicht verwendet werden. Die sind abgeblendet und tragen den Vermerk *nicht in Verwendung* mit einem Knopf *einschalten* daneben.
+
+Das ist wichtig zu wissen, weil der **Kompetenz-Check** nur in der Vorlage *Allgemein* von Haus aus dabei ist. In Mathematik, in allen drei Deutsch-Varianten und in den Nebenfach-Vorlagen musst du ihn erst einschalten, dann erscheinen seine Chips.
+
+### Jede Kategorie darf ohne Note laufen
+
+Das gilt nicht nur für Hausübung und Mitarbeit. **Jede** Kategorie lässt sich auf *ohne Note* stellen, auch der Kompetenz-Check, die Schularbeit, das Diktat oder eine selbst angelegte Beurteilung.
+
+Beim **Kompetenz-Check** ist das besonders praktisch: Als Note bekommst du die Checkliste der Kompetenzen und daraus eine Ziffer. Auf *ohne Note* gestellt, bekommst du stattdessen vier Stufen zum Antippen — sehr gut gemacht, gut gemacht, gemacht, nicht gemacht — und ein Tipp genügt. Umschalten kannst du jederzeit, die bereits eingetragenen Daten bleiben in beiden Richtungen erhalten.
+
+### Die Stufen selbst benennen
+
+Die Vorgabetexte passen nicht überall. Deshalb steht in den Fach-Einstellungen unter jeder Kategorie ohne Note der Knopf **benennen**.
+
+Dort tippst du jede Stufe selbst ein, von der besten zur schwächsten, und kannst mit **+ Stufe** und **− Stufe** zwischen zwei und fünf Stufen wählen. Für den Kompetenz-Check zum Beispiel: *vollständig erreicht · überwiegend erreicht · teilweise erreicht · noch nicht erreicht*.
+
+Drei Dinge, die du wissen solltest:
+
+- **Die Benennung gilt je Fach getrennt.** Deutsch in der 3A und Deutsch in der 4C können unterschiedliche Texte haben.
+- **Umbenennen kostet keine Daten.** Die Einträge hängen an der Position der Stufe, nicht am Text. Ein bereits eingetragener Vermerk heißt danach einfach anders.
+- **Ein leeres Feld holt die Vorgabe** für diese eine Stufe zurück, **Vorgabe zurückholen** stellt alle Texte wieder her.
+
+Die Kurzzeichen passen sich der Anzahl an: bei zwei Stufen + −, bei drei + ~ −, bei vier ++ + ~ −, bei fünf ++ + ~ − −−. Ebenso die Farbabstufung.
+
 ### Du entscheidest, was in die Note einfließt
 
-Unter *Einstellungen*, Fach auswählen, Abschnitt **Benotet oder nur vermerkt** steht bei jeder Kategorie zuerst *Note* oder *ohne Note*, und bei *ohne Note* zusätzlich *zählt nicht* oder *zählt mit*.
+Unter *Einstellungen*, Fach auswählen, Abschnitt **Benotet oder nur vermerkt** steht bei jeder Kategorie zuerst *Note* oder *ohne Note*. Bei *ohne Note* wählst du darunter die **Wirkung auf den Notenschnitt**, drei Möglichkeiten:
 
-Auf *zählt mit* gestellt, bekommen die Stufen feste Werte auf der Notenskala und lassen sich wie jede andere Kategorie gewichten:
+| Wirkung | Was passiert |
+|---|---|
+| **keine** | Die Einträge werden nur vermerkt und bleiben aus der Rechnung heraus. |
+| **Bonus** | Die Einstufungen werden zusammengezählt und verschieben den Notenschnitt, insgesamt aber höchstens um die Obergrenze, die du darunter einstellst. |
+| **eigener Anteil** | Die Kategorie bekommt feste Werte auf der Notenskala und einen eigenen Gewichtungsregler, zählt also wie eine Note. |
 
-- Mitarbeit: sehr gute = 1, gute = 3, keine = 5
+**Vorgabe ist bei der Mitarbeit *Bonus*, bei der Hausübung *keine*.**
+
+### Wie der Bonus für die Mitarbeit rechnet
+
+Der Grundgedanke: Wer mehr mitarbeitet, soll etwas davon haben. Die Mitarbeit darf aber nie über der Schularbeit stehen.
+
+Deshalb zählt die App die Einstufungen zusammen, statt sie zu mitteln:
+
+| Mitarbeit | Bonus je Eintrag |
+|---|---|
+| sehr gute Mitarbeit | −0,15 (verbessert) |
+| gute Mitarbeit | −0,05 (verbessert ein wenig) |
+| wenig Mitarbeit | +0,05 (verschlechtert ein wenig) |
+| keine Mitarbeit | +0,15 (verschlechtert) |
+
+Drei gute Mitarbeiten sind also besser als eine, sechs besser als drei. Nach oben ist trotzdem Schluss: Die Summe wird auf die Obergrenze gekappt, Vorgabe **0,5 Notenstufen**, einstellbar über den Regler *Bonus höchstens* zwischen 0,25 und 1,0.
+
+Ein Beispiel: Zwei Schularbeiten mit Dreier ergeben den Schnitt 3,0. Mit dreimal sehr guter Mitarbeit werden daraus 2,55, mit sechsmal 2,50 und keinen Deut besser. Eine gekippte Note ist also möglich, ein Sprung vom Dreier auf den Einser nicht.
+
+**Ohne Noten gibt es überhaupt keinen Schnitt und damit auch keinen Bonus.** Wer nur Mitarbeitseinträge hat und noch keine Schularbeit, hat weiterhin keinen Notenschnitt, egal wie fleißig. Das war vorher anders und ist der wichtigste Unterschied zur Einstellung *eigener Anteil*: Die trägt, solange sonst nichts eingetragen ist, allein den ganzen Anteil, und dann bestimmt eine einzige Mitarbeit die Note. Wenn du das nicht möchtest, nimm Bonus.
+
+### Wo der Bonus sichtbar ist
+
+- In der Schüleransicht steht unter dem Notenschnitt, wie er zustande kommt, zum Beispiel `2,7 − 0,45 Bonus`, und neben der Mitarbeit ein Merkzeichen `Bonus −0,45`.
+- Im Notenverlauf sind es zwei Linien: lange Striche für den Schnitt der Noten, kurze Striche für den Wert mit Bonus, darunter ein Satz, der beide benennt.
+- Auf dem Elternsprechtag-Blatt und in der Word-Sicherung steht derselbe Satz ausgeschrieben, samt Hinweis, wenn die Obergrenze erreicht wurde.
+
+Auf *eigener Anteil* gestellt, bekommen die Stufen stattdessen feste Werte auf der Notenskala:
+
+- Mitarbeit: sehr gute = 1, gute = 2, wenig = 3, keine = 5
 - Hausübung: sehr gut gemacht = 1, gut gemacht = 2, gemacht = 3, nicht gemacht = 5
-
-Vorgabe ist *zählt nicht*. Es bleibt auch dann eine Einstufung und keine Note, die Zuordnung sagt nur, mit welchem Wert sie in die Rechnung eingeht.
 
 Das gilt für **jede** Kategorie, auch für Schularbeit, Diktat oder eine selbst angelegte Beurteilung. Du kannst also jede davon auf *ohne Note* stellen oder umgekehrt eine Einstufung mitzählen lassen. Die Einstellung gilt je Fach getrennt.
 
-Ganz oben in den Einstellungen eines Fachs steht unter **Was in die Note einfließt** immer der aktuelle Stand im Klartext, also welche Kategorien zählen und welche nur vermerkt werden.
+Ganz oben in den Einstellungen eines Fachs steht unter **Was in die Note einfließt** immer der aktuelle Stand im Klartext: welche Kategorien zählen, welche als Bonus wirken und mit welcher Obergrenze, und welche nur vermerkt werden.
 
-Alle Texte in der App richten sich danach: In der Schüleransicht steht neben Mitarbeit und Hausübung ein Merkzeichen *zählt mit* oder *zählt nicht*, im Notenverlauf sind mitgezählte Einstufungen als offene Punkte gezeichnet, und auf dem Elternsprechtag-Blatt steht ausgeschrieben, wie die Kategorie behandelt wird, samt der verwendeten Werte. Es wird also nirgends behauptet, etwas werde nicht benotet, wenn du es doch mitzählen lässt.
+Alle Texte in der App richten sich danach. Es wird nirgends behauptet, etwas werde nicht benotet, wenn du es doch mitzählen lässt.
 
-Fächer, in denen aus einer früheren Fassung schon Noten in Mitarbeit oder Hausübung liegen, bleiben unverändert bei Noten, damit sich kein bereits angezeigter Notenschnitt rückwirkend ändert.
+Fächer, in denen aus einer früheren Fassung schon Noten in Mitarbeit oder Hausübung liegen, bleiben unverändert bei Noten, damit sich kein bereits angezeigter Notenschnitt rückwirkend ändert. Ebenso bleibt ein Fach, in dem du die Mitarbeit ausdrücklich auf *zählt mit* gestellt hast, genau dort stehen. Den Bonus bekommt nur, wo die Mitarbeit bisher gar keine Wirkung hatte.
 
 ## Nicht mitgeschrieben
 
@@ -95,7 +155,7 @@ Ganz oben stehen Notenschnitt, Anzahl der Noten, der Notenverlauf und die Zusamm
 
 ## Grafischer Verlauf
 
-In der Schüleransicht steht über den Noten ein **Notenverlauf**: die Noten in zeitlicher Folge, oben die Eins, unten die Fünf, die strichlierte Linie ist der Schnitt. Er erscheint, sobald mindestens zwei Noten vorliegen, und steht genauso auf dem Elternsprechtag-Blatt.
+In der Schüleransicht steht über den Noten ein **Notenverlauf**: die Noten in zeitlicher Folge, oben die Eins, unten die Fünf, die lang strichlierte Linie ist der Schnitt der Noten, eine fein gepunktete Linie kommt dazu, sobald ein Bonus wirkt. Er erscheint, sobald mindestens zwei Noten vorliegen, und steht genauso auf dem Elternsprechtag-Blatt.
 
 In der Statistik gibt es zusätzlich die **Verteilung der Noten** für die ganze Klasse, also wie oft welche Note vergeben wurde. Auch sie ist auf der Klassenübersicht mit ausgedruckt.
 
