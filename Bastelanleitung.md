@@ -1,6 +1,6 @@
 # Selbst ändern, ohne Daten zu verlieren
 
-Für Klassenheft ab Version 12. Diese Anleitung setzt keine Programmierkenntnisse voraus.
+Für Klassenheft ab Version 13. Diese Anleitung setzt keine Programmierkenntnisse voraus.
 
 ## Das Wichtigste zuerst: gehen die Schülerdaten verloren?
 
@@ -69,7 +69,7 @@ Ganz oben in der Datei steht ein Block mit der Überschrift **HIER DARFST DU GEF
    Richtig: `schularbeit: "Schularbeit"` wird zu `schularbeit: "Schularbeit neu"`
    Falsch: `Schularbeit: "Schularbeit"`
 2. Kommas, geschweifte Klammern und eckige Klammern stehen lassen.
-3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "12";` wird zu `"13"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
+3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "13";` wird zu `"14"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
 
 ### Was wo steht
 

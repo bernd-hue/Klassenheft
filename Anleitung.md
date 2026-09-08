@@ -1,4 +1,4 @@
-# Klassenheft, Version 12
+# Klassenheft, Version 13
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -52,6 +52,38 @@ Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit eine
 **Wer gefehlt hat** bekommt das graue Feld ganz rechts in seiner Zeile.
 
 Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese Maske ist jetzt schlanker: Beurteilungsart, die fünf Notenfelder, Speichern. Der Rechner für Punkte und Prozent sowie die Gewichtung stehen darunter und stören den kurzen Weg nicht mehr.
+
+## Die Schüleransicht
+
+Ganz oben steht die **allgemeine Leistungstendenz**: der Notenschnitt groß, daneben die Note in Worten und ein Pfeil, wohin sich die Leistung bewegt. Der Pfeil erscheint ab vier Noten, darunter wäre er Zufall und die App sagt das auch.
+
+Liegt der Schnitt genau dazwischen, steht das auch so da: *zwischen Befriedigend und Genügend*. Ein „eher Genügend" bei 3,5 würde eine Entscheidung behaupten, die die Zahl nicht hergibt.
+
+Darunter der **Schnitt je Beurteilungsart** — Schularbeit 3,5, Test 2,5 und so fort. Die frühere Anzeige „Anzahl der Noten" ist entfallen, sie hat nichts gesagt.
+
+Dann gleich die Knöpfe: **Leistung eintragen**, Notiz, Foto, Elternsprechtag-Blatt. Sie stehen jetzt oben, nicht mehr ganz unten, damit der häufigste Handgriff ohne Scrollen erreichbar ist.
+
+### Namen ausbessern
+
+Ein Tippfehler im Namen fällt oft erst Wochen später auf. Tippe in der Schüleransicht auf den Namen oder auf **ändern** daneben. Die Noten hängen nicht am Namen, sondern an der Person, das Umbenennen kostet also nichts.
+
+### Datum ausbessern
+
+Der Tag der Schularbeit ist selten der Tag, an dem du sie korrigierst und einträgst. Klapp die Einträge auf, tipp auf das **unterstrichene Datum** und trag den richtigen Tag ein, im Format TT.MM. Die App prüft die Eingabe und lehnt einen 32. Jänner ab.
+
+### Was-wäre-wenn
+
+Unter dem Verlauf steht ein Bereich zum Herzeigen. Tipp eine Beurteilungsart an, um sie **probeweise** aus der Rechnung zu nehmen, und du siehst sofort, was das mit der Note macht. Darunter steht ausgerechnet, welcher Schnitt herauskäme, wenn die Mitarbeit ab jetzt durchgehend die beste Stufe wäre — genau der Satz, den man einem Kind sagen will:
+
+> Bei durchgehend bester Mitarbeit: Ø 2,9 statt Ø 3,5 jetzt.
+
+**Es wird dabei nichts verändert und nichts gespeichert.** Der echte Notenschnitt bleibt, wie er ist. *Zurücksetzen* räumt die Vorschau wieder ab.
+
+### Thema einer Leistung
+
+In jeder Eingabemaske gibt es ein freiwilliges Feld **Thema**: Bruchrechnung, Gleichungen, Seite 42. Es steht danach beim Eintrag, auf dem Elternsprechtag-Blatt und in der Word-Sicherung. Leer lassen ist der Normalfall, dann steht dort wie bisher nur die Beurteilungsart.
+
+In der Sammelerfassung gilt das Thema für die ganze Runde. Du kannst es auch nachtragen, wenn schon die halbe Klasse eingetragen ist — die bereits gesetzten Zeilen ziehen mit.
 
 ## Was benotet wird und was nicht
 

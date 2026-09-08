@@ -1,6 +1,6 @@
 # Klassenheft auf iPhone und MacBook installieren
 
-Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 08.09.2026, Version 12.
+Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 08.09.2026, Version 13.
 
 ---
 
@@ -22,7 +22,7 @@ Du hast bereits eine Adresse: **bernd-hue.github.io/Klassenheft**. Dort liegt ei
 2. Oben auf **Add file**, dann **Upload files**.
 3. Im Finder den entpackten Ordner **Klassenheft_App** öffnen.
 4. Dort alle Dateien markieren, mit **Cmd + A**, und mit der Maus in das GitHub-Fenster ziehen. **Nicht den Ordner selbst hineinziehen, sondern seinen Inhalt** — sonst landet alles in einem Unterordner und die Adresse zeigt weiter die alte Fassung.
-5. Unten ins Textfeld **Version 12** schreiben und auf **Commit changes** klicken.
+5. Unten ins Textfeld **Version 13** schreiben und auf **Commit changes** klicken.
 6. Ein bis zwei Minuten warten. GitHub braucht kurz, bis die neue Fassung ausgeliefert wird.
 
 Die alten Dateien mit gleichem Namen werden dabei überschrieben, das ist so gewollt.
@@ -33,12 +33,12 @@ Die alten Dateien mit gleichem Namen werden dabei überschrieben, das ist so gew
 
 ## Schritt 2: Nachsehen, ob die neue Fassung da ist
 
-Am MacBook **bernd-hue.github.io/Klassenheft** aufrufen, dann unten auf **Einstellungen** und ganz nach unten scrollen. Dort steht seit Version 12 ein eigener Abschnitt **FASSUNG**.
+Am MacBook **bernd-hue.github.io/Klassenheft** aufrufen, dann unten auf **Einstellungen** und ganz nach unten scrollen. Dort steht seit Version 13 ein eigener Abschnitt **FASSUNG**.
 
 **Die App sagt dir selbst, woran du bist:**
 
-- *"Geladen ist Klassenheft, Version 12. Das ist die Fassung, die auch auf der Adresse liegt."* → alles in Ordnung, weiter mit Schritt 3.
-- *"Geladen ist Klassenheft, Version 9. Auf der Adresse liegt bereits Version 12."* → dein Browser zeigt noch die alte Fassung aus seinem Zwischenspeicher. Darunter steht ein Knopf **Version 12 jetzt laden**. Einmal darauf tippen, fertig. **Deine Klassen und Noten bleiben dabei erhalten**, sie liegen in einem eigenen Speicher, den das Aktualisieren nicht berührt.
+- *"Geladen ist Klassenheft, Version 13. Das ist die Fassung, die auch auf der Adresse liegt."* → alles in Ordnung, weiter mit Schritt 3.
+- *"Geladen ist Klassenheft, Version 9. Auf der Adresse liegt bereits Version 13."* → dein Browser zeigt noch die alte Fassung aus seinem Zwischenspeicher. Darunter steht ein Knopf **Version 13 jetzt laden**. Einmal darauf tippen, fertig. **Deine Klassen und Noten bleiben dabei erhalten**, sie liegen in einem eigenen Speicher, den das Aktualisieren nicht berührt.
 
 Der Knopf ist der zuverlässige Weg. Er leert den Zwischenspeicher, meldet den Hintergrunddienst ab und lädt neu. Das ist genau das, was man sonst von Hand machen müsste.
 
@@ -118,7 +118,7 @@ Dann lade ich dir eine neue `index.html`, du lädst sie wie in Schritt 1 bei Git
 ## Kurzfassung zum Abhaken
 
 - [ ] Dateien bei GitHub hochgeladen
-- [ ] Am MacBook unter Einstellungen, Abschnitt FASSUNG, geprüft, dass Version 12 geladen ist
+- [ ] Am MacBook unter Einstellungen, Abschnitt FASSUNG, geprüft, dass Version 13 geladen ist
 - [ ] Am MacBook in Chrome installiert
 - [ ] Am iPhone in Safari zum Home-Bildschirm hinzugefügt
 - [ ] Am iPhone ab jetzt nur noch das Symbol verwenden

@@ -83,6 +83,7 @@
     display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:15px; flex-shrink:0;
   }
   .avatar.small{width:38px; height:38px; font-size:12px; border-width:1.5px;}
+  .datum-klick{text-decoration:underline; cursor:pointer;}
   .stats{display:flex; border-bottom:2px solid #000000;}
   .stat{flex:1; padding:12px 8px; text-align:center;}
   .stat:first-child{border-right:1px solid #000000;}
@@ -236,7 +237,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "12";
+const APP_FASSUNG = "13";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -546,6 +547,42 @@ function catCol(sub, key){
 /* Bezeichnung einer Note. Sie hängt an der Kategorie, damit eine umbenannte
    eigene Beurteilung überall mitwandert. Für Altbestände, deren Kategorie es
    nicht mehr gibt, greift der beim Eintragen gespeicherte Text. */
+/* Anklickbares Datum. Sieht überall gleich aus und führt zum Ausbessern. */
+/* Freies Feld für den Inhalt einer Leistung, etwa "Bruchrechnung" oder
+   "Gleichungen". Immer freiwillig: leer lassen ist der Normalfall, und dann
+   steht überall nur die Beurteilungsart wie bisher. */
+function themaFeld(id, wert, platzhalter){
+  return `<div style="padding:0 16px 8px;">
+    <span class="field-label">Thema, freiwillig</span>
+    <input type="text" id="${id}" value="${esc(wert || "")}" placeholder="${esc(platzhalter)}"
+           style="margin-bottom:0;" autocomplete="off">
+  </div>`;
+}
+
+function themaVorschlag(cat){
+  if(cat === "kompetenz") return "z. B. Bruchrechnung";
+  if(cat === "hausuebung") return "z. B. Seite 42, Aufgabe 3";
+  if(cat === "diktat") return "z. B. Wörter mit ie";
+  return "z. B. Gleichungen";
+}
+
+function themaLesen(id){
+  const el = document.getElementById(id);
+  return el && el.value.trim() ? el.value.trim() : null;
+}
+
+function datumFeld(e){
+  return '<span class="date datum-klick" title="Datum ändern" onclick="datumAendern(\'' + e.id + '\')">' +
+         esc(e.date || "\u2013") + "</span>";
+}
+
+/* Bezeichnung eines Eintrags, also die Beurteilungsart, ergänzt um das Thema,
+   falls eines eingetragen wurde. */
+function eintragTitel(sub, e){
+  const art = noteBezeichnung(sub, e);
+  return e.thema ? art + ": " + e.thema : art;
+}
+
 function noteBezeichnung(sub, n){
   if(findCustom(sub, n.cat) || CAT_LABELS[n.cat]) return catLabel(sub, n.cat);
   return n.label || "Note";
@@ -965,7 +1002,8 @@ let pendingPhoto = null;
 let tab = "home";
 let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                  newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
-                 zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null };
+                 zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
+                 thema:null, schnellThema:null };
 let statView = { screen:"list", classId:null, subjectId:null };
 let settingsView = { screen:"list", classId:null, subjectId:null, stufenOffen:null };
 
@@ -1076,6 +1114,110 @@ function schnittAus(sub, notes){
   notes.forEach(n => { const w = noteWeight(sub, n); sum += n.value * w; wsum += w; });
   return wsum > 0 ? sum / wsum : null;
 }
+
+/* ---------- LEISTUNGSTENDENZ UND KATEGORIENSCHNITTE ----------
+   Die Anzahl der Noten sagt niemandem etwas. Nützlich ist, wie die Leistung
+   je Beurteilungsart aussieht und wohin sie sich bewegt. */
+
+/* Note in Worten, mit "eher" wenn der Wert dazwischen liegt */
+const NOTEN_WORTE = ["Sehr gut", "Gut", "Befriedigend", "Genügend", "Nicht genügend"];
+
+function notenWort(v){
+  if(v === null || isNaN(v)) return "";
+  const unten = Math.max(1, Math.min(5, Math.floor(v)));
+  const oben = Math.max(1, Math.min(5, Math.ceil(v)));
+  const rest = v - Math.floor(v);
+  /* Genau dazwischen ist genau dazwischen. Ein "eher Genügend" bei 3,5 würde
+     eine Entscheidung behaupten, die die Zahl nicht hergibt. */
+  if(unten !== oben && rest > 0.42 && rest < 0.58){
+    return "zwischen " + NOTEN_WORTE[unten - 1] + " und " + NOTEN_WORTE[oben - 1];
+  }
+  const nah = Math.max(1, Math.min(5, Math.round(v)));
+  return (Math.abs(v - nah) < 0.25 ? "" : "eher ") + NOTEN_WORTE[nah - 1];
+}
+
+/* Schnitt je Kategorie, nur für die, die auch in den Notenschnitt eingehen */
+function kategorienSchnitte(sub, studentId, sem){
+  const noten = wertendeNoten(sub, studentId, sem);
+  const ergebnis = [];
+  activeCats(sub).forEach(cat => {
+    const drin = noten.filter(n => n.cat === cat);
+    if(!drin.length) return;
+    let summe = 0, gewicht = 0;
+    drin.forEach(n => { const q = noteWeight(sub, n); summe += n.value * q; gewicht += q; });
+    if(gewicht <= 0) return;
+    ergebnis.push({ cat: cat, label: catLabel(sub, cat), kurz: catShort(sub, cat),
+                    schnitt: summe / gewicht, anzahl: drin.length });
+  });
+  return ergebnis;
+}
+
+/* Wohin bewegt sich die Leistung? Erste Hälfte der Werte gegen zweite.
+   Unter vier Werten ist das Zufall, dann sagen wir lieber nichts. */
+function tendenz(sub, studentId, sem){
+  const noten = wertendeNoten(sub, studentId, sem);
+  if(noten.length < 4) return { richtung: "unklar", pfeil: "", text: "" };
+  const mitte = Math.floor(noten.length / 2);
+  const mittelAus = liste => liste.reduce((a, e) => a + e.value, 0) / liste.length;
+  const frueher = mittelAus(noten.slice(0, mitte));
+  const spaeter = mittelAus(noten.slice(noten.length - mitte));
+  const unterschied = frueher - spaeter;      /* positiv heißt: besser geworden */
+  if(unterschied > 0.35) return { richtung: "besser", pfeil: "\u2197", text: "wird besser" };
+  if(unterschied < -0.35) return { richtung: "schlechter", pfeil: "\u2198", text: "wird schwächer" };
+  return { richtung: "stabil", pfeil: "\u2192", text: "gleichbleibend" };
+}
+
+/* Gedeckte Farbe für die große Tendenzkachel. Bewusst nicht grell:
+   das Feld ist groß, ein kräftiger Ton würde den ganzen Bildschirm dominieren. */
+function tendenzFarbe(v){
+  if(v === null) return { fg:"#4A4943", bg:"#F4F3F0" };
+  if(v < 2.5) return { fg:"#2A6B2E", bg:"#EDF5EB" };
+  if(v < 3.5) return { fg:"#7A6B10", bg:"#F7F4E8" };
+  if(v < 4.5) return { fg:"#96650F", bg:"#FAF3E8" };
+  return { fg:"#A8241C", bg:"#FAEEEE" };
+}
+
+/* ---------- NOTENVORHERSAGE ----------
+   Zum Herzeigen: Kategorien probeweise weglassen und sehen, was das mit der
+   Note macht. Verändert nichts am Bestand, es wird nichts gespeichert. */
+let vorschauAus = [];
+
+function vorschauSchnitt(sub, studentId, sem){
+  if(!vorschauAus.length) return computeSchnitt(sub, studentId, sem);
+  const kopie = JSON.parse(JSON.stringify(sub));
+  kopie.cats = (kopie.cats || []).filter(k => vorschauAus.indexOf(k) === -1);
+  kopie.stufenBonus = (kopie.stufenBonus || []).filter(k => vorschauAus.indexOf(k) === -1);
+  kopie.stufenZaehlt = (kopie.stufenZaehlt || []).filter(k => vorschauAus.indexOf(k) === -1);
+  kopie.entries = kopie.entries.filter(e => vorschauAus.indexOf(e.cat) === -1);
+  return computeSchnitt(kopie, studentId, sem);
+}
+
+/* Was käme heraus, wenn die Mitarbeit ab jetzt durchgehend die beste Stufe
+   wäre? Genau der Satz, den man dem Kind sagen will. */
+function bestenfalls(sub, studentId, sem){
+  const bonusCats = activeCats(sub).filter(k => istBonusCat(sub, k));
+  if(!bonusCats.length) return null;
+  const grund = schnittOhneBonus(sub, studentId, sem);
+  if(grund === null) return null;
+  const jetzt = computeSchnitt(sub, studentId, sem);
+
+  const kopie = JSON.parse(JSON.stringify(sub));
+  kopie.entries = kopie.entries.map(e => {
+    if(e.type === "stufe" && bonusCats.indexOf(e.cat) !== -1) return Object.assign({}, e, { stufe: 0 });
+    return e;
+  });
+  const best = computeSchnitt(kopie, studentId, sem);
+  if(best === null || Math.abs(best - jetzt) < 0.005) return null;
+  return { jetzt: jetzt, best: best, cats: bonusCats.map(k => catLabel(sub, k)) };
+}
+
+function vorschauSchalten(cat){
+  const i = vorschauAus.indexOf(cat);
+  if(i === -1) vorschauAus.push(cat); else vorschauAus.splice(i, 1);
+  render();
+}
+
+function vorschauZuruecksetzen(){ vorschauAus = []; render(); }
 
 function countPosNeg(sub, studentId, sem){
   let pos = 0, neg = 0;
@@ -1501,7 +1643,8 @@ function renderStudent(){
       const liste = (n.achieved || []).join(", ") || "keine";
       return `<div class="entry">
         <span class="catdot" style="background:${col.fg};"></span>
-        <div class="txt">Kompetenz-Check ${n.date} &ndash; ${liste} (${(n.achieved||[]).length}/${n.total})</div>
+        <div class="txt">${esc(eintragTitel(sub, n))} &ndash; ${esc(liste)} (${(n.achieved||[]).length}/${n.total})</div>
+        ${datumFeld(n)}
         <span class="grade" style="color:${gcol.fg};">${n.value}</span>
         <button class="ghost small" onclick="deleteEntry('${n.id}')" title="löschen">&times;</button>
       </div>`;
@@ -1509,7 +1652,8 @@ function renderStudent(){
     const basis = n.basis ? ` <span style="font-size:11px;">(${n.basis})</span>` : "";
     return `<div class="entry">
       <span class="catdot" style="background:${col.fg};"></span>
-      <div class="txt">${noteBezeichnung(sub, n)} ${n.date}${basis}</div>
+      <div class="txt">${esc(eintragTitel(sub, n))}${basis}</div>
+      ${datumFeld(n)}
       <span class="badge" style="border-color:${col.fg}; color:${col.fg}; background:${col.bg};">${fmtW(noteWeight(sub, n))}</span>
       <span class="grade" style="color:${gcol.fg};">${n.value}</span>
       <button class="ghost small" onclick="deleteEntry('${n.id}')" title="löschen">&times;</button>
@@ -1518,24 +1662,24 @@ function renderStudent(){
 
   const verlaufRows = verlauf.map(e => {
     const del = `<button class="ghost small" onclick="deleteEntry('${e.id}')" title="löschen">&times;</button>`;
-    if(e.type === "positiv") return `<div class="entry positiv"><span>+</span><div class="txt">${e.text}</div><span class="date">${e.date}</span>${del}</div>`;
-    if(e.type === "negativ") return `<div class="entry negativ"><span>&minus;</span><div class="txt">${e.text}</div><span class="date">${e.date}</span>${del}</div>`;
-    if(e.type === "foto") return `<div class="entry"><img class="thumb" src="${e.dataUrl}"><div class="txt">Foto &ndash; ${e.tag}</div><span class="date">${e.date}</span>${del}</div>`;
+    if(e.type === "positiv") return `<div class="entry positiv"><span>+</span><div class="txt">${esc(e.text)}</div>${datumFeld(e)}${del}</div>`;
+    if(e.type === "negativ") return `<div class="entry negativ"><span>&minus;</span><div class="txt">${esc(e.text)}</div>${datumFeld(e)}${del}</div>`;
+    if(e.type === "foto") return `<div class="entry"><img class="thumb" src="${e.dataUrl}"><div class="txt">Foto &ndash; ${esc(e.tag)}</div>${datumFeld(e)}${del}</div>`;
     if(e.type === "stufe"){
       const c = catCol(sub, e.cat);
       return `<div class="entry">
         <span class="catdot" style="background:${c.fg};"></span>
-        <div class="txt"><b>${esc(stufenZeichen(e.cat, e.stufe, stufenListe(sub, e.cat).length))}</b> ${esc(catLabel(sub, e.cat))}: ${esc(stufenText(sub, e))}</div>
-        <span class="date">${e.date}</span>${del}</div>`;
+        <div class="txt"><b>${esc(stufenZeichen(e.cat, e.stufe, stufenListe(sub, e.cat).length))}</b> ${esc(catLabel(sub, e.cat))}${e.thema ? " (" + esc(e.thema) + ")" : ""}: ${esc(stufenText(sub, e))}</div>
+        ${datumFeld(e)}${del}</div>`;
     }
     if(e.type === "fehlt"){
       const c = catCol(sub, e.cat);
       return `<div class="entry">
         <span class="catdot" style="background:${c.fg};"></span>
-        <div class="txt">${esc(catLabel(sub, e.cat))}: nicht mitgeschrieben, keine Note</div>
-        <span class="date">${e.date}</span>${del}</div>`;
+        <div class="txt">${esc(catLabel(sub, e.cat))}${e.thema ? " (" + esc(e.thema) + ")" : ""}: nicht mitgeschrieben, keine Note</div>
+        ${datumFeld(e)}${del}</div>`;
     }
-    return `<div class="entry"><span>&#9633;</span><div class="txt">${esc(e.text || "")}</div><span class="date">${e.date}</span>${del}</div>`;
+    return `<div class="entry"><span>&#9633;</span><div class="txt">${esc(e.text || "")}</div>${datumFeld(e)}${del}</div>`;
   }).join("");
 
   const assignBar = pendingPhoto ? `
@@ -1545,6 +1689,70 @@ function renderStudent(){
       <button onclick="assignPhoto('Schülerarbeit')">Schülerarbeit</button>
       <button class="ghost" onclick="pendingPhoto=null; render();">Abbrechen</button>
     </div>` : "";
+
+  /* ---------- Kopfbereich: Tendenz groß, Kategorien darunter ---------- */
+  const tend = tendenz(sub, s.id);
+  const tf = tendenzFarbe(schnitt);
+  const wort = notenWort(schnitt);
+  const bonusZusatz = (schnitt !== null && bonus.wert)
+    ? fmt(grundschnitt) + " " + (bonus.wert < 0 ? "\u2212" : "+") + " " + fmtB(Math.abs(bonus.wert)) + " Bonus"
+    : "";
+
+  const tendenzBlock = `
+    <div style="padding:16px; border-bottom:2px solid #000; background:${tf.bg};">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:40px; font-weight:bold; line-height:1; color:${tf.fg};">${fmtO(schnitt)}</span>
+        <span style="font-size:17px; font-weight:bold; color:${tf.fg};">${esc(wort)}</span>
+        ${tend.pfeil ? '<span style="font-size:15px; color:' + tf.fg + ';">' + tend.pfeil + " " + esc(tend.text) + "</span>" : ""}
+      </div>
+      <div style="font-size:11px; margin-top:6px;">Allgemeine Leistungstendenz${
+        bonusZusatz ? " &middot; " + esc(bonusZusatz) : ""}${
+        anzahlFehlt ? " &middot; " + anzahlFehlt + "\u00d7 nicht mitgeschrieben" : ""}${
+        tend.richtung === "unklar" && schnitt !== null ? " &middot; für eine Richtung braucht es mindestens vier Noten" : ""}</div>
+    </div>`;
+
+  /* Schnitt je Beurteilungsart, die tatsächlich in die Note eingeht */
+  const kats = kategorienSchnitte(sub, s.id);
+  const katZeile = !kats.length ? "" : `
+    <div class="stats" style="flex-wrap:wrap;">
+      ${kats.map(k => {
+        const c = catCol(sub, k.cat);
+        return `<div class="stat" style="min-width:88px; border-right:1px solid #000;">
+          <div class="val" style="font-size:19px; color:${c.fg};">${fmt(k.schnitt)}</div>
+          <div class="lbl">${esc(k.kurz)}${k.anzahl > 1 ? " &middot; " + k.anzahl + "\u00d7" : ""}</div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  /* ---------- Notenvorhersage ---------- */
+  const vorschauCats = activeCats(sub).filter(k =>
+    notenCats(sub).indexOf(k) !== -1 || istBonusCat(sub, k));
+  const vorschauWert = vorschauSchnitt(sub, s.id);
+  const best = bestenfalls(sub, s.id);
+  const vorschauBlock = (!vorschauCats.length || schnitt === null) ? "" : `
+    <div class="label" style="border-top:2px solid #000;">WAS-WÄRE-WENN</div>
+    <div class="helptext">Zum Herzeigen: Beurteilungsarten wegschalten und sehen, was das mit der Note macht. Es wird dabei nichts verändert und nichts gespeichert.</div>
+    <div class="chips">
+      ${vorschauCats.map(k => {
+        const c = catCol(sub, k);
+        const aus = vorschauAus.indexOf(k) !== -1;
+        const stil = aus
+          ? "background:#fff; border-color:#999; color:#999; text-decoration:line-through;"
+          : `background:${c.bg}; border-color:${c.fg}; color:${c.fg};`;
+        return `<div class="chip vorschau-chip" style="${stil}" onclick="vorschauSchalten('${k}')">${esc(catShort(sub, k))}</div>`;
+      }).join("")}
+      ${vorschauAus.length ? '<div class="chip vorschau-chip" style="background:#000; border-color:#000; color:#fff;" onclick="vorschauZuruecksetzen()">zurücksetzen</div>' : ""}
+    </div>
+    ${vorschauAus.length ? `
+      <div style="padding:0 16px 12px;">
+        <div style="font-size:15px; font-weight:bold;">Ohne ${esc(vorschauAus.map(k => catLabel(sub, k)).join(", "))}: ${fmtO(vorschauWert)}</div>
+        <div style="font-size:12px;">statt ${fmtO(schnitt)} mit allem.</div>
+      </div>` : ""}
+    ${best ? `
+      <div style="padding:0 16px 12px;">
+        <div style="font-size:15px; font-weight:bold;">Bei durchgehend bester ${esc(best.cats.join(" und "))}: ${fmtO(best.best)}</div>
+        <div style="font-size:12px;">statt ${fmtO(best.jetzt)} jetzt. Das ist der Unterschied, den die Mitarbeit noch machen kann.</div>
+      </div>` : ""}`;
 
   const niveauZeile = (cls.stufe === 1) ? "" : `
     <div style="padding:10px 16px; border-bottom:1px solid #000; display:flex; align-items:center; gap:10px;">
@@ -1565,8 +1773,12 @@ function renderStudent(){
     <div style="padding:16px; display:flex; align-items:center; gap:14px; border-bottom:1px solid #000;">
       ${avatarHtml(s, false)}
       <div style="flex:1;">
-        <div style="font-size:17px; font-weight:bold;">${s.name}</div>
-        <div style="font-size:12px;">Klasse ${cls.name}</div>
+        <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:17px; font-weight:bold; text-decoration:underline; cursor:pointer;"
+                title="Namen ändern" onclick="nameAendern()">${esc(s.name)}</span>
+          <button class="ghost small" onclick="nameAendern()">ändern</button>
+        </div>
+        <div style="font-size:12px;">Klasse ${esc(cls.name)}</div>
         <div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">
           <button class="ghost" onclick="pickAvatar('kamera')">Foto aufnehmen</button>
           <button class="ghost" onclick="pickAvatar('mediathek')">aus Mediathek</button>
@@ -1576,12 +1788,17 @@ function renderStudent(){
       <button class="ghost" onclick="deleteStudent()">löschen</button>
     </div>
     ${niveauZeile}
-    <div class="stats">
-      <div class="stat"><div class="val ${schnitt !== null && schnitt >= 4 ? "red" : ""}">${fmtO(schnitt)}</div><div class="lbl">Notenschnitt${(schnitt !== null && bonus.wert) ? "<br>" + fmt(grundschnitt) + " " + (bonus.wert < 0 ? "&minus;" : "+") + " " + fmtB(Math.abs(bonus.wert)) + " Bonus" : ""}</div></div>
-      <div class="stat"><div class="val">${anzahlNoten}</div><div class="lbl">${anzahlNoten === 1 ? "Note" : "Noten"}${anzahlFehlt ? " &middot; " + anzahlFehlt + "× nicht mitgeschrieben" : ""}</div></div>
+    ${tendenzBlock}
+    ${katZeile}
+    <div class="footer" style="border-bottom:2px solid #000;">
+      <button class="gross" onclick="goHome('newNote')">Leistung eintragen</button>
+      <button onclick="goNewEntry('notiz')">Notiz</button>
+      <button onclick="document.getElementById('cameraInput').click()">Foto aufnehmen</button>
+      <button onclick="printSchueler('${cls.id}','${s.id}')">Elternsprechtag-Blatt</button>
     </div>
     ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
     ${bilanzZeilen}
+    ${vorschauBlock}
     <div style="padding:12px 16px; border-top:2px solid #000000; border-bottom:${homeView.zeigeEintraege ? "1px" : "2px"} solid #000000;">
       <button onclick="toggleEintraege()" style="width:100%;">${homeView.zeigeEintraege
         ? "Einzelne Einträge ausblenden"
@@ -1593,16 +1810,58 @@ function renderStudent(){
       ${noteRows || '<div class="helptext">Keine Einträge in dieser Kategorie.</div>'}
       <div class="label" style="border-top:2px solid #000; margin-top:4px;">VERLAUF</div>
       ${verlaufRows || '<div class="helptext">Noch kein Verlauf.</div>'}` : ""}
-    <div class="footer">
-      <button class="gross" onclick="goHome('newNote')">Leistung eintragen</button>
-      <button onclick="goNewEntry('notiz')">Notiz</button>
-      <button onclick="document.getElementById('cameraInput').click()">Foto aufnehmen</button>
-      <button onclick="printSchueler('${cls.id}','${s.id}')">Elternsprechtag-Blatt</button>
-    </div>
   `;
 }
 
 function setNoteFilter(key){ homeView.noteFilter = key; render(); }
+
+/* ---------- NACHTRÄGLICH AUSBESSERN ----------
+   Ein Tippfehler im Namen fällt oft erst Wochen später auf. Dann muss er sich
+   in Sekunden ausbessern lassen, ohne dass Noten verloren gehen. Der Name
+   hängt an der id, nicht am Text, also kostet das Umbenennen nichts. */
+function nameAendern(){
+  const cls = getClass(homeView.classId);
+  const s = getStudent(cls, homeView.studentId);
+  if(!s) return;
+  const neu = prompt("Name ausbessern:", s.name);
+  if(neu === null) return;
+  const sauber = String(neu).trim();
+  if(!sauber){ alert("Der Name darf nicht leer sein."); return; }
+  const doppelt = cls.students.some(x => x.id !== s.id && x.name.trim().toLowerCase() === sauber.toLowerCase());
+  if(doppelt && !confirm("In dieser Klasse gibt es schon jemanden mit diesem Namen. Trotzdem so nennen?")) return;
+  s.name = sauber;
+  s.updatedAt = Date.now();
+  save();
+  render();
+}
+
+/* Datum eines Eintrags ändern. Der Tag der Schularbeit ist nicht der Tag,
+   an dem man sie korrigiert und einträgt. */
+function datumGueltig(text){
+  const t = String(text || "").trim();
+  const m = t.match(/^(\d{1,2})\.(\d{1,2})\.?$/);
+  if(!m) return null;
+  const tag = parseInt(m[1], 10), monat = parseInt(m[2], 10);
+  if(monat < 1 || monat > 12) return null;
+  const tageImMonat = [31,29,31,30,31,30,31,31,30,31,30,31][monat - 1];
+  if(tag < 1 || tag > tageImMonat) return null;
+  return String(tag).padStart(2, "0") + "." + String(monat).padStart(2, "0") + ".";
+}
+
+function datumAendern(entryId){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  const e = sub && sub.entries.find(x => x.id === entryId);
+  if(!e) return;
+  const eingabe = prompt("Datum ändern, Format TT.MM.\n\nDer Tag der Leistung, nicht der Tag des Eintragens.", e.date || "");
+  if(eingabe === null) return;
+  const sauber = datumGueltig(eingabe);
+  if(!sauber){ alert("Das Datum konnte ich nicht lesen. Bitte als TT.MM. eingeben, zum Beispiel 04.12."); return; }
+  e.date = sauber;
+  e.ts = Date.now();
+  save();
+  render();
+}
 
 function deleteEntry(entryId){
   const cls = getClass(homeView.classId);
@@ -1787,6 +2046,7 @@ function renderNewNote(){
         <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
       </div>
       <div class="chips">${chips}</div>
+      ${themaFeld("themaInput", homeView.thema, themaVorschlag(cat))}
       <div class="label" style="color:${col.fg};">EINTRAG, EIN TIPP GENÜGT</div>
       <div style="padding:0 16px 12px;">${stufen}</div>
       <div class="helptext">${catLabel(sub, cat)}: ${esc(zaehltText(sub, cat))}. Der Eintrag wird sofort gespeichert.
@@ -1805,6 +2065,7 @@ function renderNewNote(){
         <div class="sub">${s.name} &middot; ${sub.fach}</div>
       </div>
       <div class="chips">${chips}</div>
+      ${themaFeld("themaInput", homeView.thema, themaVorschlag("kompetenz"))}
       <div class="label" style="color:${col.fg};">ERREICHTE KOMPETENZEN</div>
       <div style="padding:0 16px;">${boxen || '<div class="helptext" style="padding-left:0;">Noch keine Kompetenzen hinterlegt, siehe Einstellungen.</div>'}</div>
       <form onsubmit="createNote(event)" style="padding:12px 16px 8px;">
@@ -1872,6 +2133,7 @@ function renderNewNote(){
     </div>
     <div class="chips">${chips}</div>
     <div class="grade-row" style="padding-top:12px;">${tiles}</div>
+    ${themaFeld("themaInput", homeView.thema, themaVorschlag(cat))}
     <form onsubmit="createNote(event)" style="padding:12px 16px 4px;">
       <button type="submit" id="saveNoteBtn" class="gross" ${homeView.newNoteGrade === null ? "disabled" : ""}>Speichern</button>
     </form>
@@ -1895,6 +2157,7 @@ function goSchnell(){
   homeView.noteWeight = startWeight(sub, homeView.newNoteCat);
   homeView.schnellIds = {};
   homeView.schnellMax = null;
+  homeView.schnellThema = null;
   homeView.screen = "schnell";
   render();
 }
@@ -1905,6 +2168,7 @@ function schnellCat(cat){
   homeView.noteWeight = startWeight(sub, cat);
   homeView.schnellIds = {};
   homeView.schnellMax = null;
+  homeView.schnellThema = null;
   render();
 }
 
@@ -1942,15 +2206,18 @@ function schnellSpeichern(studentId, daten){
   if(!sub) return;
   const bekannt = homeView.schnellIds[studentId];
   const vorhanden = bekannt ? sub.entries.find(e => e.id === bekannt) : null;
+  const thema = homeView.schnellThema || null;
   if(vorhanden && vorhanden.type === "note"){
     vorhanden.value = daten.value;
     vorhanden.basis = daten.basis || null;
+    vorhanden.thema = thema;
     vorhanden.ts = Date.now();
   } else {
     if(vorhanden) sub.entries = sub.entries.filter(e => e.id !== vorhanden.id);
     const eintrag = { id: uid(), studentId: studentId, type: "note", cat: cat,
       value: daten.value, w: typeof homeView.noteWeight === "number" ? homeView.noteWeight : 1,
-      basis: daten.basis || null, ts: Date.now(), sem: semesterFuerNeu(), date: today(),
+      basis: daten.basis || null, thema: thema,
+      ts: Date.now(), sem: semesterFuerNeu(), date: today(),
       label: catLabel(sub, cat) };
     sub.entries.push(eintrag);
     homeView.schnellIds[studentId] = eintrag.id;
@@ -1967,6 +2234,7 @@ function schnellFehlt(studentId){
   const bekannt = homeView.schnellIds[studentId];
   if(bekannt) sub.entries = sub.entries.filter(e => e.id !== bekannt);
   const eintrag = { id: uid(), studentId: studentId, type: "fehlt", cat: cat,
+    thema: homeView.schnellThema || null,
     ts: Date.now(), sem: semesterFuerNeu(), date: today() };
   sub.entries.push(eintrag);
   homeView.schnellIds[studentId] = eintrag.id;
@@ -1995,16 +2263,33 @@ function schnellStufe(studentId, index){
   if(vorhanden){
     vorhanden.stufe = index;
     vorhanden.label = stufenListe(sub, cat)[index];
+    vorhanden.thema = homeView.schnellThema || null;
     vorhanden.ts = Date.now();
   } else {
     const eintrag = { id: uid(), studentId: studentId, type: "stufe", cat: cat,
-      stufe: index, label: stufenListe(sub, cat)[index], ts: Date.now(),
+      stufe: index, label: stufenListe(sub, cat)[index],
+      thema: homeView.schnellThema || null, ts: Date.now(),
       sem: semesterFuerNeu(), date: today() };
     sub.entries.push(eintrag);
     homeView.schnellIds[studentId] = eintrag.id;
   }
   save();
   render();
+}
+
+/* Thema der laufenden Runde. Bereits gesetzte Zeilen ziehen mit, damit man
+   das Thema auch nachtragen kann, wenn schon die halbe Klasse eingetragen ist. */
+function setSchnellThema(wert){
+  const sauber = String(wert || "").trim();
+  homeView.schnellThema = sauber || null;
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  if(sub){
+    Object.keys(homeView.schnellIds || {}).forEach(sid => {
+      const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
+      if(e) e.thema = homeView.schnellThema;
+    });
+    save();
+  }
 }
 
 function schnellLoeschen(studentId){
@@ -2093,6 +2378,19 @@ function renderSchnell(){
     </div>`;
   }).join("");
 
+  /* Ein Thema für die ganze Runde. Wird beim Tippen mitgespeichert und
+     nachträglich auch auf schon gesetzte Zeilen übernommen. */
+  const themaZeile = `
+    <div class="feinbereich" style="border-top:none; padding-bottom:6px;">
+      <div class="feinzeile">
+        <span class="feinlabel">Thema, freiwillig</span>
+        <input type="text" id="schnellThemaInput" style="margin-bottom:0; flex:1;"
+               value="${esc(homeView.schnellThema || "")}"
+               placeholder="${esc(themaVorschlag(cat))}" onchange="setSchnellThema(this.value)">
+      </div>
+      <div class="helptext" style="padding:2px 0 0;">Gilt für alle Eintragungen in dieser Runde, zum Beispiel die geprüfte Kompetenz. Leer lassen ist in Ordnung.</div>
+    </div>`;
+
   /* Höchstpunktezahl einmal für die ganze Klasse */
   const punkteZeile = (stufenModus || !hasSchluessel(cat) || cat === "diktat") ? "" : `
     <div class="feinbereich" style="border-top:none; padding-bottom:6px;">
@@ -2127,6 +2425,7 @@ function renderSchnell(){
     <div class="helptext" style="color:${col.fg};">${stufenModus
       ? catLabel(sub, cat) + ": ein Tipp je Zeile, wird sofort gespeichert. " + zaehltText(sub, cat) + "."
       : "Ein Tipp je Zeile genügt, die Note wird sofort gespeichert. Nochmal tippen bessert aus."}</div>
+    ${themaZeile}
     ${gewichtZeile}
     ${punkteZeile}
     ${zeilen || '<div class="helptext">Noch keine Schüler:innen in dieser Klasse.</div>'}
@@ -2156,7 +2455,8 @@ function createFehlt(){
   const cat = homeView.newNoteCat;
   if(!sub) return;
   sub.entries.push({ id: uid(), studentId: homeView.studentId, type: "fehlt", cat: cat,
-    ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+    thema: themaLesen("themaInput"), ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+  homeView.thema = null;
   save();
   goHome("student");
 }
@@ -2168,8 +2468,9 @@ function createStufe(index){
   const cat = homeView.newNoteCat;
   if(!sub || !istStufenCat(sub, cat)) return;
   sub.entries.push({ id: uid(), studentId: homeView.studentId, type: "stufe", cat: cat,
-    stufe: index, label: stufenListe(sub, cat)[index], ts: Date.now(),
-    sem: semesterFuerNeu(), date: today() });
+    stufe: index, label: stufenListe(sub, cat)[index], thema: themaLesen("themaInput"),
+    ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+  homeView.thema = null;
   save();
   goHome("student");
 }
@@ -2181,20 +2482,23 @@ function createNote(ev){
   const cat = homeView.newNoteCat;
   const w = typeof homeView.noteWeight === "number" ? homeView.noteWeight : 1;
 
+  const thema = themaLesen("themaInput");
+
   if(cat === "kompetenz" && !istStufenCat(sub, cat)){
     const angehakt = Array.from(document.querySelectorAll(".compCheck:checked")).map(el => el.value);
     const gesamt = sub.competencies.length;
     sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       achieved: angehakt, total: gesamt, value: gradeFromRatio(gesamt > 0 ? angehakt.length / gesamt : 0),
-      w: w, ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
+      w: w, thema: thema, ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
   } else {
     if(homeView.newNoteGrade === null) return;
     sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
-      value: homeView.newNoteGrade, w: w, basis: homeView.noteBasis || null,
+      value: homeView.newNoteGrade, w: w, basis: homeView.noteBasis || null, thema: thema,
       ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
   }
   homeView.newNoteGrade = null;
   homeView.noteBasis = null;
+  homeView.thema = null;
   save();
   goHome("student");
 }
@@ -2467,7 +2771,7 @@ function wordDokument(){
           if(noten.length){
             const zeilen = noten.map(n => [
               n.date,
-              noteBezeichnung(sub, n),
+              eintragTitel(sub, n),
               n.cat === "kompetenz" ? ((n.achieved||[]).length + " von " + n.total + " Kompetenzen") : (n.basis || ""),
               fmtW(noteWeight(sub, n)),
               String(n.value)
@@ -2480,7 +2784,8 @@ function wordDokument(){
 
           const stufen = eigene.filter(e => e.type === "stufe");
           if(stufen.length){
-            const zeilen = stufen.map(e => [e.date, catLabel(sub, e.cat), stufenText(sub, e)]);
+            const zeilen = stufen.map(e => [e.date, catLabel(sub, e.cat),
+              stufenText(sub, e) + (e.thema ? "  \u00b7  " + e.thema : "")]);
             const arten = {};
             stufen.forEach(e => { arten[e.cat] = true; });
             const hinweise = Object.keys(arten).map(c => catLabel(sub, c) + ": " + zaehltText(sub, c)).join("  |  ");
@@ -2493,7 +2798,8 @@ function wordDokument(){
             const zeilen = rest.map(e => [
               e.date,
               e.type === "positiv" ? "Positiv" : (e.type === "negativ" ? "Negativ" : (e.type === "fehlt" ? catLabel(sub, e.cat) : "Notiz")),
-              e.type === "fehlt" ? "nicht mitgeschrieben, keine Note" : (e.text || "")
+              (e.type === "fehlt" ? "nicht mitgeschrieben, keine Note" : (e.text || "")) +
+                (e.thema ? "  \u00b7  " + e.thema : "")
             ]);
             body += wTable(["Datum","Art","Eintrag"], zeilen, [1100,1500,5800]);
           }
@@ -2984,9 +3290,11 @@ function uebertragungBereich(){
 }
 
 function ansichtenZuruecksetzen(){
+  vorschauAus = [];
   homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
-               zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null };
+               zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
+                 thema:null, schnellThema:null };
   statView = { screen:"list", classId:null, subjectId:null };
   settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null, stufenOffen:null };
 }
@@ -3232,7 +3540,7 @@ function noteTabelle(sub, studentId){
       : (n.basis || "");
     return `<tr>
       <td>${esc(n.date)}</td>
-      <td>${esc(noteBezeichnung(sub, n))}</td>
+      <td>${esc(eintragTitel(sub, n))}</td>
       <td>${esc(grundlage)}</td>
       <td>${esc(fmtW(noteWeight(sub, n)))}</td>
       <td style="text-align:center; font-weight:bold;">${n.value}</td>
@@ -3274,7 +3582,7 @@ function stufenTabelle(sub, studentId){
   const bilanz = stufenBilanz(sub, studentId).map(b =>
     `<div class="pr-note" style="margin-top:2mm;"><b>${esc(b.label)}</b>, ${esc(b.hinweis)}: ${esc(b.teile.join(", "))}</div>`).join("");
   const zeilen = liste.map(e =>
-    `<tr><td style="width:14%;">${esc(e.date)}</td><td style="width:26%;">${esc(catLabel(sub, e.cat))}</td><td>${esc(stufenText(sub, e))}</td></tr>`).join("");
+    `<tr><td style="width:14%;">${esc(e.date)}</td><td style="width:26%;">${esc(catLabel(sub, e.cat))}</td><td>${esc(stufenText(sub, e))}${e.thema ? " &middot; " + esc(e.thema) : ""}</td></tr>`).join("");
   return bilanz + `<table class="pr-tbl" style="margin-top:2mm;">
     <tr><th>Datum</th><th>Art</th><th>Eintrag</th></tr>${zeilen}
   </table>`;
@@ -3285,7 +3593,8 @@ function verlaufTabelle(sub, studentId){
   if(!liste.length) return "";
   const zeilen = liste.map(e => {
     const art = e.type === "positiv" ? "Positiv" : (e.type === "negativ" ? "Negativ" : (e.type === "fehlt" ? catLabel(sub, e.cat) : "Notiz"));
-    const text = e.type === "fehlt" ? "nicht mitgeschrieben, keine Note" : (e.text || "");
+    const text = (e.type === "fehlt" ? "nicht mitgeschrieben, keine Note" : (e.text || "")) +
+                 (e.thema ? " \u00b7 " + e.thema : "");
     return `<tr><td style="width:14%;">${esc(e.date)}</td><td style="width:18%;">${esc(art)}</td><td>${esc(text)}</td></tr>`;
   }).join("");
   return `<table class="pr-tbl" style="margin-top:3mm;">
