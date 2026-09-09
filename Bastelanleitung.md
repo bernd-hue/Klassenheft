@@ -1,6 +1,6 @@
 # Selbst ändern, ohne Daten zu verlieren
 
-Für Klassenheft ab Version 14. Diese Anleitung setzt keine Programmierkenntnisse voraus.
+Für Klassenheft ab Version 15. Diese Anleitung setzt keine Programmierkenntnisse voraus.
 
 ## Das Wichtigste zuerst: gehen die Schülerdaten verloren?
 
@@ -69,7 +69,7 @@ Ganz oben in der Datei steht ein Block mit der Überschrift **HIER DARFST DU GEF
    Richtig: `schularbeit: "Schularbeit"` wird zu `schularbeit: "Schularbeit neu"`
    Falsch: `Schularbeit: "Schularbeit"`
 2. Kommas, geschweifte Klammern und eckige Klammern stehen lassen.
-3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "14";` wird zu `"15"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
+3. Nach dem Ändern die **Fassungsnummer hochzählen** (`const APP_FASSUNG = "15";` wird zu `"16"`). Dann legt die App beim nächsten Start von selbst eine Sicherheitskopie an.
 
 ### Was wo steht
 
@@ -98,6 +98,9 @@ In `STUFEN_BONUS` steht je Kategorie, um wie viel eine einzelne Einstufung den N
 Halte die Einzelwerte klein. Bei 0,15 je Eintrag und einer Obergrenze von 0,5 braucht es vier gute Mitarbeiten für die volle Wirkung, das fühlt sich beim Eintragen richtig an. Werte über 0,3 machen die Obergrenze nach zwei Einträgen wirkungslos.
 
 Wenn du `STUFEN_VORGABE` änderst, zähle zusätzlich `STUFEN_STAND` um eins hoch. Dann ziehen bestehende Fächer die neue Vorgabe genau einmal nach, ohne das zu überschreiben, was du in einem Fach von Hand eingestellt hast.
+
+**Ab wann jemand Aufmerksamkeit braucht** (`AUFFALL_SCHNITT`, `AUFFALL_MITARBEIT`, `AUFFALL_MIN_STUFEN`)
+`AUFFALL_SCHNITT` ist der Notenschnitt, ab dem eine Zeile in der Klassenliste hervorgehoben wird, Vorgabe 4,0. `AUFFALL_MITARBEIT` ist der Anteil schwacher Einstufungen, ab dem die Mitarbeit auffällt, Vorgabe 0.5, also die Hälfte. `AUFFALL_MIN_STUFEN` ist, wie viele Einstufungen es mindestens braucht, bevor überhaupt etwas behauptet wird, Vorgabe 3. Setz den Anteil höher, wenn dir zu viele Zeilen markiert sind.
 
 **Farben für eigene Beurteilungen** (`CUSTOM_COLORS`)
 Die sechs Farbpunkte, die beim Anlegen einer eigenen Beurteilung zur Wahl stehen.

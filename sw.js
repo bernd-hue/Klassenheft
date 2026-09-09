@@ -4,7 +4,7 @@
    Schülerdaten liegen im lokalen Speicher des Browsers und werden hier
    niemals angefasst oder irgendwohin gesendet. */
 
-const CACHE = "klassenheft-v14";
+const CACHE = "klassenheft-v15";
 const DATEIEN = [
   "./",
   "./index.html",

@@ -242,7 +242,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "14";
+const APP_FASSUNG = "15";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -412,7 +412,7 @@ const STUFEN_VORGABE = ["hausuebung", "mitarbeit"];
 
 /* Wird hochgezählt, sobald sich die Vorgabe oben ändert. Bestehende Fächer
    ziehen die neue Vorgabe dann genau einmal nach. */
-const STUFEN_STAND = 4;
+const STUFEN_STAND = 5;
 
 /* ---------- MITARBEIT ALS BONUS ----------
    Mitarbeit soll die Note verbessern, je mehr desto besser, darf aber nie
@@ -556,6 +556,41 @@ function catCol(sub, key){
 /* Freies Feld für den Inhalt einer Leistung, etwa "Bruchrechnung" oder
    "Gleichungen". Immer freiwillig: leer lassen ist der Normalfall, und dann
    steht überall nur die Beurteilungsart wie bisher. */
+/* Welche Arbeit ist das? Vier Felder, wie es dem Schuljahr entspricht,
+   plus die Möglichkeit einer fünften, falls doch mehr geschrieben wird.
+   Ohne diese Wahl würde die App nach dem Datum gruppieren, und dann wären
+   zwei am selben Tag nachgetragene Schularbeiten eine einzige. */
+const ARBEITEN_MAX = 6;
+
+function arbeitWahl(sub, cat, gewaehlt, aufruf){
+  const hoechste = hoechsteArbeitNr(sub, cat);
+  const zeigen = Math.max(4, Math.min(ARBEITEN_MAX, hoechste + 1));
+  const felder = [];
+  for(let n = 1; n <= zeigen; n++){
+    const schon = arbeiten(sub, cat).find(a => a.nr === n);
+    const aktiv = gewaehlt === n;
+    const stil = aktiv
+      ? "background:#000; border-color:#000; color:#fff;"
+      : (schon ? "background:#F1EFE8; border-color:#000; color:#000;"
+               : "background:#fff; border-color:#999; color:#4A4943;");
+    felder.push(`<div class="chip" style="${stil}" onclick="${aufruf}(${n})"
+      title="${schon ? "bereits " + schon.anzahl + " Eintr\u00e4ge" : "noch leer"}">${n}.${
+      schon ? ' <span style="font-size:10px;">(' + schon.anzahl + ")</span>" : ""}</div>`);
+  }
+  return `<div style="padding:8px 16px 0;">
+    <span class="field-label">Welche ${esc(catLabel(sub, cat))}?</span>
+    <div class="chips" style="padding:6px 0 2px;">${felder.join("")}</div>
+    <div class="helptext" style="padding:0 0 4px;">Die Nummer entscheidet, was zusammengehört, nicht das Datum. So kannst du die 1. und die 2. am selben Nachmittag nachtragen und trotzdem getrennt auswerten. In Klammern steht, wie viele Einträge es dort schon gibt.</div>
+  </div>`;
+}
+
+/* Für welche Kategorien lohnt die Nummerierung? Für alles, was als eigene
+   Arbeit geschrieben wird, also alle benoteten Kategorien. Nicht für
+   Einstufungen wie Mitarbeit, die laufend anfallen. */
+function nummeriert(sub, cat){
+  return !istStufenCat(sub, cat) && cat !== "kompetenz";
+}
+
 function themaFeld(id, wert, platzhalter){
   return `<div style="padding:0 16px 8px;">
     <span class="field-label">Thema, freiwillig</span>
@@ -883,6 +918,8 @@ function normaliseClass(cls){
           }
         });
       }
+      /* Ab Stand 5 tragen die Arbeiten eine eigene Nummer. */
+      if((sub.stufenStand || 0) < 5) arbeitsNummernNachziehen(sub);
       sub.stufenStand = STUFEN_STAND;
     }
     if(!Array.isArray(sub.stufenZaehlt)) sub.stufenZaehlt = [];
@@ -1008,8 +1045,8 @@ let tab = "home";
 let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                  newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                  zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
-                 thema:null, schnellThema:null };
-let statView = { screen:"list", classId:null, subjectId:null, arbeitCat:null, arbeitDatum:null };
+                 thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null };
+let statView = { screen:"list", classId:null, subjectId:null, arbeitCat:null, arbeitKennung:null };
 let settingsView = { screen:"list", classId:null, subjectId:null, stufenOffen:null };
 
 /* Fassung, die auf der Adresse liegt, falls sie von der geladenen abweicht.
@@ -1244,7 +1281,29 @@ function schuljahrOrdnung(datum){
   return versetzt * 100 + tag;
 }
 
-/* Alle Arbeiten einer Kategorie, chronologisch, mit ihren Kennzahlen. */
+/* Die Nummer einer Arbeit. Sie gehört der Lehrkraft, nicht dem Kalender:
+   Wer die erste und die zweite Schularbeit am selben Nachmittag nachträgt,
+   hätte sonst eine einzige Arbeit, und wer nachschreibt, eine eigene.
+   Ältere Einträge ohne Nummer werden beim Laden aus der Datumsreihenfolge
+   nachgetragen, siehe arbeitsNummernNachziehen(). */
+function arbeitNr(e){
+  return (typeof e.arbeit === "number" && e.arbeit > 0) ? e.arbeit : null;
+}
+
+/* Wie viele Arbeiten sind in dieser Kategorie schon angelegt? */
+function hoechsteArbeitNr(sub, cat, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  let hoechste = 0;
+  sub.entries.forEach(e => {
+    if(e.cat !== cat) return;
+    if(z !== "alle" && eintragSemester(e) !== z) return;
+    const n = arbeitNr(e);
+    if(n && n > hoechste) hoechste = n;
+  });
+  return hoechste;
+}
+
+/* Alle Arbeiten einer Kategorie mit ihren Kennzahlen, nach Nummer sortiert. */
 function arbeiten(sub, cat, sem){
   const z = (sem === undefined) ? aktivesSemester() : sem;
   const passend = sub.entries.filter(e =>
@@ -1255,11 +1314,16 @@ function arbeiten(sub, cat, sem){
 
   const gruppen = {};
   passend.forEach(e => {
-    const schluessel = e.date || "ohne Datum";
-    if(!gruppen[schluessel]) gruppen[schluessel] = { datum: e.date || "", noten: [], fehlt: 0, themen: {} };
-    if(e.type === "fehlt") gruppen[schluessel].fehlt++;
-    else gruppen[schluessel].noten.push(e);
-    if(e.thema) gruppen[schluessel].themen[e.thema] = true;
+    /* Die Nummer ist der Schlüssel. Nur wo keine steht, greift das Datum. */
+    const nr = arbeitNr(e);
+    const schluessel = nr ? "nr" + nr : "d" + (e.date || "ohne");
+    if(!gruppen[schluessel]){
+      gruppen[schluessel] = { nr: nr, datum: e.date || "", noten: [], fehlt: 0, themen: {}, daten: {} };
+    }
+    const g = gruppen[schluessel];
+    if(e.type === "fehlt") g.fehlt++; else g.noten.push(e);
+    if(e.thema) g.themen[e.thema] = true;
+    if(e.date) g.daten[e.date] = (g.daten[e.date] || 0) + 1;
   });
 
   return Object.keys(gruppen)
@@ -1268,9 +1332,15 @@ function arbeiten(sub, cat, sem){
       const werte = g.noten.map(n => n.value);
       const verteilung = [1,2,3,4,5].map(n => werte.filter(v => v === n).length);
       const schnitt = werte.length ? werte.reduce((a, v) => a + v, 0) / werte.length : null;
+      /* Bei mehreren Terminen in einer Arbeit, etwa durch Nachschreiben,
+         gilt der häufigste Tag als der Termin der Arbeit. */
+      const tage = Object.keys(g.daten).sort((a, b) => g.daten[b] - g.daten[a]);
+      const datum = tage[0] || g.datum;
       return {
-        datum: g.datum,
-        ordnung: schuljahrOrdnung(g.datum),
+        nr: g.nr,
+        datum: datum,
+        weitereTermine: tage.length > 1 ? tage.slice(1) : [],
+        ordnung: g.nr ? g.nr : 1000 + schuljahrOrdnung(datum) / 1000,
         thema: Object.keys(g.themen).join(", "),
         anzahl: werte.length,
         fehlt: g.fehlt,
@@ -1283,7 +1353,67 @@ function arbeiten(sub, cat, sem){
     })
     .filter(a => a.anzahl > 0)
     .sort((a, b) => a.ordnung - b.ordnung)
-    .map((a, i) => Object.assign(a, { nummer: i + 1 }));
+    .map((a, i) => Object.assign(a, { nummer: a.nr || (i + 1) }));
+}
+
+/* Die Einträge genau einer Arbeit, mit Person dazu. Angesprochen wird die
+   Arbeit über ihre Nummer; nur Altbestand ohne Nummer über das Datum. */
+function arbeitEintraege(cls, sub, cat, kennung, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  const nr = parseInt(kennung, 10);
+  const ueberNummer = !isNaN(nr) && String(kennung).indexOf(".") === -1;
+  return sub.entries
+    .filter(e => e.cat === cat &&
+      (ueberNummer ? arbeitNr(e) === nr : (!arbeitNr(e) && e.date === kennung)) &&
+      (e.type === "note" || e.type === "fehlt") &&
+      (z === "alle" || eintragSemester(e) === z))
+    .map(e => ({ e: e, s: cls.students.find(x => x.id === e.studentId) }))
+    .filter(x => !!x.s);
+}
+
+/* Die Kennung einer Arbeit für Verweise: die Nummer, sonst das Datum. */
+/* Einmalig: Einträge aus früheren Fassungen haben keine Nummer. Sie
+   bekommen sie aus der Reihenfolge der Termine im Schuljahr, je Kategorie
+   und je Semester getrennt. Danach hängt die Zuordnung an der Nummer und
+   ein späteres Ausbessern des Datums wirft nichts mehr durcheinander. */
+function arbeitsNummernNachziehen(sub){
+  const cats = {};
+  sub.entries.forEach(e => {
+    if(e.type !== "note" && e.type !== "fehlt") return;
+    if(!e.date) return;
+    cats[e.cat] = true;
+  });
+  Object.keys(cats).forEach(cat => {
+    [1, 2].forEach(sem => {
+      const drin = sub.entries.filter(e =>
+        e.cat === cat && (e.type === "note" || e.type === "fehlt") &&
+        eintragSemester(e) === sem);
+      if(!drin.length) return;
+      /* Schon vergebene Nummern bleiben unangetastet */
+      const ohne = drin.filter(e => !arbeitNr(e));
+      if(!ohne.length) return;
+      const belegt = {};
+      drin.forEach(e => { const n = arbeitNr(e); if(n) belegt[n] = true; });
+      const termine = [];
+      ohne.forEach(e => { if(termine.indexOf(e.date) === -1) termine.push(e.date); });
+      termine.sort((a, b) => schuljahrOrdnung(a) - schuljahrOrdnung(b));
+      let naechste = 1;
+      termine.forEach(tag => {
+        while(belegt[naechste]) naechste++;
+        belegt[naechste] = true;
+        ohne.filter(e => e.date === tag).forEach(e => { e.arbeit = naechste; });
+        naechste++;
+      });
+    });
+  });
+}
+
+function arbeitKennung(a){
+  return a.nr ? String(a.nr) : a.datum;
+}
+
+function arbeitFinden(sub, cat, kennung, sem){
+  return arbeiten(sub, cat, sem).find(a => arbeitKennung(a) === String(kennung)) || null;
 }
 
 /* ---------- NOTENSPIEGEL ----------
@@ -1298,6 +1428,11 @@ function notenspiegel(verteilung){
     anzahl: anzahl,
     anteil: gesamt ? (anzahl * 100) / gesamt : 0
   }));
+}
+
+function spiegelVerteilung(sub, sem){
+  const noten = wertendeNotenAlle(sub, sem);
+  return [1,2,3,4,5].map(n => noten.filter(e => e.value === n).length);
 }
 
 /* Notenspiegel als Tabelle. Der Balken ist reine Verstärkung, die Zahl
@@ -1324,26 +1459,6 @@ function spiegelTabelle(verteilung, klasse){
   </table>`;
 }
 
-function spiegelVerteilung(sub, sem){
-  const noten = wertendeNotenAlle(sub, sem);
-  return [1,2,3,4,5].map(n => noten.filter(e => e.value === n).length);
-}
-
-/* Die Einträge genau einer Arbeit, mit Person dazu. */
-function arbeitEintraege(cls, sub, cat, datum, sem){
-  const z = (sem === undefined) ? aktivesSemester() : sem;
-  return sub.entries
-    .filter(e => e.cat === cat && e.date === datum &&
-      (e.type === "note" || e.type === "fehlt") &&
-      (z === "alle" || eintragSemester(e) === z))
-    .map(e => ({ e: e, s: cls.students.find(x => x.id === e.studentId) }))
-    .filter(x => !!x.s);
-}
-
-function arbeitFinden(sub, cat, datum, sem){
-  return arbeiten(sub, cat, sem).find(a => a.datum === datum) || null;
-}
-
 /* Der Vergleich in einem Satz: besser oder schlechter als die vorige. */
 function arbeitVergleich(liste, i){
   if(i === 0 || !liste[i - 1] || liste[i].schnitt === null || liste[i - 1].schnitt === null) return null;
@@ -1355,6 +1470,58 @@ function arbeitVergleich(liste, i){
     text: (unterschied > 0 ? "um " : "um ") + fmt(Math.abs(unterschied)) +
           (unterschied > 0 ? " besser" : " schlechter") + " als die vorige"
   };
+}
+
+/* ---------- WER BRAUCHT AUFMERKSAMKEIT ----------
+   Zweck: in der Klassenliste auf einen Blick sehen, mit wem man reden sollte,
+   ohne jede Person einzeln zu öffnen. Bewusst mehrere Gründe, weil ein
+   schwacher Schnitt und fehlende Mitarbeit verschiedene Gespräche sind.
+
+   Alle Schwellen stehen hier oben und lassen sich anpassen. */
+const AUFFALL_SCHNITT = 4.0;      /* ab diesem Schnitt steht die Note auf der Kippe */
+const AUFFALL_MITARBEIT = 0.5;    /* Anteil schwacher Einstufungen, ab dem es auffällt */
+const AUFFALL_MIN_STUFEN = 3;     /* so viele Einstufungen braucht es für eine Aussage */
+
+function auffaellig(sub, studentId, sem){
+  const gruende = [];
+  const schnitt = computeSchnitt(sub, studentId, sem);
+
+  if(schnitt !== null && schnitt >= AUFFALL_SCHNITT){
+    gruende.push({ art: "note", text: "Schnitt " + fmt(schnitt) });
+  }
+
+  /* Ein Nicht genügend fällt auch dann auf, wenn der Schnitt noch passt */
+  const fuenfer = wertendeNoten(sub, studentId, sem).filter(n => n.value === 5).length;
+  if(fuenfer) gruende.push({ art: "note", text: fuenfer + "\u00d7 Nicht genügend" });
+
+  /* Schwache Mitarbeit: die beiden untersten Stufen jener Kategorien, die
+     ohne Note laufen. Das ist genau das, worüber man sprechen will. */
+  activeCats(sub).forEach(cat => {
+    if(!istStufenCat(sub, cat)) return;
+    const liste = entriesOf(sub, studentId, sem).filter(e => e.type === "stufe" && e.cat === cat);
+    if(liste.length < AUFFALL_MIN_STUFEN) return;
+    const anzahlStufen = stufenListe(sub, cat).length;
+    const schwach = liste.filter(e => e.stufe >= anzahlStufen - 2).length;
+    const anteil = schwach / liste.length;
+    if(anteil >= AUFFALL_MITARBEIT){
+      gruende.push({ art: "stufe",
+        text: catLabel(sub, cat) + ": " + schwach + " von " + liste.length + " schwach" });
+    }
+  });
+
+  /* Wer bei einer Schularbeit gefehlt hat, ist kein Problemfall, aber es
+     gehört erinnert, sobald es sich häuft. */
+  const fehlt = entriesOf(sub, studentId, sem).filter(e => e.type === "fehlt").length;
+  if(fehlt >= 2) gruende.push({ art: "fehlt", text: fehlt + "\u00d7 nicht mitgeschrieben" });
+
+  return gruende;
+}
+
+/* Fasst die Klasse zusammen, für die Zeile über der Liste. */
+function auffaelligeDerKlasse(cls, sub, sem){
+  return cls.students
+    .map(s => ({ s: s, gruende: auffaellig(sub, s.id, sem) }))
+    .filter(x => x.gruende.length > 0);
 }
 
 function countPosNeg(sub, studentId, sem){
@@ -1644,21 +1811,40 @@ function renderRoster(){
   const sub = getSubject(cls, homeView.subjectId);
   if(!cls || !sub) return renderHomeList();
 
+  const auffaellige = auffaelligeDerKlasse(cls, sub);
+
   const rows = cls.students.map(s => {
     const schnitt = computeSchnitt(sub, s.id);
     const bad = schnitt !== null && schnitt >= 4.0;
-    const niveau = (cls.stufe === 1) ? "" : `<div class="sub">${NIVEAU_LABELS[s.niveau]}</div>`;
-    return `<div class="row" onclick="goHome('student',null,null,'${s.id}')">
-      <div style="display:flex; align-items:center; gap:10px;">
+    const gruende = auffaellig(sub, s.id);
+    const niveau = (cls.stufe === 1) ? "" : `<div class="sub">${esc(NIVEAU_LABELS[s.niveau])}</div>`;
+    /* Gedeckt, nicht grell: die Zeile bleibt lesbar, der Balken links
+       trägt die Auffälligkeit. Der Grund steht daneben in Worten, damit
+       die Farbe nicht der einzige Träger ist. */
+    const markiert = gruende.length
+      ? "background:#FAF3E8; border-left:5px solid #96650F;"
+      : "";
+    const grundZeile = gruende.length
+      ? `<div class="sub" style="color:#7A5209;">${esc(gruende.map(g => g.text).join(" &middot; ").replace(/&middot;/g, "·"))}</div>`
+      : "";
+    return `<div class="row" style="${markiert}" onclick="goHome('student',null,null,'${s.id}')">
+      <div style="display:flex; align-items:center; gap:10px; min-width:0;">
         ${avatarHtml(s, true)}
-        <div><div class="name" style="font-size:14px;">${s.name}</div>${niveau}</div>
+        <div style="min-width:0;"><div class="name" style="font-size:14px;">${esc(s.name)}</div>${niveau}${grundZeile}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span class="val ${bad ? "red" : ""}" style="font-size:15px; font-weight:bold;">${fmtO(schnitt)}</span>
+      <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <span class="val ${bad ? "red" : ""}" style="font-size:15px; font-weight:bold; white-space:nowrap;">${fmtO(schnitt)}</span>
         <span class="chev" style="${titleStyle("home")}">&rsaquo;</span>
       </div>
     </div>`;
   }).join("");
+
+  const hinweisZeile = !auffaellige.length ? "" : `
+    <div style="padding:10px 16px; background:#FAF3E8; border-bottom:1px solid #000; border-left:5px solid #96650F;">
+      <div style="font-size:13px; font-weight:bold; color:#7A5209;">${auffaellige.length} ${
+        auffaellige.length === 1 ? "Schüler:in braucht" : "Schüler:innen brauchen"} Aufmerksamkeit</div>
+      <div style="font-size:11px; margin-top:2px;">${esc(auffaellige.map(x => x.s.name).join(", "))}</div>
+    </div>`;
 
   const andere = cls.subjects.filter(s => s.id !== sub.id);
   const wechsel = andere.length ? `
@@ -1669,11 +1855,12 @@ function renderRoster(){
   return `
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('list')">&lsaquo;</span>
-      <span class="title" style="${titleStyle("home")}">${cls.name} &middot; ${sub.fach}</span>
+      <span class="title" style="${titleStyle("home")}">${esc(cls.name)} &middot; ${esc(sub.fach)}</span>
       <div class="sub">${cls.students.length} Schüler:innen</div>
     </div>
     ${semesterLeiste("home")}
-    ${rows || '<div class="helptext">Noch keine Schüler:innen in der Klasse ' + cls.name + '.</div>'}
+    ${hinweisZeile}
+    ${rows || '<div class="helptext">Noch keine Schüler:innen in der Klasse ' + esc(cls.name) + '.</div>'}
     ${wechsel}
     <div class="footer">
       <button class="gross" onclick="goSchnell()">Ganze Klasse bewerten</button>
@@ -1904,7 +2091,7 @@ function renderStudent(){
   return `
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('roster')">&lsaquo;</span>
-      <span class="title" style="${titleStyle("home")}">${cls.name} &middot; ${sub.fach}</span>
+      <span class="title" style="${titleStyle("home")}">${esc(cls.name)} &middot; ${esc(sub.fach)}</span>
     </div>
     ${assignBar}
     ${semesterLeiste("home")}
@@ -2270,6 +2457,7 @@ function renderNewNote(){
       <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${cls.stufe === 1 ? "" : " &middot; " + NIVEAU_LABELS[s.niveau]} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
     </div>
     <div class="chips">${chips}</div>
+    ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.arbeitNr, "setArbeitNr") : ""}
     <div class="grade-row" style="padding-top:12px;">${tiles}</div>
     ${themaFeld("themaInput", homeView.thema, themaVorschlag(cat))}
     <form onsubmit="createNote(event)" style="padding:12px 16px 4px;">
@@ -2296,6 +2484,8 @@ function goSchnell(){
   homeView.schnellIds = {};
   homeView.schnellMax = null;
   homeView.schnellThema = null;
+  homeView.schnellArbeit = nummeriert(sub, homeView.newNoteCat)
+    ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, homeView.newNoteCat) + 1) : null;
   homeView.screen = "schnell";
   render();
 }
@@ -2307,6 +2497,8 @@ function schnellCat(cat){
   homeView.schnellIds = {};
   homeView.schnellMax = null;
   homeView.schnellThema = null;
+  homeView.schnellArbeit = nummeriert(sub, cat)
+    ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, cat) + 1) : null;
   render();
 }
 
@@ -2349,12 +2541,13 @@ function schnellSpeichern(studentId, daten){
     vorhanden.value = daten.value;
     vorhanden.basis = daten.basis || null;
     vorhanden.thema = thema;
+    vorhanden.arbeit = homeView.schnellArbeit || null;
     vorhanden.ts = Date.now();
   } else {
     if(vorhanden) sub.entries = sub.entries.filter(e => e.id !== vorhanden.id);
     const eintrag = { id: uid(), studentId: studentId, type: "note", cat: cat,
       value: daten.value, w: typeof homeView.noteWeight === "number" ? homeView.noteWeight : 1,
-      basis: daten.basis || null, thema: thema,
+      basis: daten.basis || null, thema: thema, arbeit: homeView.schnellArbeit || null,
       ts: Date.now(), sem: semesterFuerNeu(), date: today(),
       label: catLabel(sub, cat) };
     sub.entries.push(eintrag);
@@ -2372,7 +2565,7 @@ function schnellFehlt(studentId){
   const bekannt = homeView.schnellIds[studentId];
   if(bekannt) sub.entries = sub.entries.filter(e => e.id !== bekannt);
   const eintrag = { id: uid(), studentId: studentId, type: "fehlt", cat: cat,
-    thema: homeView.schnellThema || null,
+    thema: homeView.schnellThema || null, arbeit: homeView.schnellArbeit || null,
     ts: Date.now(), sem: semesterFuerNeu(), date: today() };
   sub.entries.push(eintrag);
   homeView.schnellIds[studentId] = eintrag.id;
@@ -2417,6 +2610,27 @@ function schnellStufe(studentId, index){
 
 /* Thema der laufenden Runde. Bereits gesetzte Zeilen ziehen mit, damit man
    das Thema auch nachtragen kann, wenn schon die halbe Klasse eingetragen ist. */
+/* Nummer für die Einzelmaske */
+function setArbeitNr(n){
+  homeView.arbeitNr = (homeView.arbeitNr === n) ? null : n;
+  render();
+}
+
+/* Nummer für die ganze Runde in der Sammelerfassung. Bereits gesetzte
+   Zeilen ziehen mit, damit man sie auch nachträglich richtigstellen kann. */
+function setSchnellArbeit(n){
+  homeView.schnellArbeit = n;
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  if(sub){
+    Object.keys(homeView.schnellIds || {}).forEach(sid => {
+      const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
+      if(e) e.arbeit = n;
+    });
+    save();
+  }
+  render();
+}
+
 function setSchnellThema(wert){
   const sauber = String(wert || "").trim();
   homeView.schnellThema = sauber || null;
@@ -2563,12 +2777,16 @@ function renderSchnell(){
     <div class="helptext" style="color:${col.fg};">${stufenModus
       ? catLabel(sub, cat) + ": ein Tipp je Zeile, wird sofort gespeichert. " + zaehltText(sub, cat) + "."
       : "Ein Tipp je Zeile genügt, die Note wird sofort gespeichert. Nochmal tippen bessert aus."}</div>
+    ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.schnellArbeit, "setSchnellArbeit") : ""}
     ${themaZeile}
     ${gewichtZeile}
     ${punkteZeile}
     ${zeilen || '<div class="helptext">Noch keine Schüler:innen in dieser Klasse.</div>'}
     <div class="footer">
       <button onclick="goHome('roster')">Fertig${gesetzt ? " (" + gesetzt + " eingetragen)" : ""}</button>
+      ${(gesetzt && nummeriert(sub, cat) && homeView.schnellArbeit)
+        ? `<button class="gross" onclick="goArbeit('${cls.id}','${sub.id}','${cat}','${homeView.schnellArbeit}')">Auswertung dieser ${esc(catLabel(sub, cat))} ansehen</button>`
+        : ""}
     </div>
   `;
 }
@@ -2593,7 +2811,8 @@ function createFehlt(){
   const cat = homeView.newNoteCat;
   if(!sub) return;
   sub.entries.push({ id: uid(), studentId: homeView.studentId, type: "fehlt", cat: cat,
-    thema: themaLesen("themaInput"), ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+    thema: themaLesen("themaInput"), arbeit: homeView.arbeitNr || null,
+    ts: Date.now(), sem: semesterFuerNeu(), date: today() });
   homeView.thema = null;
   save();
   goHome("student");
@@ -2627,11 +2846,13 @@ function createNote(ev){
     const gesamt = sub.competencies.length;
     sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       achieved: angehakt, total: gesamt, value: gradeFromRatio(gesamt > 0 ? angehakt.length / gesamt : 0),
-      w: w, thema: thema, ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
+      w: w, thema: thema, arbeit: homeView.arbeitNr || null,
+      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
   } else {
     if(homeView.newNoteGrade === null) return;
     sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       value: homeView.newNoteGrade, w: w, basis: homeView.noteBasis || null, thema: thema,
+      arbeit: homeView.arbeitNr || null,
       ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
   }
   homeView.newNoteGrade = null;
@@ -3270,6 +3491,7 @@ function mergeState(basis, fremd){
         if(Array.isArray(fsub.stufenBonus))  bsub.stufenBonus  = fsub.stufenBonus.slice();
         if(typeof fsub.bonusMax === "number") bsub.bonusMax    = fsub.bonusMax;
         if(typeof fsub.stufenStand === "number") bsub.stufenStand = fsub.stufenStand;
+        /* arbeitsNummernNachziehen() greift danach über normaliseClass, falls nötig */
         if(fsub.stufenTexte && typeof fsub.stufenTexte === "object"){
           bsub.stufenTexte = JSON.parse(JSON.stringify(fsub.stufenTexte));
         }
@@ -3453,7 +3675,7 @@ function ansichtenZuruecksetzen(){
   homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
-                 thema:null, schnellThema:null };
+                 thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null };
   statView = { screen:"list", classId:null, subjectId:null };
   settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null, stufenOffen:null };
 }
@@ -3645,6 +3867,7 @@ function verteilungSvg(sub, sem, breite, hoehe, fertig){
     anzahl = [1,2,3,4,5].map(n => noten.filter(e => e.value === n).length);
   }
   const groesste = Math.max.apply(null, anzahl) || 1;
+  const gesamtZahl = anzahl.reduce((a, v) => a + v, 0);
 
   const b = breite || 380, h = hoehe || 120;
   const unten = 22, oben = 14;
@@ -3660,8 +3883,11 @@ function verteilungSvg(sub, sem, breite, hoehe, fertig){
     const stab = wert === 0 ? "" :
       `<rect x="${xPos.toFixed(1)}" y="${yPos.toFixed(1)}" width="${balkenBreite.toFixed(1)}" height="${hoeheBalken.toFixed(1)}"
              rx="3" fill="${g.bg}" stroke="${g.fg}" stroke-width="1.5"><title>Note ${i+1}: ${wert}×</title></rect>`;
-    const zahl = `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${(wert === 0 ? oben + iH - 4 : yPos - 4).toFixed(1)}"
-             text-anchor="middle" font-size="11" font-weight="bold" fill="#000000">${wert}</text>`;
+    const anteil = gesamtZahl ? Math.round((wert * 100) / gesamtZahl) : 0;
+    const zahl = `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${(wert === 0 ? oben + iH - 4 : yPos - 5).toFixed(1)}"
+             text-anchor="middle" font-size="11" font-weight="bold" fill="#000000">${wert}</text>` +
+      (wert ? `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${(wert === 0 ? oben + iH + 6 : yPos + 12).toFixed(1)}"
+             text-anchor="middle" font-size="9" fill="#4A4943">${anteil} %</text>` : "");
     const beschriftung = `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${h - 6}" text-anchor="middle" font-size="11" fill="#000000">${i + 1}</text>`;
     return stab + zahl + beschriftung;
   }).join("");
@@ -3867,14 +4093,14 @@ function blattSchueler(cls, s){
 
 /* Ein Blatt für genau eine Arbeit. Das ist das Papier, das bei einer
    Konferenz oder im Gespräch mit der Fachgruppe auf dem Tisch liegt. */
-function blattArbeit(cls, sub, cat, datum){
+function blattArbeit(cls, sub, cat, kennung){
   const liste = arbeiten(sub, cat);
-  const a = liste.find(x => x.datum === datum);
+  const a = liste.find(x => arbeitKennung(x) === String(kennung));
   if(!a) return "";
   const i = liste.indexOf(a);
   const v = arbeitVergleich(liste, i);
   const label = catLabel(sub, cat);
-  const alle = arbeitEintraege(cls, sub, cat, datum);
+  const alle = arbeitEintraege(cls, sub, cat, arbeitKennung(a));
   const mitNote = alle.filter(x => x.e.type === "note")
     .sort((x, y) => x.e.value - y.e.value || x.s.name.localeCompare(y.s.name));
   const ohneNote = alle.filter(x => x.e.type === "fehlt");
@@ -3919,11 +4145,67 @@ function blattArbeit(cls, sub, cat, datum){
   </div>`;
 }
 
-function printArbeit(classId, subjectId, cat, datum){
+/* Alle Arbeiten einer Kategorie auf einem Blatt, je Arbeit ein eigener
+   Block. Das ist das Blatt für das Ende des Schuljahres. */
+function blattAlleArbeiten(cls, sub, cat){
+  const liste = arbeiten(sub, cat);
+  if(!liste.length) return "";
+  const label = catLabel(sub, cat);
+
+  const bloecke = liste.map((a, i) => {
+    const v = arbeitVergleich(liste, i);
+    return `<div style="margin-top:5mm; border-top:1px solid #000000; padding-top:3mm;">
+      <div class="pr-h2" style="margin-top:0;">${a.nummer}. ${esc(label)} &middot; ${esc(a.datum)}${
+        a.thema ? " &middot; " + esc(a.thema) : ""}</div>
+      <div style="display:flex; gap:6mm; align-items:flex-start;">
+        <div style="flex:1;">
+          <table class="pr-tbl">
+            <tr><th>Beurteilung</th><th style="width:22%;">Anzahl</th><th style="width:22%;">Anteil</th></tr>
+            ${notenspiegel(a.verteilung).map(z => `<tr>
+              <td>${z.note} &middot; ${esc(z.wort)}</td>
+              <td style="text-align:center; font-weight:bold;">${z.anzahl}</td>
+              <td style="text-align:center;">${fmtPct(z.anteil)} %</td>
+            </tr>`).join("")}
+            <tr><td style="font-weight:bold;">Notenschnitt</td>
+                <td style="text-align:center; font-weight:bold;">${fmt(a.schnitt)}</td>
+                <td style="text-align:center;">${a.anzahl} geschr.${a.fehlt ? ", " + a.fehlt + " nicht" : ""}</td></tr>
+          </table>
+        </div>
+        <div style="flex:1;">${verteilungSvg(sub, undefined, 250, 110, a.verteilung)}</div>
+      </div>
+      ${v ? '<div class="pr-note" style="margin-top:2mm;">' + esc(v.text.charAt(0).toUpperCase() + v.text.slice(1)) + ".</div>" : ""}
+    </div>`;
+  }).join("");
+
+  return `<div class="pr-page">
+    <div class="pr-head">
+      <div>
+        <div class="pr-h1">${esc(label)}: alle Termine im Überblick</div>
+        <div style="font-size:11pt; margin-top:1mm;">Klasse ${esc(cls.name)} &middot; ${esc(sub.fach)}</div>
+        <div style="font-size:10pt; margin-top:1mm;">Zeitraum: ${esc(SEM_LABELS[aktivesSemester()])}</div>
+      </div>
+      <div class="pr-meta">${kopfMeta()}</div>
+    </div>
+    ${liste.length > 1 ? '<div class="pr-chart">' + arbeitenSvg(liste, 520, 150) + "</div>" : ""}
+    ${bloecke}
+  </div>`;
+}
+
+function printAlleArbeiten(classId, subjectId, cat){
   const cls = getClass(classId);
   const sub = getSubject(cls, subjectId);
   if(!cls || !sub) return;
-  document.getElementById("printArea").innerHTML = blattArbeit(cls, sub, cat, datum);
+  const blatt = blattAlleArbeiten(cls, sub, cat);
+  if(!blatt){ alert("Für diese Beurteilungsart gibt es noch keine Einträge."); return; }
+  document.getElementById("printArea").innerHTML = blatt;
+  window.print();
+}
+
+function printArbeit(classId, subjectId, cat, kennung){
+  const cls = getClass(classId);
+  const sub = getSubject(cls, subjectId);
+  if(!cls || !sub) return;
+  document.getElementById("printArea").innerHTML = blattArbeit(cls, sub, cat, kennung);
   window.print();
 }
 
@@ -4041,12 +4323,12 @@ function renderStat(){
 }
 
 /* Eine einzelne Arbeit für sich, mit allem was dazugehört. */
-function goArbeit(classId, subjectId, cat, datum){
+function goArbeit(classId, subjectId, cat, kennung){
   statView.screen = "arbeit";
   statView.classId = classId;
   statView.subjectId = subjectId;
   statView.arbeitCat = cat;
-  statView.arbeitDatum = datum;
+  statView.arbeitKennung = String(kennung);
   render();
 }
 
@@ -4055,13 +4337,13 @@ function renderStatArbeit(){
   const sub = getSubject(cls, statView.subjectId);
   if(!cls || !sub) return renderStatList();
   const liste = arbeiten(sub, statView.arbeitCat);
-  const a = liste.find(x => x.datum === statView.arbeitDatum);
+  const a = liste.find(x => arbeitKennung(x) === statView.arbeitKennung);
   if(!a) return renderStatDetail();
 
   const i = liste.indexOf(a);
   const v = arbeitVergleich(liste, i);
   const label = catLabel(sub, statView.arbeitCat);
-  const alle = arbeitEintraege(cls, sub, statView.arbeitCat, a.datum);
+  const alle = arbeitEintraege(cls, sub, statView.arbeitCat, arbeitKennung(a));
   const mitNote = alle.filter(x => x.e.type === "note")
     .sort((x, y) => x.e.value - y.e.value || x.s.name.localeCompare(y.s.name));
   const ohneNote = alle.filter(x => x.e.type === "fehlt");
@@ -4123,7 +4405,7 @@ function renderStatArbeit(){
     ${zeilen || '<div class="helptext">Keine Noten.</div>'}
     ${fehlZeilen}
     <div class="footer">
-      <button onclick="printArbeit('${cls.id}','${sub.id}','${statView.arbeitCat}','${a.datum}')">Diese ${esc(label)} drucken</button>
+      <button onclick="printArbeit('${cls.id}','${sub.id}','${statView.arbeitCat}','${arbeitKennung(a)}')">Diese ${esc(label)} drucken</button>
       <button class="ghost" onclick="goStat('detail')">zurück zur Übersicht</button>
     </div>
   `;
@@ -4153,7 +4435,9 @@ function renderStatDetail(){
   const sub = getSubject(cls, statView.subjectId);
   if(!cls || !sub) return renderStatList();
 
-  const je = cls.students.map(s => ({ s: s, schnitt: computeSchnitt(sub, s.id), ...countPosNeg(sub, s.id) }));
+  const je = cls.students.map(s => ({ s: s, schnitt: computeSchnitt(sub, s.id),
+    fuenfer: wertendeNoten(sub, s.id).filter(n => n.value === 5).length,
+    ...countPosNeg(sub, s.id) }));
   const avgs = je.map(p => p.schnitt).filter(v => v !== null);
   const klassenschnitt = avgs.length ? avgs.reduce((a,b) => a+b, 0) / avgs.length : null;
   const totalPos = je.reduce((a,p) => a + p.pos, 0);
@@ -4167,9 +4451,11 @@ function renderStatDetail(){
         ${avatarHtml(p.s, true)}
         <div class="name" style="font-size:14px;">${p.s.name}</div>
       </div>
-      <div style="text-align:right; display:flex; gap:10px; align-items:center;">
-        <span style="font-size:12px;"><span class="green">${p.pos}</span>/<span class="${p.neg > p.pos ? "red" : ""}">${p.neg}</span></span>
-        <span class="val ${bad ? "red" : ""}" style="font-size:14px;">${fmtO(p.schnitt)}</span>
+      <div style="text-align:right; display:flex; gap:10px; align-items:center; flex-shrink:0;">
+        ${(p.pos + p.neg) > 0
+          ? '<span style="font-size:12px;"><span class="green">' + p.pos + '</span>/<span class="' + (p.neg > p.pos ? "red" : "") + '">' + p.neg + "</span></span>"
+          : (p.fuenfer ? '<span style="font-size:11px; color:#A8241C;">' + p.fuenfer + "\u00d7 5</span>" : "")}
+        <span class="val ${bad ? "red" : ""}" style="font-size:14px; white-space:nowrap;">${fmtO(p.schnitt)}</span>
         <button class="ghost" onclick="printSchueler('${cls.id}','${p.s.id}')">Blatt</button>
       </div>
     </div>`;
@@ -4197,6 +4483,30 @@ function renderStatDetail(){
     </div>`;
   }).join("");
 
+  /* ---------- Jede Arbeit als Kachel, ganz oben ----------
+     Bernd hat die Auswertung nicht gefunden, weil sie hinter einer
+     Tabellenzeile weit unten lag. Sie steht jetzt als Erstes. */
+  const arbeitKacheln = notenCats(sub).map(k => {
+    const liste = arbeiten(sub, k);
+    if(!liste.length) return "";
+    const c = catCol(sub, k);
+    const kacheln = liste.map(a => {
+      const tf = tendenzFarbe(a.schnitt);
+      return `<div style="flex:1; min-width:132px; border:2px solid #000; border-radius:8px;
+                   padding:10px; background:${tf.bg}; cursor:pointer;"
+                   onclick="goArbeit('${cls.id}','${sub.id}','${k}','${arbeitKennung(a)}')">
+        <div style="font-size:12px; font-weight:bold;">${a.nummer}. ${esc(catShort(sub, k))}</div>
+        <div style="font-size:26px; font-weight:bold; line-height:1.1; color:${tf.fg};">${fmtO(a.schnitt)}</div>
+        <div style="font-size:10px;">${esc(a.datum)}${a.thema ? " &middot; " + esc(a.thema) : ""}</div>
+        <div style="font-size:10px; margin-top:3px;">${a.anzahl} geschrieben${
+          a.negativ ? ", <b>" + a.negativ + "\u00d7 Nicht gen.</b>" : ""}</div>
+        <div style="font-size:10px; text-decoration:underline;">Auswertung ansehen</div>
+      </div>`;
+    }).join("");
+    return `<div class="label" style="border-top:2px solid #000; color:${c.fg};">${esc(catLabel(sub, k).toUpperCase())}</div>
+      <div style="padding:0 16px 12px; display:flex; gap:8px; flex-wrap:wrap;">${kacheln}</div>`;
+  }).join("");
+
   /* ---------- Schularbeiten und andere Arbeiten vergleichen ----------
      Gezeigt wird jede benotete Kategorie, in der es mindestens zwei Termine
      gibt. Bei nur einem Termin gibt es nichts zu vergleichen. */
@@ -4210,7 +4520,7 @@ function renderStatDetail(){
       const v = arbeitVergleich(liste, i);
       const farbe = !v ? "" : (v.richtung === "besser" ? "#2A6B2E" : (v.richtung === "schlechter" ? "#A8241C" : "#4A4943"));
       const pfeil = !v ? "" : (v.richtung === "besser" ? "\u2197" : (v.richtung === "schlechter" ? "\u2198" : "\u2192"));
-      return `<tr class="vgl-zeile" onclick="goArbeit('${cls.id}','${sub.id}','${k}','${a.datum}')" title="Diese ${esc(label)} für sich ansehen">
+      return `<tr class="vgl-zeile" onclick="goArbeit('${cls.id}','${sub.id}','${k}','${arbeitKennung(a)}')" title="Diese ${esc(label)} für sich ansehen">
         <td style="font-weight:bold; text-decoration:underline;">${a.nummer}.</td>
         <td>${esc(a.datum)}${a.thema ? '<br><span style="font-size:11px;">' + esc(a.thema) + "</span>" : ""}</td>
         <td style="text-align:center; font-weight:bold;">${fmt(a.schnitt)}</td>
@@ -4280,7 +4590,8 @@ function renderStatDetail(){
         ? '<div class="stat"><div class="val"><span class="green">' + totalPos + '</span> / <span class="' + (totalNeg > totalPos ? "red" : "") + '">' + totalNeg + '</span></div><div class="lbl">Positiv / Negativ gesamt</div></div>'
         : '<div class="stat"><div class="val ' + (negGesamt ? "red" : "") + '">' + negGesamt + '</div><div class="lbl">Nicht genügend' + (notenGesamt ? " &middot; " + fmtPct((negGesamt * 100) / notenGesamt) + " % aller Noten" : "") + '</div></div>'}
     </div>
-    ${verteilung ? '<div class="label">VERTEILUNG DER NOTEN</div><div class="chart">' + verteilung + "</div>" : ""}
+    ${arbeitKacheln}
+    ${verteilung ? '<div class="label" style="border-top:2px solid #000;">VERTEILUNG ALLER NOTEN</div><div class="chart">' + verteilung + "</div>" : ""}
     ${spiegelGesamt ? '<div class="label">NOTENSPIEGEL</div><div style="padding:0 16px 12px; overflow-x:auto;">' + spiegelGesamt + "</div>" : ""}
     ${vergleichBloecke}
     <div class="label" style="border-top:2px solid #000;">SCHÜLER:INNEN</div>
@@ -4294,6 +4605,8 @@ function renderStatDetail(){
     <div class="footer">
       <button onclick="printKlasse('${cls.id}','${sub.id}')">Klassenübersicht drucken</button>
       <button onclick="printAlleSchueler('${cls.id}')">Alle Einzelblätter drucken</button>
+      ${notenCats(sub).filter(k => arbeiten(sub, k).length).map(k =>
+        `<button onclick="printAlleArbeiten('${cls.id}','${sub.id}','${k}')">${esc(catShort(sub, k))}: alle auf einem Blatt</button>`).join("")}
     </div>
   `;
 }

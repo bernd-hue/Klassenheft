@@ -1,4 +1,4 @@
-# Klassenheft, Version 14
+# Klassenheft, Version 15
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -52,6 +52,57 @@ Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit eine
 **Wer gefehlt hat** bekommt das graue Feld ganz rechts in seiner Zeile.
 
 Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese Maske ist jetzt schlanker: Beurteilungsart, die fünf Notenfelder, Speichern. Der Rechner für Punkte und Prozent sowie die Gewichtung stehen darunter und stören den kurzen Weg nicht mehr.
+
+## Wer braucht Aufmerksamkeit
+
+In der Klassenliste sind Schüler:innen mit schwacher Mitarbeit oder schlechten Ergebnissen **farblich abgehoben**, mit einem Balken links und dem Grund im Klartext daneben. Ganz oben steht, wie viele es sind und wer.
+
+Es gilt als auffällig, wer eines davon hat:
+
+| Grund | Schwelle |
+|---|---|
+| Schwacher Notenschnitt | ab 4,0 |
+| Nicht genügend | jedes einzelne, auch bei sonst gutem Schnitt |
+| Schwache Mitarbeit | mindestens die Hälfte der Einstufungen auf den beiden untersten Stufen, ab drei Einträgen |
+| Nicht mitgeschrieben | ab zwei Mal |
+
+Warum mehrere Gründe: Ein schwacher Schnitt und fehlende Mitarbeit sind verschiedene Gespräche. Wer nur den Schnitt sieht, übersieht das Kind, das die Schularbeiten schafft, aber im Unterricht nicht mehr mitgeht.
+
+Die Schwellen stehen im Code ganz oben bei `AUFFALL_SCHNITT`, `AUFFALL_MITARBEIT` und `AUFFALL_MIN_STUFEN` und lassen sich ändern, siehe Bastelanleitung.
+
+## Welche Schularbeit ist das?
+
+**Beim Eintragen wählst du die Nummer:** 1., 2., 3., 4. In Klammern steht, wie viele Einträge es dort schon gibt.
+
+Das ist wichtiger, als es aussieht. Vorher hat die App nach dem **Datum** gruppiert, und das geht in zwei Fällen schief:
+
+- Du trägst die 1. und die 2. Schularbeit am selben Nachmittag nach — dann wären beide **eine einzige** Arbeit gewesen.
+- Jemand schreibt eine Woche später nach — dann wäre das eine **eigene** Arbeit gewesen.
+
+Mit der Nummer stimmt beides: gleicher Tag, verschiedene Nummern bleiben getrennt; verschiedene Tage, gleiche Nummer gehören zusammen. Als Termin gilt dann der Tag, an dem die meisten geschrieben haben, der Nachschreibtermin wird trotzdem festgehalten.
+
+Bei Schularbeiten aus früheren Fassungen trägt die App die Nummern **einmalig aus der Reihenfolge der Termine** nach. Danach ändert ein Ausbessern des Datums nichts mehr an der Zuordnung.
+
+## Auswertung einer Schularbeit
+
+Gleich oben in der Fachstatistik steht **jede Arbeit als Kachel**: Nummer, Schnitt, Datum, Thema, wie viele geschrieben haben und wie viele Nicht genügend. Ein Tipp führt zur vollen Auswertung.
+
+Nach dem **Ganze Klasse bewerten** führt ein Knopf direkt dorthin — du siehst also sofort, wie die Schularbeit ausgefallen ist.
+
+Die Auswertung zeigt:
+
+- den **Klassendurchschnitt** dieser Arbeit, groß und in Worten
+- **wie viele 1er, 2er, 3er, 4er und 5er** es gab, als Balken mit Prozent und als Notenspiegel ausgeschrieben
+- den Vergleich zur vorigen Arbeit und das Mittel aller
+- beste und schwächste Note
+- alle Namen mit ihrer Note, nach Note sortiert
+- wer nicht mitgeschrieben hat
+
+## Am Ende des Schuljahres
+
+In der Fachstatistik ganz unten: **Schularbeit: alle auf einem Blatt**. Ein Ausdruck mit dem Vergleichsdiagramm über alle Termine und darunter je Arbeit ein eigener Block mit Notenspiegel, Prozenten, Schnitt und dem Satz, ob sie besser oder schlechter ausgefallen ist als die vorige.
+
+Stell dafür oben auf **Ganzes Jahr**, sonst siehst du nur die Arbeiten des gewählten Semesters.
 
 ## Schularbeiten vergleichen
 
