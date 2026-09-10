@@ -242,7 +242,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17";
+const APP_FASSUNG = "17.1";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -516,6 +516,99 @@ function schluesselText(kind, key){
   }
   const t = PROZENT_KEYS[key];
   return "ab " + t[0][0] + " % = 1 &middot; ab " + t[1][0] + " % = 2 &middot; ab " + t[2][0] + " % = 3 &middot; ab " + t[3][0] + " % = 4 &middot; darunter = 5";
+}
+
+/* ---------- SCHLÜSSEL ZUM NACHLESEN ----------
+   Der Schlüssel rechnet still im Hintergrund. Damit man ihn nachprüfen kann,
+   ohne den Code zu lesen, steht er in den Einstellungen als Tabelle: welcher
+   Prozentbereich welche Note ergibt, für beide Leistungsniveaus nebeneinander. */
+
+/* Von-bis je Note aus der Schwellenliste. Die Obergrenze ist die nächsthöhere
+   Schwelle minus eins, damit keine Lücke und keine Überschneidung entsteht. */
+function prozentBereich(key, note){
+  const t = PROZENT_KEYS[key] || PROZENT_KEYS.ahs;
+  const i = note - 1;
+  if(i < 0 || i >= t.length) return "";
+  const unten = t[i][0];
+  if(i === t.length - 1) return "unter " + t[i-1][0] + " %";
+  const oben = i === 0 ? 100 : t[i-1][0] - 1;
+  return unten + " bis " + oben + " %";
+}
+
+function fehlerBereich(key, note){
+  const t = DIKTAT_KEYS[key] || DIKTAT_KEYS.ahs;
+  const i = note - 1;
+  if(i < 0 || i >= t.length) return "";
+  if(i === t.length - 1) return "ab " + (t[i-1][0] + 1);
+  const unten = i === 0 ? 0 : t[i-1][0] + 1;
+  const oben = t[i][0];
+  return unten === oben ? String(unten) : unten + " bis " + oben;
+}
+
+/* Welche Niveaus in dieser Klasse überhaupt vorkommen können. Die 1. Klasse
+   kennt noch keine, dort gibt es nur eine Spalte. */
+function schluesselSpalten(cls){
+  if((cls.stufe || 2) === 1) return [["stufe1", "1. Klasse"]];
+  return [["ahs", NIVEAU_LABELS.ahs], ["standard", NIVEAU_LABELS.standard]];
+}
+
+/* Eine Tabelle, Note für Note. art ist "prozent" oder "fehler". */
+function schluesselTabelle(cls, art){
+  const spalten = schluesselSpalten(cls);
+  const einheit = art === "fehler" ? " (Fehler)" : "";
+  const kopf = spalten.map(([, lbl]) => `<th>${esc(lbl)}${einheit}</th>`).join("");
+  const zeilen = [1,2,3,4,5].map(note => {
+    const g = gradeColor(note);
+    const felder = spalten.map(([key]) =>
+      `<td>${art === "fehler" ? fehlerBereich(key, note) : prozentBereich(key, note)}</td>`).join("");
+    return `<tr>
+      <td style="font-weight:bold; color:${g.fg}; width:26px;">${note}</td>
+      <td style="font-size:11px;">${esc(notenWort(note))}</td>
+      ${felder}
+    </tr>`;
+  }).join("");
+  return `<table class="vgl-tbl"><tr><th></th><th>Note</th>${kopf}</tr>${zeilen}</table>`;
+}
+
+/* Der ganze Abschnitt zum Nachlesen, wie er in den Einstellungen steht.
+   Zeigt nur die Schlüssel, die in diesem Fach tatsächlich zum Tragen kommen,
+   damit in Mathematik nicht die Diktattabelle mitläuft. */
+function schluesselBereich(cls, sub){
+  const cats = activeCats(sub);
+  const mitProzent = cats.filter(k => PROZENT_CATS.indexOf(k) !== -1 && !istStufenCat(sub, k));
+  const mitDiktat  = cats.indexOf("diktat") !== -1 && !istStufenCat(sub, "diktat");
+  const eigene = cats.filter(k => isCustomCat(k) && !istStufenCat(sub, k));
+
+  const teile = [];
+
+  if(mitProzent.length){
+    teile.push(`
+      <div class="helptext" style="padding-bottom:4px;"><b>Nach Prozent:</b> ${esc(mitProzent.map(k => catLabel(sub, k)).join(", "))}</div>
+      <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "prozent")}</div>`);
+  }
+
+  if(mitDiktat){
+    teile.push(`
+      <div class="helptext" style="padding-bottom:4px;"><b>Nach Fehleranzahl:</b> ${esc(catLabel(sub, "diktat"))}, geübtes Diktat, Textlänge laut Vorlage etwa 45 bis 65 Wörter</div>
+      <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "fehler")}</div>`);
+  }
+
+  if(!teile.length){
+    return `<div class="helptext">In diesem Fach ist gerade keine Kategorie eingeschaltet, die über einen Schlüssel gerechnet wird. Sobald du eine Schularbeit, eine Grammatik- oder Rechtschreibüberprüfung oder ein Diktat einschaltest, steht der Schlüssel hier.</div>`;
+  }
+
+  const zusatz = eigene.length
+    ? `<br>Deine eigenen Beurteilungen (${esc(eigene.map(k => catLabel(sub, k)).join(", "))}) haben keinen Schlüssel. Dort tippst du die Note direkt an oder gibst Punkte ein, dann rechnet die App mit dem Prozentschlüssel oben.`
+    : "";
+
+  return teile.join("") + `
+    <div class="helptext" style="padding-top:0;">
+      Diese Tabellen sind zum Nachlesen. Die App rechnet genau danach, wenn du beim Eintragen Prozent, Punkte oder Fehler eingibst.
+      Eine Note direkt antippen kannst du immer, dann greift kein Schlüssel.${zusatz}
+      <br><br>Grundlage ist die Vorlage der Deutschkollegin. ${(cls.stufe || 2) === 1
+        ? "Die 1. Klasse kennt noch keine Leistungsniveaus, deshalb gibt es nur eine Spalte."
+        : "Ab der 2. Klasse entscheidet das Leistungsniveau je Schüler:in, das du in der Schüleransicht einstellst."}
+    </div>`;
 }
 
 function stufeLabel(cls){ return (cls.stufe || 2) === 1 ? "1. Klasse" : "2. bis 4. Klasse"; }
@@ -5024,6 +5117,7 @@ function renderSettingsDetail(){
     <div class="label" style="border-top:2px solid #000;">NOTENSCHLÜSSEL</div>
     <div class="chips">${stufeChips}</div>
     <div class="helptext">Gilt für die ganze Klasse ${cls.name}. Ab der 2. Klasse zählt zusätzlich das Leistungsniveau, das du je Schüler:in einstellst.</div>
+    ${schluesselBereich(cls, sub)}
 
     <div class="label" style="border-top:2px solid #000;">KATEGORIEN</div>
     <div class="helptext">Nur angehakte Kategorien erscheinen bei der Notenvergabe.</div>

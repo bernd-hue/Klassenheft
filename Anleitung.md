@@ -1,4 +1,4 @@
-# Klassenheft, Version 17
+# Klassenheft, Version 17.1
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -198,6 +198,38 @@ Unter dem Verlauf steht ein Bereich zum Herzeigen. Tipp eine Beurteilungsart an,
 In jeder Eingabemaske gibt es ein freiwilliges Feld **Thema**: Bruchrechnung, Gleichungen, Seite 42. Es steht danach beim Eintrag, auf dem Elternsprechtag-Blatt und in der Word-Sicherung. Leer lassen ist der Normalfall, dann steht dort wie bisher nur die Beurteilungsart.
 
 In der Sammelerfassung gilt das Thema für die ganze Runde. Du kannst es auch nachtragen, wenn schon die halbe Klasse eingetragen ist — die bereits gesetzten Zeilen ziehen mit.
+
+## Welcher Notenschlüssel gilt
+
+*Einstellungen*, Klasse und Fach auswählen, Abschnitt **NOTENSCHLÜSSEL**. Dort steht der Schlüssel als Tabelle zum Nachlesen, Note für Note, mit **beiden Leistungsniveaus nebeneinander**:
+
+| Note | | Standard AHS | Standard |
+|---|---|---|---|
+| 1 | Sehr gut | 90 bis 100 % | 64 bis 100 % |
+| 2 | Gut | 77 bis 89 % | 51 bis 63 % |
+| 3 | Befriedigend | 64 bis 76 % | 37 bis 50 % |
+| 4 | Genügend | 51 bis 63 % | 25 bis 36 % |
+| 5 | Nicht genügend | unter 51 % | unter 25 % |
+
+Das gilt für Schularbeit, Grammatik-Wiederholung und Rechtschreib-Überprüfung, in **jedem** Fach gleich, also auch in Mathematik.
+
+Ist im Fach ein **Diktat** eingeschaltet, steht darunter zusätzlich die Tabelle nach Fehleranzahl:
+
+| Note | | Standard AHS | Standard |
+|---|---|---|---|
+| 1 | Sehr gut | 0 bis 1 | 0 bis 5 |
+| 2 | Gut | 2 bis 3 | 6 bis 7 |
+| 3 | Befriedigend | 4 bis 5 | 8 bis 9 |
+| 4 | Genügend | 6 bis 7 | 10 bis 11 |
+| 5 | Nicht genügend | ab 8 | ab 12 |
+
+Bezugsgröße ist ein geübtes Diktat mit etwa 45 bis 65 Wörtern.
+
+Die App zeigt nur die Tabellen, die im geöffneten Fach auch zum Tragen kommen — in Mathematik also keine Diktattabelle. Ist gerade keine Kategorie mit Schlüssel eingeschaltet, sagt sie das, statt eine leere Tabelle zu zeigen.
+
+In der **1. Klasse** gibt es nur eine Spalte, dort sind die Leistungsniveaus noch nicht getrennt. Der Schlüssel entspricht dem von Standard AHS, mit einem größeren Bereich beim Genügend (25 bis 63 %).
+
+Die Tabellen sind reine Auskunft. Gerechnet wird damit, sobald du beim Eintragen Prozent, Punkte oder Fehler eingibst. Eine Note direkt antippen kannst du immer, dann greift kein Schlüssel.
 
 ## Was benotet wird und was nicht
 

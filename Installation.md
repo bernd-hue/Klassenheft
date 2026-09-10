@@ -1,6 +1,6 @@
 # Klassenheft auf iPhone und MacBook installieren
 
-Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 08.09.2026, Version 17.
+Schritt für Schritt. Rechne mit etwa fünfzehn Minuten. Stand 10.09.2026, Version 17.1.
 
 ---
 
@@ -22,7 +22,7 @@ Du hast bereits eine Adresse: **bernd-hue.github.io/Klassenheft**. Dort liegt ei
 2. Oben auf **Add file**, dann **Upload files**.
 3. Im Finder den entpackten Ordner **Klassenheft_App** öffnen.
 4. Dort alle Dateien markieren, mit **Cmd + A**, und mit der Maus in das GitHub-Fenster ziehen. **Nicht den Ordner selbst hineinziehen, sondern seinen Inhalt** — sonst landet alles in einem Unterordner und die Adresse zeigt weiter die alte Fassung.
-5. Unten ins Textfeld **Version 17** schreiben und auf **Commit changes** klicken.
+5. Unten ins Textfeld **Version 17.1** schreiben und auf **Commit changes** klicken.
 6. Ein bis zwei Minuten warten. GitHub braucht kurz, bis die neue Fassung ausgeliefert wird.
 
 Die alten Dateien mit gleichem Namen werden dabei überschrieben, das ist so gewollt.
@@ -37,8 +37,8 @@ Am MacBook **bernd-hue.github.io/Klassenheft** aufrufen, dann unten auf **Einste
 
 **Die App sagt dir selbst, woran du bist:**
 
-- *"Geladen ist Klassenheft, Version 17. Das ist die Fassung, die auch auf der Adresse liegt."* → alles in Ordnung, weiter mit Schritt 3.
-- *"Geladen ist Klassenheft, Version 9. Auf der Adresse liegt bereits Version 17."* → dein Browser zeigt noch die alte Fassung aus seinem Zwischenspeicher. Darunter steht ein Knopf **Version 17 jetzt laden**. Einmal darauf tippen, fertig. **Deine Klassen und Noten bleiben dabei erhalten**, sie liegen in einem eigenen Speicher, den das Aktualisieren nicht berührt.
+- *"Geladen ist Klassenheft, Version 17.1. Das ist die Fassung, die auch auf der Adresse liegt."* → alles in Ordnung, weiter mit Schritt 3.
+- *"Geladen ist Klassenheft, Version 9. Auf der Adresse liegt bereits Version 17.1."* → dein Browser zeigt noch die alte Fassung aus seinem Zwischenspeicher. Darunter steht ein Knopf **Version 17.1 jetzt laden**. Einmal darauf tippen, fertig. **Deine Klassen und Noten bleiben dabei erhalten**, sie liegen in einem eigenen Speicher, den das Aktualisieren nicht berührt.
 
 Der Knopf ist der zuverlässige Weg. Er leert den Zwischenspeicher, meldet den Hintergrunddienst ab und lädt neu. Das ist genau das, was man sonst von Hand machen müsste.
 
@@ -118,7 +118,7 @@ Dann lade ich dir eine neue `index.html`, du lädst sie wie in Schritt 1 bei Git
 ## Kurzfassung zum Abhaken
 
 - [ ] Dateien bei GitHub hochgeladen
-- [ ] Am MacBook unter Einstellungen, Abschnitt FASSUNG, geprüft, dass Version 17 geladen ist
+- [ ] Am MacBook unter Einstellungen, Abschnitt FASSUNG, geprüft, dass Version 17.1 geladen ist
 - [ ] Am MacBook in Chrome installiert
 - [ ] Am iPhone in Safari zum Home-Bildschirm hinzugefügt
 - [ ] Am iPhone ab jetzt nur noch das Symbol verwenden
