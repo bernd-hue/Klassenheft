@@ -1,4 +1,4 @@
-# Klassenheft, Version 15
+# Klassenheft, Version 17
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -53,6 +53,20 @@ Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit eine
 
 Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese Maske ist jetzt schlanker: Beurteilungsart, die fünf Notenfelder, Speichern. Der Rechner für Punkte und Prozent sowie die Gewichtung stehen darunter und stören den kurzen Weg nicht mehr.
 
+## Fotos am Handy
+
+**Foto aufnehmen** in der Schüleransicht öffnet am Handy die rückwärtige Kamera, **Foto aufnehmen** beim Porträt die vordere, **aus Mediathek** die Fotoauswahl. Nach der Aufnahme fragt die App, wozu das Foto gehört: Hausübung oder Schülerarbeit.
+
+Jedes Bild wird **vor dem Speichern verkleinert**: ein Eintragsfoto auf 480 Punkte Breite, ein Porträtfoto auf 200 mal 200 quadratisch aus der Mitte. Aus einem 10 MB großen Kamerabild werden dabei etwa 40 KB. Das Original bleibt in deiner Fotos-App unberührt, die App legt nur die verkleinerte Fassung ab.
+
+### Wie viel Platz ist da
+
+Unter *Einstellungen*, Abschnitt **Speicher dieses Geräts**, siehst du, wie voll es ist und wie viel davon die Fotos ausmachen. Der Browser gibt einer App etwa **5 MB**. Das reicht für rund **hundert Fotos** neben allen Noten.
+
+Ab 70 % wird der Balken auffällig und die App sagt es dir. Dann: einmal *Jetzt sichern*, danach alte Fotos in den Schüleransichten löschen. **Die Sicherung enthält die Fotos weiterhin** — gelöscht werden sie also nur aus der App, nicht aus der Sicherung.
+
+Wird es doch einmal zu eng, sagt die App beim Speichern klar, dass der Eintrag **nicht** übernommen wurde, und stellt den letzten gespeicherten Stand wieder her. Was du auf dem Bildschirm siehst, ist damit immer das, was wirklich gespeichert ist.
+
 ## Wer braucht Aufmerksamkeit
 
 In der Klassenliste sind Schüler:innen mit schwacher Mitarbeit oder schlechten Ergebnissen **farblich abgehoben**, mit einem Balken links und dem Grund im Klartext daneben. Ganz oben steht, wie viele es sind und wer.
@@ -62,9 +76,11 @@ Es gilt als auffällig, wer eines davon hat:
 | Grund | Schwelle |
 |---|---|
 | Schwacher Notenschnitt | ab 4,0 |
-| Nicht genügend | jedes einzelne, auch bei sonst gutem Schnitt |
-| Schwache Mitarbeit | mindestens die Hälfte der Einstufungen auf den beiden untersten Stufen, ab drei Einträgen |
+| Nicht genügend | ab zwei; ein einzelnes genügt, wenn der Schnitt schon über 3,0 liegt |
+| Schwache Mitarbeit | mindestens 60 % der Einstufungen auf den beiden untersten Stufen, ab vier Einträgen |
 | Nicht mitgeschrieben | ab zwei Mal |
+
+Die Schwellen sind bewusst so gesetzt, dass in einer üblichen Klasse eine Handvoll Namen markiert ist und nicht die halbe Liste. Eine Markierung, die fast jeden trifft, sagt nichts mehr.
 
 Warum mehrere Gründe: Ein schwacher Schnitt und fehlende Mitarbeit sind verschiedene Gespräche. Wer nur den Schnitt sieht, übersieht das Kind, das die Schularbeiten schafft, aber im Unterricht nicht mehr mitgeht.
 
@@ -150,6 +166,8 @@ Tipp in der Vergleichstabelle auf eine Zeile. Dann bekommst du diese eine Arbeit
 Er steht in der Fachstatistik für das ganze Fach, bei jeder einzelnen Arbeit, auf dem Klassenblatt, auf dem Blatt je Arbeit und in der Word-Sicherung.
 
 ## Die Schüleransicht
+
+Auf dem Elternsprechtag-Blatt steht neben dem Notenschnitt der **Klassenschnitt zum Vergleich**. Erst im Vergleich sagt ein Schnitt etwas. Die frühere Anzeige „Anzahl der Noten" ist entfallen.
 
 Ganz oben steht die **allgemeine Leistungstendenz**: der Notenschnitt groß, daneben die Note in Worten und ein Pfeil, wohin sich die Leistung bewegt. Der Pfeil erscheint ab vier Noten, darunter wäre er Zufall und die App sagt das auch.
 

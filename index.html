@@ -182,8 +182,8 @@
   .pr-tbl th, .pr-tbl td{border:1px solid #000000; padding:2mm 2.5mm; text-align:left; vertical-align:top;}
   .pr-tbl th{background:#eeeeee; font-size:9pt;}
   .pr-kpi{display:flex; gap:0; border:1px solid #000000; margin-bottom:4mm;}
-  .pr-kpi div{flex:1; padding:3mm; text-align:center; border-right:1px solid #000000;}
-  .pr-kpi div:last-child{border-right:none;}
+  .pr-kpi > div{flex:1; padding:3mm; text-align:center; border-right:1px solid #000000;}
+  .pr-kpi > div:last-child{border-right:none;}
   .pr-kpi .v{font-size:16pt; font-weight:bold;}
   .pr-kpi .l{font-size:8pt;}
   .pr-chart{margin:2mm 0 3mm; page-break-inside:avoid;}
@@ -242,7 +242,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "15";
+const APP_FASSUNG = "17";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -1028,17 +1028,73 @@ function load(){
   return { classes: [], settings: defaultSettings() };
 }
 
+/* Der zuletzt erfolgreich gespeicherte Stand, als Text. Wird gebraucht, um
+   nach einem gescheiterten Speichern zurückzurollen. */
+let letzterGuterStand = null;
+
+/* Speichern und ehrlich bleiben.
+
+   Der frühere Weg hat bei vollem Speicher zwar gemeldet, dass es nicht
+   geklappt hat, den Eintrag aber im Programm stehen lassen. Auf dem
+   Bildschirm war er da, im Speicher nicht, und nach dem nächsten Öffnen
+   war er weg. Deshalb wird der Stand jetzt zurückgerollt: Was du siehst,
+   ist das, was wirklich gespeichert ist. */
 function save(){
+  const text = JSON.stringify({ version: 4, classes: state.classes, settings: state.settings });
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 4, classes: state.classes, settings: state.settings }));
+    localStorage.setItem(STORAGE_KEY, text);
+    letzterGuterStand = text;
+    return true;
   }catch(e){
-    alert("Speichern hat nicht geklappt. Vermutlich ist der Speicher des Gerätes voll, zum Beispiel durch viele Fotos. Bitte ein Backup exportieren und alte Fotos entfernen.");
+    let hergestellt = false;
+    if(letzterGuterStand){
+      try{
+        const alt = JSON.parse(letzterGuterStand);
+        state.classes = alt.classes;
+        state.settings = alt.settings;
+        hergestellt = true;
+      }catch(e2){}
+    }
+    alert("Der Speicher dieses Geräts ist voll.\n\n" +
+      (hergestellt ? "Der letzte Eintrag wurde deshalb NICHT übernommen und ist wieder verschwunden.\n\n" : "") +
+      "Fotos brauchen den meisten Platz. So schaffst du Luft:\n" +
+      "1. Unter Einstellungen auf Jetzt sichern, damit alles gesichert ist.\n" +
+      "2. Alte Fotos in den Schüleransichten löschen.\n\n" +
+      "Die Sicherung enthält die Fotos weiterhin.");
+    if(hergestellt) render();
+    return false;
   }
+}
+
+/* Wie voll ist der Speicher? Für den Hinweis in den Einstellungen. */
+function speicherStand(){
+  let belegt = 0;
+  try{
+    const t = localStorage.getItem(STORAGE_KEY);
+    belegt = t ? t.length : 0;
+  }catch(e){ return null; }
+  /* Die Obergrenze nennt kein Browser verlässlich. 5 MB ist der Wert, den
+     iOS und Android in der Praxis anbieten; lieber vorsichtig rechnen. */
+  const grenze = 5 * 1024 * 1024;
+  let fotos = 0, fotoBytes = 0;
+  state.classes.forEach(c => {
+    c.students.forEach(s => { if(s.photo){ fotos++; fotoBytes += s.photo.length; } });
+    c.subjects.forEach(sub => sub.entries.forEach(e => {
+      if(e.type === "foto" && e.dataUrl){ fotos++; fotoBytes += e.dataUrl.length; }
+    }));
+  });
+  return {
+    belegt: belegt, grenze: grenze,
+    anteil: Math.min(100, (belegt * 100) / grenze),
+    fotos: fotos, fotoBytes: fotoBytes,
+    fotoAnteil: belegt ? (fotoBytes * 100) / belegt : 0
+  };
 }
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
 let state = load();
+try{ letzterGuterStand = localStorage.getItem(STORAGE_KEY); }catch(e){}
 let pendingPhoto = null;
 
 let tab = "home";
@@ -1479,8 +1535,10 @@ function arbeitVergleich(liste, i){
 
    Alle Schwellen stehen hier oben und lassen sich anpassen. */
 const AUFFALL_SCHNITT = 4.0;      /* ab diesem Schnitt steht die Note auf der Kippe */
-const AUFFALL_MITARBEIT = 0.5;    /* Anteil schwacher Einstufungen, ab dem es auffällt */
-const AUFFALL_MIN_STUFEN = 3;     /* so viele Einstufungen braucht es für eine Aussage */
+const AUFFALL_MITARBEIT = 0.6;    /* Anteil schwacher Einstufungen, ab dem es auffällt */
+const AUFFALL_MIN_STUFEN = 4;     /* so viele Einstufungen braucht es für eine Aussage */
+const AUFFALL_FUENFER = 2;        /* ab so vielen Nicht genügend, siehe unten */
+const AUFFALL_WACKELT = 3.0;      /* darüber genügt schon ein einzelnes Nicht genügend */
 
 function auffaellig(sub, studentId, sem){
   const gruende = [];
@@ -1490,9 +1548,13 @@ function auffaellig(sub, studentId, sem){
     gruende.push({ art: "note", text: "Schnitt " + fmt(schnitt) });
   }
 
-  /* Ein Nicht genügend fällt auch dann auf, wenn der Schnitt noch passt */
+  /* Nicht genügend: mehrere fallen immer auf, ein einzelnes nur dann, wenn
+     der Schnitt ohnehin schon wackelt. Sonst wäre in einer normalen Klasse
+     die halbe Liste markiert, und dann sagt die Markierung nichts mehr. */
   const fuenfer = wertendeNoten(sub, studentId, sem).filter(n => n.value === 5).length;
-  if(fuenfer) gruende.push({ art: "note", text: fuenfer + "\u00d7 Nicht genügend" });
+  if(fuenfer >= AUFFALL_FUENFER || (fuenfer && schnitt !== null && schnitt >= AUFFALL_WACKELT)){
+    gruende.push({ art: "note", text: fuenfer + "\u00d7 Nicht genügend" });
+  }
 
   /* Schwache Mitarbeit: die beiden untersten Stufen jener Kategorien, die
      ohne Note laufen. Das ist genau das, worüber man sprechen will. */
@@ -3967,6 +4029,14 @@ function kopfMeta(){
 
 /* Zeile mit beiden Semestern und dem Jahresschnitt. Steht auf jedem Blatt,
    damit am Elternsprechtag der Verlauf über das Schuljahr sichtbar ist. */
+/* Klassenschnitt des Fachs im gewählten Zeitraum. Auf dem Elternblatt ist
+   das die nützlichste zweite Zahl: erst im Vergleich sagt ein Schnitt etwas. */
+function klassenSchnittVon(cls, sub, sem){
+  const werte = cls.students.map(s => computeSchnitt(sub, s.id, sem)).filter(v => v !== null);
+  if(!werte.length) return null;
+  return werte.reduce((a, b) => a + b, 0) / werte.length;
+}
+
 function semesterZeile(sub, studentId){
   const s1 = computeSchnitt(sub, studentId, 1);
   const s2 = computeSchnitt(sub, studentId, 2);
@@ -4058,11 +4128,17 @@ function blattSchueler(cls, s){
     return `
       <div class="pr-h2">${esc(sub.fach)}</div>
       <div class="pr-kpi">
-        <div><div class="v">${fmtO(schnitt)}</div><div class="l">Notenschnitt</div></div>
-        <div><div class="v">${wertendeNoten(sub, s.id).length}</div><div class="l">Noten</div></div>
+        <div><div class="v">${fmtO(schnitt)}</div><div class="l">Notenschnitt${
+          notenWort(schnitt) ? "<br>" + esc(notenWort(schnitt)) : ""}</div></div>
+        ${klassenSchnittVon(cls, sub) !== null
+          ? '<div><div class="v">' + fmtO(klassenSchnittVon(cls, sub)) + '</div><div class="l">Klassenschnitt<br>zum Vergleich</div></div>'
+          : ""}
         ${(pn.pos + pn.neg) > 0
           ? '<div><div class="v">' + pn.pos + " / " + pn.neg + '</div><div class="l">Positiv / Negativ</div></div>'
-          : '<div><div class="v">' + entriesOf(sub, s.id).filter(e => e.type === "fehlt").length + '</div><div class="l">nicht mitgeschrieben</div></div>'}
+          : ""}
+        ${entriesOf(sub, s.id).filter(e => e.type === "fehlt").length
+          ? '<div><div class="v">' + entriesOf(sub, s.id).filter(e => e.type === "fehlt").length + '</div><div class="l">nicht mitgeschrieben</div></div>'
+          : ""}
       </div>
       ${grafik ? '<div class="pr-chart">' + grafik + "</div>" : ""}
       ${grafik ? "" : bonusZeile(sub, s.id)}
@@ -4708,6 +4784,29 @@ function renderSettingsList(){
     <div class="label" style="border-top:2px solid #000;">SICHERHEITSKOPIE IM GERÄT</div>
     <div class="helptext">${kopieText}</div>
     ${kopie ? '<div class="footer"><button onclick="sicherheitskopieZurueck()">Sicherheitskopie zurückholen</button></div>' : ""}
+
+    ${(function(){
+      const sp = speicherStand();
+      if(!sp) return "";
+      const eng = sp.anteil >= 70;
+      const farbe = sp.anteil >= 85 ? "#A8241C" : (eng ? "#96650F" : "#2A6B2E");
+      return `<div class="label" style="border-top:2px solid #000;">SPEICHER DIESES GERÄTS</div>
+        <div style="padding:0 16px 4px;">
+          <div style="display:flex; align-items:baseline; gap:8px;">
+            <span style="font-size:17px; font-weight:bold; color:${farbe};">${fmtPct(sp.anteil)} % belegt</span>
+            <span style="font-size:11px;">${Math.round(sp.belegt / 1024)} KB von etwa ${Math.round(sp.grenze / 1024 / 1024)} MB</span>
+          </div>
+          <div style="height:10px; border:1.5px solid #000; border-radius:5px; margin-top:5px; overflow:hidden;">
+            <div style="height:100%; width:${Math.max(1, Math.round(sp.anteil))}%; background:${farbe};"></div>
+          </div>
+        </div>
+        <div class="helptext">${sp.fotos
+          ? sp.fotos + (sp.fotos === 1 ? " Foto belegt " : " Fotos belegen ") + fmtPct(sp.fotoAnteil) + " % davon. "
+          : "Noch keine Fotos gespeichert. "}${
+          eng
+            ? "<b>Es wird eng.</b> Sichere jetzt und lösche danach alte Fotos, sonst lässt sich irgendwann nichts mehr eintragen. Die Sicherung enthält die Fotos weiterhin."
+            : "Fotos brauchen mit Abstand den meisten Platz. Ein Foto belegt etwa 40 KB, es passen also einige hundert."}</div>`;
+    })()}
 
     <div class="label" style="border-top:2px solid #000;">FASSUNG</div>
     <div class="helptext">Geladen ist <b>Klassenheft, Version ${APP_FASSUNG}</b>.${
