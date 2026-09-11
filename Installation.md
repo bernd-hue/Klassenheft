@@ -50,17 +50,41 @@ Der harte Weg, nur wenn du **noch keine eigenen Daten** eingetragen hast: in Chr
 
 ---
 
-## Schritt 3: Am MacBook installieren
+## Schritt 3: Am MacBook installieren und ins Dock legen
 
-Nimm dafür **Chrome**.
+Nimm dafür **Chrome** (Edge geht genauso). **Safari kann das am Mac nicht.**
 
-1. **bernd-hue.github.io/Klassenheft** öffnen.
-2. Rechts in der Adresszeile erscheint ein kleines Symbol zum Installieren, ein Bildschirm mit einem Pfeil nach unten. Darauf klicken, dann **Installieren**.
-3. Klassenheft öffnet sich jetzt in einem eigenen Fenster, ohne Adresszeile, und liegt im Launchpad und im Dock.
+1. In Chrome **bernd-hue.github.io/Klassenheft** öffnen.
+2. Rechts in der Adresszeile erscheint ein kleines Symbol zum Installieren: ein **Bildschirm mit einem Pfeil nach unten**. Darauf klicken, dann **Installieren**.
+   *Falls es fehlt:* oben rechts auf die **drei Punkte**, dann **Streamen, Speichern und Teilen**, dann **Seite als App installieren**.
+3. Klassenheft öffnet sich sofort in einem **eigenen Fenster** — ohne Adresszeile, ohne Chrome-Leisten, wie ein normales Mac-Programm. Gleichzeitig liegt es ab jetzt im **Launchpad** und im Ordner **Programme**.
 
-Falls das Symbol nicht auftaucht: in Chrome oben rechts auf die drei Punkte, dann **Speichern und teilen**, dann **Verknüpfung erstellen** bzw. **Seite als App installieren**.
+### Dauerhaft im Dock
 
-Ein Hinweis zu Safari am Mac: Safari legt für eine so installierte App einen eigenen, getrennten Datenspeicher an. Wenn du sowohl in Safari als auch in der installierten App arbeitest, hast du zwei getrennte Stände. Deshalb am Mac bei Chrome bleiben, dort ist es ein gemeinsamer Speicher.
+Solange die App läuft, steht ihr Symbol unten im Dock. Darauf **rechtsklicken** → **Optionen** → **Im Dock behalten**. Damit bleibt sie dort, auch wenn du sie beendest.
+
+### Was die installierte App zusätzlich kann
+
+- eigenes Fenster, kein versehentliches Wegklicken eines Tabs
+- funktioniert **ohne Internet**
+- der **Sicherungsordner** lässt sich einrichten — dann legt die App beide Sicherungsdateien von selbst dorthin, statt dass du sie einzeln antippst. Das geht nur in Chrome und Edge.
+
+### Wichtig: Chrome und Safari haben getrennte Speicher
+
+Die Noten liegen im Speicher des jeweiligen Browsers. Hast du am Mac bisher **Safari** verwendet, ist die Chrome-App beim ersten Start **leer**. Das ist kein Fehler.
+
+So holst du deinen Stand herüber:
+
+1. In **Safari** die App öffnen, *Einstellungen*, **Jetzt sichern**, die **Datendatei (.json)** antippen
+2. In der **Chrome-App** *Einstellungen*, **Sicherung einspielen**, diese Datei auswählen
+
+Danach laufen beide **getrennt weiter**. Entscheide dich am Mac für einen von beiden und bleib dabei, sonst musst du ständig zusammenführen.
+
+Die Dock-App und Chrome selbst teilen sich dagegen **denselben** Speicher. Was du in der Dock-App einträgst, siehst du auch, wenn du die Adresse in einem normalen Chrome-Tab öffnest.
+
+### Am Windows-Rechner
+
+Genauso: Chrome oder Edge, Symbol in der Adresszeile, **Installieren**. Die App landet im Startmenü und lässt sich an die Taskleiste heften.
 
 ---
 
@@ -119,8 +143,9 @@ Dann lade ich dir eine neue `index.html`, du lädst sie wie in Schritt 1 bei Git
 
 - [ ] Dateien bei GitHub hochgeladen
 - [ ] Am MacBook unter Einstellungen, Abschnitt FASSUNG, geprüft, dass Version 17.3 geladen ist
-- [ ] Am MacBook in Chrome installiert
+- [ ] Am MacBook über Chrome installiert und im Dock behalten (Rechtsklick auf das Symbol, Optionen, Im Dock behalten)
 - [ ] Am iPhone in Safari zum Home-Bildschirm hinzugefügt
 - [ ] Am iPhone ab jetzt nur noch das Symbol verwenden
 - [ ] Name, Schuljahr, Gerätename und Sicherungsordner eingetragen
 - [ ] Einmal Probe gedruckt und einmal gesichert
+
