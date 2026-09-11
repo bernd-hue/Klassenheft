@@ -130,6 +130,14 @@
     border:2px solid #000000; border-radius:8px; padding:15px 12px; margin-bottom:8px;
     font-size:15px; font-weight:bold; text-align:center; cursor:pointer;
   }
+  /* Entschuldigt ist keine Stufe, sondern das Gegenteil einer Bewertung.
+     Deshalb eine eigene Klasse: gleich gut treffbar, aber abgesetzt und
+     nie mitgezählt, wenn irgendwo die Stufen gezählt werden. */
+  .fehlt-btn{
+    border:2px dashed #4A4943; border-radius:8px; padding:13px 12px;
+    margin:0 16px 12px; background:#F1EFE8; color:#4A4943;
+    font-size:15px; font-weight:bold; text-align:center; cursor:pointer;
+  }
 
   /* Schnellerfassung: eine Zeile je Schüler:in */
   .schnell-zeile{display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid #000000;}
@@ -242,7 +250,22 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.1";
+const APP_FASSUNG = "17.3";
+
+/* ---------- AUSGABE ----------
+   Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
+   Programme wären ein Fehler: jede Korrektur müsste zweimal gemacht werden,
+   und spätestens beim dritten Mal wäre eine davon vergessen.
+
+   "mittelschule"  Die Ausgabe für die österreichische Mittelschule.
+                   Notenschlüssel und Leistungsniveaus sind vorbelegt.
+   "frei"          Die Ausgabe für andere Schultypen und Schulformen.
+                   Es ist kein Schlüssel vorbelegt, jede Lehrkraft legt die
+                   Prozentsätze je Fach selbst fest. Leistungsniveaus sind
+                   von Haus aus aus, lassen sich aber einschalten. */
+const AUSGABE = "mittelschule";
+const IST_FREI = (AUSGABE === "frei");
+const APP_NAME = IST_FREI ? "Klassenheft frei" : "Klassenheft";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
@@ -492,8 +515,37 @@ function stufeFromKlasse(name){
   return m && m[0] === "1" ? 1 : 2;
 }
 
-function schluesselKey(cls, student){
+/* ---------- LEISTUNGSNIVEAUS ----------
+   Die Unterscheidung Standard AHS / Standard gibt es nur in den
+   Hauptgegenständen Deutsch, Mathematik und Englisch. In den theoretischen
+   und praktischen Nebengegenständen gibt es sie nicht, dort gilt ein
+   einziger Schlüssel für alle. Vorher hat die App das Niveau überall
+   angesetzt, damit bekam in Geografie dieselbe Prozentzahl je nach
+   eingestelltem Niveau zwei verschiedene Noten. */
+const NIVEAU_FAECHER = ["deutsch", "mathematik", "englisch", "mathe"];
+
+/* Vorschlag, ob ein Fach Niveaus führt. Entschieden wird nach Vorlage und
+   Fachname; ändern lässt es sich in den Einstellungen je Fach. */
+function niveausVorschlag(fach, template){
+  /* In der freien Ausgabe gibt es die österreichischen Leistungsniveaus
+     nicht von Haus aus. Wer sie braucht, schaltet sie je Fach ein. */
+  if(IST_FREI) return false;
+  if(template && String(template).indexOf("nebenfach") === 0) return false;
+  const n = String(fach || "").toLowerCase();
+  return NIVEAU_FAECHER.some(h => n.indexOf(h) !== -1);
+}
+
+/* Führt dieses Fach Leistungsniveaus? Fehlt die Einstellung, entscheidet
+   der Vorschlag, damit Altbestand sich nicht von selbst ändert. */
+function hatNiveaus(sub){
+  if(!sub) return true;
+  if(typeof sub.niveaus === "boolean") return sub.niveaus;
+  return niveausVorschlag(sub.fach, sub.template);
+}
+
+function schluesselKey(cls, student, sub){
   if((cls.stufe || 2) === 1) return "stufe1";
+  if(sub && !hatNiveaus(sub)) return "ahs";
   return (student && student.niveau === "standard") ? "standard" : "ahs";
 }
 
@@ -503,18 +555,55 @@ function noteFromFehler(fehler, key){
   return 5;
 }
 
-function noteFromProzent(prozent, key){
-  const tbl = PROZENT_KEYS[key] || PROZENT_KEYS.ahs;
+/* ---------- EIGENER NOTENSCHLÜSSEL JE FACH ----------
+   Die vorgegebenen Schlüssel passen für die österreichische Mittelschule.
+   Andere Schultypen, andere Bundesländer und Fächer wie Englisch rechnen
+   mit anderen Prozentsätzen. Deshalb kann jedes Fach eigene Schwellen
+   bekommen: vier Zahlen für die Noten 1 bis 4, alles darunter ist eine 5.
+   Ist nichts hinterlegt, gilt unverändert die Vorgabe. */
+
+/* Vier Schwellen, streng fallend, zwischen 1 und 100. Alles andere wird
+   nicht angenommen, sonst entstünde ein Schlüssel, der Noten verschluckt
+   oder zwei Noten für denselben Wert vorsieht. */
+function grenzenGueltig(g){
+  if(!Array.isArray(g) || g.length !== 4) return false;
+  for(let i = 0; i < 4; i++){
+    const z = Number(g[i]);
+    if(isNaN(z) || z < 1 || z > 100) return false;
+    if(i > 0 && z >= Number(g[i-1])) return false;
+  }
+  return true;
+}
+
+function eigeneGrenzen(sub, key){
+  if(!sub || !sub.schluessel) return null;
+  const g = sub.schluessel[key] || sub.schluessel.alle;
+  return grenzenGueltig(g) ? g.map(Number) : null;
+}
+
+function hatEigenenSchluessel(sub){
+  return !!(sub && sub.schluessel && (eigeneGrenzen(sub, "ahs") || eigeneGrenzen(sub, "standard")));
+}
+
+/* Die Tabelle, nach der tatsächlich gerechnet wird. */
+function prozentTabelle(sub, key){
+  const g = eigeneGrenzen(sub, key);
+  if(g) return [[g[0],1],[g[1],2],[g[2],3],[g[3],4],[0,5]];
+  return PROZENT_KEYS[key] || PROZENT_KEYS.ahs;
+}
+
+function noteFromProzent(prozent, key, sub){
+  const tbl = prozentTabelle(sub, key);
   for(let i = 0; i < tbl.length; i++){ if(prozent >= tbl[i][0]) return tbl[i][1]; }
   return 5;
 }
 
-function schluesselText(kind, key){
+function schluesselText(kind, key, sub){
   if(kind === "fehler"){
     const t = DIKTAT_KEYS[key];
     return "0 bis " + t[0][0] + " = 1 &middot; bis " + t[1][0] + " = 2 &middot; bis " + t[2][0] + " = 3 &middot; bis " + t[3][0] + " = 4 &middot; ab " + (t[3][0]+1) + " = 5";
   }
-  const t = PROZENT_KEYS[key];
+  const t = prozentTabelle(sub, key);
   return "ab " + t[0][0] + " % = 1 &middot; ab " + t[1][0] + " % = 2 &middot; ab " + t[2][0] + " % = 3 &middot; ab " + t[3][0] + " % = 4 &middot; darunter = 5";
 }
 
@@ -525,8 +614,8 @@ function schluesselText(kind, key){
 
 /* Von-bis je Note aus der Schwellenliste. Die Obergrenze ist die nächsthöhere
    Schwelle minus eins, damit keine Lücke und keine Überschneidung entsteht. */
-function prozentBereich(key, note){
-  const t = PROZENT_KEYS[key] || PROZENT_KEYS.ahs;
+function prozentBereich(key, note, sub){
+  const t = prozentTabelle(sub, key);
   const i = note - 1;
   if(i < 0 || i >= t.length) return "";
   const unten = t[i][0];
@@ -547,20 +636,21 @@ function fehlerBereich(key, note){
 
 /* Welche Niveaus in dieser Klasse überhaupt vorkommen können. Die 1. Klasse
    kennt noch keine, dort gibt es nur eine Spalte. */
-function schluesselSpalten(cls){
+function schluesselSpalten(cls, sub){
   if((cls.stufe || 2) === 1) return [["stufe1", "1. Klasse"]];
+  if(sub && !hatNiveaus(sub)) return [["ahs", "Notenschlüssel"]];
   return [["ahs", NIVEAU_LABELS.ahs], ["standard", NIVEAU_LABELS.standard]];
 }
 
 /* Eine Tabelle, Note für Note. art ist "prozent" oder "fehler". */
-function schluesselTabelle(cls, art){
-  const spalten = schluesselSpalten(cls);
+function schluesselTabelle(cls, art, sub){
+  const spalten = schluesselSpalten(cls, sub);
   const einheit = art === "fehler" ? " (Fehler)" : "";
   const kopf = spalten.map(([, lbl]) => `<th>${esc(lbl)}${einheit}</th>`).join("");
   const zeilen = [1,2,3,4,5].map(note => {
     const g = gradeColor(note);
     const felder = spalten.map(([key]) =>
-      `<td>${art === "fehler" ? fehlerBereich(key, note) : prozentBereich(key, note)}</td>`).join("");
+      `<td>${art === "fehler" ? fehlerBereich(key, note) : prozentBereich(key, note, sub)}</td>`).join("");
     return `<tr>
       <td style="font-weight:bold; color:${g.fg}; width:26px;">${note}</td>
       <td style="font-size:11px;">${esc(notenWort(note))}</td>
@@ -575,39 +665,43 @@ function schluesselTabelle(cls, art){
    damit in Mathematik nicht die Diktattabelle mitläuft. */
 function schluesselBereich(cls, sub){
   const cats = activeCats(sub);
-  const mitProzent = cats.filter(k => PROZENT_CATS.indexOf(k) !== -1 && !istStufenCat(sub, k));
+  /* Eigene Beurteilungen rechnen ebenfalls nach dem Prozentschlüssel,
+     sobald man Punkte eingibt. Sie hier zu übersehen hieße, dass genau die
+     Nebenfach-Vorlagen keine Tabelle zu sehen bekommen. */
+  const mitProzent = cats.filter(k => hasSchluessel(k) && k !== "diktat" && !istStufenCat(sub, k));
   const mitDiktat  = cats.indexOf("diktat") !== -1 && !istStufenCat(sub, "diktat");
-  const eigene = cats.filter(k => isCustomCat(k) && !istStufenCat(sub, k));
 
   const teile = [];
 
   if(mitProzent.length){
     teile.push(`
       <div class="helptext" style="padding-bottom:4px;"><b>Nach Prozent:</b> ${esc(mitProzent.map(k => catLabel(sub, k)).join(", "))}</div>
-      <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "prozent")}</div>`);
+      <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "prozent", sub)}</div>`);
   }
 
   if(mitDiktat){
     teile.push(`
       <div class="helptext" style="padding-bottom:4px;"><b>Nach Fehleranzahl:</b> ${esc(catLabel(sub, "diktat"))}, geübtes Diktat, Textlänge laut Vorlage etwa 45 bis 65 Wörter</div>
-      <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "fehler")}</div>`);
+      <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "fehler", sub)}</div>`);
   }
 
   if(!teile.length){
     return `<div class="helptext">In diesem Fach ist gerade keine Kategorie eingeschaltet, die über einen Schlüssel gerechnet wird. Sobald du eine Schularbeit, eine Grammatik- oder Rechtschreibüberprüfung oder ein Diktat einschaltest, steht der Schlüssel hier.</div>`;
   }
 
-  const zusatz = eigene.length
-    ? `<br>Deine eigenen Beurteilungen (${esc(eigene.map(k => catLabel(sub, k)).join(", "))}) haben keinen Schlüssel. Dort tippst du die Note direkt an oder gibst Punkte ein, dann rechnet die App mit dem Prozentschlüssel oben.`
-    : "";
+  const zusatz = "";
 
   return teile.join("") + `
     <div class="helptext" style="padding-top:0;">
       Diese Tabellen sind zum Nachlesen. Die App rechnet genau danach, wenn du beim Eintragen Prozent, Punkte oder Fehler eingibst.
       Eine Note direkt antippen kannst du immer, dann greift kein Schlüssel.${zusatz}
-      <br><br>Grundlage ist die Vorlage der Deutschkollegin. ${(cls.stufe || 2) === 1
+      <br><br>${IST_FREI
+        ? "Der Ausgangswert stammt aus der österreichischen Mittelschule. Stell ihn auf die Prozentsätze deiner Schule um."
+        : "Grundlage ist die Vorlage der Deutschkollegin."} ${(cls.stufe || 2) === 1
         ? "Die 1. Klasse kennt noch keine Leistungsniveaus, deshalb gibt es nur eine Spalte."
-        : "Ab der 2. Klasse entscheidet das Leistungsniveau je Schüler:in, das du in der Schüleransicht einstellst."}
+        : (hatNiveaus(sub)
+            ? "Das Leistungsniveau stellst du je Schüler:in in der Schüleransicht ein."
+            : "In diesem Fach gibt es keine Leistungsniveaus, deshalb gilt ein Schlüssel für alle. Umstellen kannst du das oben.")}
     </div>`;
 }
 
@@ -839,7 +933,7 @@ function bonusSumme(sub, studentId, sem){
     roh += summe;
     teile.push({ cat: cat, label: catLabel(sub, cat), anzahl: drin.length, wert: summe });
   });
-  const grenze = bonusMax(sub);
+  const grenze = Math.abs(bonusMax(sub));
   const wert = Math.max(-grenze, Math.min(grenze, roh));
   return { wert: wert, roh: roh, gedeckelt: Math.abs(roh) > grenze + 0.0001, teile: teile };
 }
@@ -1189,6 +1283,7 @@ function uid(){ return Math.random().toString(36).slice(2,9); }
 let state = load();
 try{ letzterGuterStand = localStorage.getItem(STORAGE_KEY); }catch(e){}
 let pendingPhoto = null;
+let pendingPhotoTag = null;
 
 let tab = "home";
 let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
@@ -1196,7 +1291,7 @@ let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, no
                  zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
                  thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null };
 let statView = { screen:"list", classId:null, subjectId:null, arbeitCat:null, arbeitKennung:null };
-let settingsView = { screen:"list", classId:null, subjectId:null, stufenOffen:null };
+let settingsView = { screen:"list", classId:null, subjectId:null, stufenOffen:null, schluesselOffen:null };
 
 /* Fassung, die auf der Adresse liegt, falls sie von der geladenen abweicht.
    Wird von fassungPruefen() ganz am Ende gesetzt. Muss hier oben stehen,
@@ -1221,6 +1316,18 @@ function allSubjectRows(){
 
 /* Alle Einträge einer Person im gewählten Zeitraum. Ohne Angabe gilt das
    gerade eingestellte Semester, "alle" liefert das ganze Schuljahr. */
+/* Nach Datum sortiert, bei gleichem Tag nach Eintragszeitpunkt. Wird
+   gebraucht, wo "zeitliche Folge" behauptet wird: ein nachgetragener oder
+   nachträglich richtiggestellter Eintrag stand sonst am Ende der Liste und
+   hat Tendenzpfeil und Verlaufsgrafik verdreht. */
+function nachDatum(liste){
+  return liste.slice().sort((a, b) => {
+    const d = schuljahrOrdnung(a.date || "") - schuljahrOrdnung(b.date || "");
+    if(d !== 0) return d;
+    return (a.ts || 0) - (b.ts || 0);
+  });
+}
+
 function entriesOf(sub, studentId, sem){
   const z = (sem === undefined) ? aktivesSemester() : sem;
   return sub.entries.filter(e => e.studentId === studentId && (z === "alle" || eintragSemester(e) === z));
@@ -1237,8 +1344,8 @@ function wertendeNotenAlle(sub, sem){
   const z = (sem === undefined) ? aktivesSemester() : sem;
   return sub.entries.filter(e => (z === "alle" || eintragSemester(e) === z))
     .map(e => {
-      if(e.type === "note") return e;
-      if(e.type === "stufe" && stufeZaehlt(sub, e.cat)) return Object.assign({}, e, { value: stufenWert(sub, e), ausStufe: true });
+      if(e.type === "note") return catZaehlt(sub, e.cat) ? e : null;
+      if(e.type === "stufe" && catZaehlt(sub, e.cat)) return Object.assign({}, e, { value: stufenWert(sub, e), ausStufe: true });
       return null;
     }).filter(Boolean);
 }
@@ -1250,13 +1357,45 @@ function noteWeight(sub, n){
   return isProzentMode(sub) ? 1 : (sub.weights[n.cat] ?? 1);
 }
 
+/* Zählt diese Kategorie in den Notenschnitt? Maßgeblich ist ausschließlich
+   die Einstellung, nicht der Eintragstyp. Eine Kategorie, die abgeschaltet
+   oder auf "ohne Note" gestellt ist, zählt nicht mehr mit, auch wenn aus
+   der Zeit davor noch Noten darin stehen.
+   Das war bis Version 17.1 anders und hat Schnitte verzogen: die
+   Einstellungsseite hat "zählt nicht mehr in den Notenschnitt" versprochen,
+   gerechnet wurde trotzdem weiter. */
+function catZaehlt(sub, cat){
+  if(activeCats(sub).indexOf(cat) === -1) return false;
+  if(istStufenCat(sub, cat)) return stufeZaehlt(sub, cat);
+  return true;
+}
+
+/* Wie ein entschuldigtes Fehlen in dieser Kategorie heißt. Bei einer
+   Schularbeit hat man sie nicht mitgeschrieben, eine Hausübung war
+   entschuldigt. Gemeint ist beides Mal dasselbe: es wird nichts angerechnet,
+   weder gut noch schlecht. Das ist der Unterschied zur untersten Stufe,
+   die eine Bewertung ist. */
+const FEHLT_MITSCHREIBEN = ["schularbeit", "diktat", "grammatik", "rechtschreib"];
+function fehltText(sub, cat){
+  return FEHLT_MITSCHREIBEN.indexOf(cat) !== -1
+    ? "nicht mitgeschrieben, keine Note"
+    : "entschuldigt, zählt nicht";
+}
+
+/* Noten, die zwar gespeichert sind, aber laut Einstellung nicht mitzählen.
+   Sie verschwinden nicht, sie werden nur offen ausgewiesen. */
+function stilleNoten(sub, studentId, sem){
+  return entriesOf(sub, studentId, sem)
+    .filter(e => e.type === "note" && !catZaehlt(sub, e.cat));
+}
+
 /* Alle Werte, die in den Notenschnitt eingehen: die echten Noten und
    zusätzlich jene Stufeneinträge, für die das Mitzählen eingeschaltet ist.
    Einträge vom Typ "fehlt" bleiben grundsätzlich draußen. */
 function wertendeNoten(sub, studentId, sem){
   return entriesOf(sub, studentId, sem).map(e => {
-    if(e.type === "note") return e;
-    if(e.type === "stufe" && stufeZaehlt(sub, e.cat)){
+    if(e.type === "note") return catZaehlt(sub, e.cat) ? e : null;
+    if(e.type === "stufe" && catZaehlt(sub, e.cat)){
       return Object.assign({}, e, { value: stufenWert(sub, e), w: typeof e.w === "number" ? e.w : 1, ausStufe: true });
     }
     return null;
@@ -1292,17 +1431,30 @@ function schnittAus(sub, notes){
       const anteil = sub.weights[cat] ?? 0;
       if(anteil <= 0) return;
       let s = 0, w = 0;
-      inCat.forEach(n => { const nw = noteWeight(sub, n); s += n.value * nw; w += nw; });
+      inCat.forEach(n => {
+        const nw = Math.max(0, noteWeight(sub, n));
+        const v = Number(n.value);
+        if(isNaN(v)) return;
+        s += v * nw; w += nw;
+      });
       if(w <= 0) return;
       sum += (s / w) * anteil;
       wsum += anteil;
     });
-    if(wsum <= 0) return notes.reduce((a,n) => a + n.value, 0) / notes.length;
+    /* Kein Notbehelf mit ungewichtetem Mittel: der würde genau die Noten
+       zurückholen, die per Gewicht 0 ausgeschlossen wurden, und im
+       Prozentmodus ein anderes Ergebnis liefern als im Faktormodus. */
+    if(wsum <= 0) return null;
     return sum / wsum;
   }
 
   let sum = 0, wsum = 0;
-  notes.forEach(n => { const w = noteWeight(sub, n); sum += n.value * w; wsum += w; });
+  notes.forEach(n => {
+    const w = Math.max(0, noteWeight(sub, n));
+    const v = Number(n.value);
+    if(isNaN(v)) return;
+    sum += v * w; wsum += w;
+  });
   return wsum > 0 ? sum / wsum : null;
 }
 
@@ -1346,7 +1498,7 @@ function kategorienSchnitte(sub, studentId, sem){
 /* Wohin bewegt sich die Leistung? Erste Hälfte der Werte gegen zweite.
    Unter vier Werten ist das Zufall, dann sagen wir lieber nichts. */
 function tendenz(sub, studentId, sem){
-  const noten = wertendeNoten(sub, studentId, sem);
+  const noten = nachDatum(wertendeNoten(sub, studentId, sem));
   if(noten.length < 4) return { richtung: "unklar", pfeil: "", text: "" };
   const mitte = Math.floor(noten.length / 2);
   const mittelAus = liste => liste.reduce((a, e) => a + e.value, 0) / liste.length;
@@ -1463,11 +1615,15 @@ function arbeiten(sub, cat, sem){
 
   const gruppen = {};
   passend.forEach(e => {
-    /* Die Nummer ist der Schlüssel. Nur wo keine steht, greift das Datum. */
+    /* Die Nummer ist der Schlüssel, aber nur innerhalb eines Semesters: die
+       Nummern laufen je Semester wieder bei 1 los. Ohne das Semester im
+       Schlüssel würden im Zeitraum "Ganzes Jahr" die 1. Schularbeit des
+       ersten und die 1. des zweiten Semesters zu einer verschmelzen. */
     const nr = arbeitNr(e);
-    const schluessel = nr ? "nr" + nr : "d" + (e.date || "ohne");
+    const semE = eintragSemester(e);
+    const schluessel = "s" + semE + (nr ? "nr" + nr : "d" + (e.date || "ohne"));
     if(!gruppen[schluessel]){
-      gruppen[schluessel] = { nr: nr, datum: e.date || "", noten: [], fehlt: 0, themen: {}, daten: {} };
+      gruppen[schluessel] = { nr: nr, sem: semE, datum: e.date || "", noten: [], fehlt: 0, themen: {}, daten: {} };
     }
     const g = gruppen[schluessel];
     if(e.type === "fehlt") g.fehlt++; else g.noten.push(e);
@@ -1487,9 +1643,12 @@ function arbeiten(sub, cat, sem){
       const datum = tage[0] || g.datum;
       return {
         nr: g.nr,
+        sem: g.sem,
         datum: datum,
         weitereTermine: tage.length > 1 ? tage.slice(1) : [],
-        ordnung: g.nr ? g.nr : 1000 + schuljahrOrdnung(datum) / 1000,
+        /* Erst nach Semester, dann nach Nummer. Sonst stünde im Jahresblatt
+           die 1. des Sommers vor der 2. des Winters. */
+        ordnung: (g.sem === 2 ? 100 : 0) + (g.nr ? g.nr : 50 + schuljahrOrdnung(datum) / 1000),
         thema: Object.keys(g.themen).join(", "),
         anzahl: werte.length,
         fehlt: g.fehlt,
@@ -1502,18 +1661,29 @@ function arbeiten(sub, cat, sem){
     })
     .filter(a => a.anzahl > 0)
     .sort((a, b) => a.ordnung - b.ordnung)
-    .map((a, i) => Object.assign(a, { nummer: a.nr || (i + 1) }));
+    .map((a, i) => Object.assign(a, { nummer: a.nr || (i + 1) }))
+    /* Im Zeitraum "Ganzes Jahr" stehen zwei erste Schularbeiten in einer
+       Liste. Ohne Semesterzusatz wäre nicht erkennbar, welche gemeint ist. */
+    .map(a => Object.assign(a, {
+      semHinweis: (z === "alle") ? " (" + (a.sem === 2 ? "2." : "1.") + " Sem.)" : ""
+    }));
 }
 
 /* Die Einträge genau einer Arbeit, mit Person dazu. Angesprochen wird die
-   Arbeit über ihre Nummer; nur Altbestand ohne Nummer über das Datum. */
+   Arbeit über Semester und Nummer; nur Altbestand ohne Nummer über das Datum.
+   Das Semester muss mit hinein, weil die Nummern je Semester wieder bei 1
+   beginnen und "1." sonst zwei verschiedene Arbeiten meinen könnte. */
 function arbeitEintraege(cls, sub, cat, kennung, sem){
   const z = (sem === undefined) ? aktivesSemester() : sem;
-  const nr = parseInt(kennung, 10);
-  const ueberNummer = !isNaN(nr) && String(kennung).indexOf(".") === -1;
+  const teile = String(kennung).split("|");
+  const semTeil = teile.length > 1 ? parseInt(teile[0], 10) : null;
+  const rest = teile.length > 1 ? teile[1] : teile[0];
+  const nr = parseInt(rest, 10);
+  const ueberNummer = !isNaN(nr) && String(rest).indexOf(".") === -1;
   return sub.entries
     .filter(e => e.cat === cat &&
-      (ueberNummer ? arbeitNr(e) === nr : (!arbeitNr(e) && e.date === kennung)) &&
+      (ueberNummer ? arbeitNr(e) === nr : (!arbeitNr(e) && e.date === rest)) &&
+      (semTeil === null || eintragSemester(e) === semTeil) &&
       (e.type === "note" || e.type === "fehlt") &&
       (z === "alle" || eintragSemester(e) === z))
     .map(e => ({ e: e, s: cls.students.find(x => x.id === e.studentId) }))
@@ -1558,11 +1728,32 @@ function arbeitsNummernNachziehen(sub){
 }
 
 function arbeitKennung(a){
-  return a.nr ? String(a.nr) : a.datum;
+  return String(a.sem || 1) + "|" + (a.nr ? String(a.nr) : a.datum);
+}
+
+/* Sucht eine Arbeit innerhalb einer bereits erzeugten Liste. Wichtig, weil
+   arbeiten() bei jedem Aufruf neue Objekte liefert: ein Treffer aus einem
+   zweiten Aufruf ist nicht dasselbe Objekt und indexOf findet ihn nicht. */
+function arbeitIndex(liste, kennung){
+  const gesucht = String(kennung);
+  let i = liste.findIndex(a => arbeitKennung(a) === gesucht);
+  if(i === -1 && gesucht.indexOf("|") === -1){
+    i = liste.findIndex(a => (a.nr ? String(a.nr) : a.datum) === gesucht);
+  }
+  return i;
 }
 
 function arbeitFinden(sub, cat, kennung, sem){
-  return arbeiten(sub, cat, sem).find(a => arbeitKennung(a) === String(kennung)) || null;
+  const liste = arbeiten(sub, cat, sem);
+  const gesucht = String(kennung);
+  const genau = liste.find(a => arbeitKennung(a) === gesucht);
+  if(genau) return genau;
+  /* Kennungen ohne Semesterangabe stammen aus einer früheren Fassung oder
+     aus einem Verweis von außen. Dann gilt die erste passende Arbeit. */
+  if(gesucht.indexOf("|") === -1){
+    return liste.find(a => (a.nr ? String(a.nr) : a.datum) === gesucht) || null;
+  }
+  return null;
 }
 
 /* ---------- NOTENSPIEGEL ----------
@@ -1581,7 +1772,14 @@ function notenspiegel(verteilung){
 
 function spiegelVerteilung(sub, sem){
   const noten = wertendeNotenAlle(sub, sem);
-  return [1,2,3,4,5].map(n => noten.filter(e => e.value === n).length);
+  /* Auf die nächste ganze Note runden. Mitzählende Einstufungen können
+     krumme Werte wie 2,33 haben; ohne Rundung fielen sie aus dem Spiegel
+     heraus, und die Summe stimmte dann nicht mehr mit der Anzahl überein. */
+  return [1,2,3,4,5].map(n => noten.filter(e => {
+    const v = Number(e.value);
+    if(isNaN(v)) return false;
+    return Math.max(1, Math.min(5, Math.round(v))) === n;
+  }).length);
 }
 
 /* Notenspiegel als Tabelle. Der Balken ist reine Verstärkung, die Zahl
@@ -1655,8 +1853,13 @@ function auffaellig(sub, studentId, sem){
     if(!istStufenCat(sub, cat)) return;
     const liste = entriesOf(sub, studentId, sem).filter(e => e.type === "stufe" && e.cat === cat);
     if(liste.length < AUFFALL_MIN_STUFEN) return;
+    /* Als schwach gilt die untere Hälfte der Skala, aber immer mindestens
+       die unterste und nie die oberste Stufe. Ein festes "die letzten zwei"
+       war bei zwei Stufen jede Stufe und bei drei Stufen schon die mittlere,
+       damit galt "sehr gute Mitarbeit" als schwach. */
     const anzahlStufen = stufenListe(sub, cat).length;
-    const schwach = liste.filter(e => e.stufe >= anzahlStufen - 2).length;
+    const abStufe = Math.max(1, Math.ceil(anzahlStufen / 2));
+    const schwach = liste.filter(e => e.stufe >= abStufe).length;
     const anteil = schwach / liste.length;
     if(anteil >= AUFFALL_MITARBEIT){
       gruende.push({ art: "stufe",
@@ -1667,7 +1870,7 @@ function auffaellig(sub, studentId, sem){
   /* Wer bei einer Schularbeit gefehlt hat, ist kein Problemfall, aber es
      gehört erinnert, sobald es sich häuft. */
   const fehlt = entriesOf(sub, studentId, sem).filter(e => e.type === "fehlt").length;
-  if(fehlt >= 2) gruende.push({ art: "fehlt", text: fehlt + "\u00d7 nicht mitgeschrieben" });
+  if(fehlt >= 2) gruende.push({ art: "fehlt", text: fehlt + "\u00d7 entschuldigt gefehlt" });
 
   return gruende;
 }
@@ -1835,10 +2038,11 @@ function renderHomeList(){
 
   return `
     <div class="header" style="${headerStyle("home")}">
-      <div class="title" style="${titleStyle("home")}">Klassenheft</div>
+      <div class="title" style="${titleStyle("home")}">${esc(APP_NAME)}</div>
       <div class="sub">Klassen und Fächer</div>
     </div>
     ${backupBanner()}
+    ${sicherungBereitBlock()}
     ${semesterLeiste("home")}
     ${rows || '<div class="helptext">Noch nichts angelegt. Leg unten eine Klasse mit einem Fach an.</div>'}
     <div class="footer">
@@ -1972,7 +2176,7 @@ function renderRoster(){
     const schnitt = computeSchnitt(sub, s.id);
     const bad = schnitt !== null && schnitt >= 4.0;
     const gruende = auffaellig(sub, s.id);
-    const niveau = (cls.stufe === 1) ? "" : `<div class="sub">${esc(NIVEAU_LABELS[s.niveau])}</div>`;
+    const niveau = (cls.stufe === 1 || !hatNiveaus(sub)) ? "" : `<div class="sub">${esc(NIVEAU_LABELS[s.niveau])}</div>`;
     /* Gedeckt, nicht grell: die Zeile bleibt lesbar, der Balken links
        trägt die Auffälligkeit. Der Grund steht daneben in Worten, damit
        die Farbe nicht der einzige Träger ist. */
@@ -2156,18 +2360,32 @@ function renderStudent(){
       const c = catCol(sub, e.cat);
       return `<div class="entry">
         <span class="catdot" style="background:${c.fg};"></span>
-        <div class="txt">${esc(catLabel(sub, e.cat))}${e.thema ? " (" + esc(e.thema) + ")" : ""}: nicht mitgeschrieben, keine Note</div>
+        <div class="txt">${esc(catLabel(sub, e.cat))}${e.thema ? " (" + esc(e.thema) + ")" : ""}: ${esc(fehltText(sub, e.cat))}</div>
         ${datumFeld(e)}${del}</div>`;
     }
     return `<div class="entry"><span>&#9633;</span><div class="txt">${esc(e.text || "")}</div>${datumFeld(e)}${del}</div>`;
   }).join("");
 
+  /* Zwei feste Knöpfe reichen nicht: ein Foto kann eine Schularbeit, ein
+     Test, eine Mitschrift oder sonst etwas sein. Der Text ist deshalb frei,
+     die Vorschläge darunter sind nur eine Abkürzung. */
   const assignBar = pendingPhoto ? `
-    <div class="assign-bar">
-      <span style="font-size:12px;">Foto zuordnen:</span>
-      <button class="green" onclick="assignPhoto('Hausübung')">Hausübung</button>
-      <button onclick="assignPhoto('Schülerarbeit')">Schülerarbeit</button>
-      <button class="ghost" onclick="pendingPhoto=null; render();">Abbrechen</button>
+    <div class="assign-bar" style="display:block;">
+      <div style="font-size:13px; font-weight:bold; margin-bottom:6px;">Wozu gehört dieses Foto?</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="fotoTagInput" placeholder="frei eintragen, z. B. Schularbeit Bruchrechnung"
+               style="margin-bottom:0; flex:1;" value="${esc(pendingPhotoTag || "")}"
+               oninput="pendingPhotoTag = this.value;">
+        <button class="green" onclick="assignPhoto()">Speichern</button>
+      </div>
+      <div class="chips" style="padding:8px 0 2px;">
+        ${fotoVorschlaege(sub).map(t =>
+          `<div class="chip" onclick="fotoTagSetzen('${t.replace(/'/g, "\\'")}')">${esc(t)}</div>`).join("")}
+      </div>
+      <div style="display:flex; gap:8px; margin-top:2px; align-items:center;">
+        <img src="${pendingPhoto}" alt="aufgenommenes Foto" style="height:52px; border:1.5px solid #000; border-radius:6px;">
+        <button class="ghost" onclick="pendingPhoto=null; pendingPhotoTag=null; render();">Abbrechen</button>
+      </div>
     </div>` : "";
 
   /* ---------- Kopfbereich: Tendenz groß, Kategorien darunter ---------- */
@@ -2178,6 +2396,20 @@ function renderStudent(){
     ? fmt(grundschnitt) + " " + (bonus.wert < 0 ? "\u2212" : "+") + " " + fmtB(Math.abs(bonus.wert)) + " Bonus"
     : "";
 
+  /* Noten, die gespeichert sind, aber laut Einstellung nicht mitzählen.
+     Sie stillschweigend wegzurechnen wäre genauso falsch wie sie
+     stillschweigend mitzurechnen: hier steht, dass es sie gibt. */
+  const still = stilleNoten(sub, s.id);
+  const stillKats = [];
+  still.forEach(e => { if(stillKats.indexOf(e.cat) === -1) stillKats.push(e.cat); });
+  const stillZeile = !still.length ? "" : `
+      <div style="font-size:11px; margin-top:4px; padding:4px 6px; background:#FFFFFF; border:1px solid #4A4943; border-radius:5px;">
+        <b>${still.length} ${still.length === 1 ? "Note zählt" : "Noten zählen"} nicht mit</b>
+        (${esc(stillKats.map(k => catLabel(sub, k)).join(", "))}), weil ${stillKats.length === 1 ? "diese Beurteilungsart" : "diese Beurteilungsarten"}
+        abgeschaltet oder auf „ohne Note“ gestellt ${stillKats.length === 1 ? "ist" : "sind"}.
+        Zu ändern in den Einstellungen.
+      </div>`;
+
   const tendenzBlock = `
     <div style="padding:16px; border-bottom:2px solid #000; background:${tf.bg};">
       <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
@@ -2187,8 +2419,9 @@ function renderStudent(){
       </div>
       <div style="font-size:11px; margin-top:6px;">Allgemeine Leistungstendenz${
         bonusZusatz ? " &middot; " + esc(bonusZusatz) : ""}${
-        anzahlFehlt ? " &middot; " + anzahlFehlt + "\u00d7 nicht mitgeschrieben" : ""}${
+        anzahlFehlt ? " &middot; " + anzahlFehlt + "\u00d7 entschuldigt" : ""}${
         tend.richtung === "unklar" && schnitt !== null ? " &middot; für eine Richtung braucht es mindestens vier Noten" : ""}</div>
+      ${stillZeile}
     </div>`;
 
   /* Schnitt je Beurteilungsart, die tatsächlich in die Note eingeht */
@@ -2234,7 +2467,7 @@ function renderStudent(){
         <div style="font-size:12px;">statt ${fmtO(best.jetzt)} jetzt. Das ist der Unterschied, den die Mitarbeit noch machen kann.</div>
       </div>` : ""}`;
 
-  const niveauZeile = (cls.stufe === 1) ? "" : `
+  const niveauZeile = (cls.stufe === 1 || !hatNiveaus(sub)) ? "" : `
     <div style="padding:10px 16px; border-bottom:1px solid #000; display:flex; align-items:center; gap:10px;">
       <span style="font-size:12px; font-weight:bold;">Leistungsniveau</span>
       <select style="margin-bottom:0; flex:1;" onchange="setNiveau(this.value)">
@@ -2410,26 +2643,46 @@ function selectNoteCat(cat){
 }
 
 /* Ein Feld für alles: "4" bei Diktat, "82", "82 %", "33/40" oder "33 von 40" sonst */
-function parseLeistung(raw, cat, key){
-  const t = String(raw || "").trim().replace(",", ".");
-  if(!t) return null;
+/* Eine Zahl im Sinne dieses Feldes: Ziffern, höchstens ein Komma oder Punkt,
+   sonst nichts. "82 Punkte", "1 000" und "12..5" sind keine Zahlen und werden
+   zurückgewiesen, statt stillschweigend zu 82, 1 und 12 zu werden. */
+function zahlOderNull(text){
+  const t = String(text || "").trim().replace(/,/g, ".");
+  if(!/^\d+(\.\d+)?$/.test(t)) return null;
+  const z = parseFloat(t);
+  return isFinite(z) ? z : null;
+}
+
+/* Ein Feld für alles. Unmögliche Eingaben werden zurückgewiesen und nicht
+   auf einen gültigen Wert zurechtgebogen: mehr Punkte als möglich oder mehr
+   als 100 % ist fast immer ein Vertipper, und eine stillschweigend daraus
+   gemachte Eins wäre schlimmer als eine Nachfrage. */
+function parseLeistung(raw, cat, key, sub){
+  const roh = String(raw || "").trim();
+  if(!roh) return null;
+
   if(cat === "diktat"){
-    const f = parseFloat(t);
-    if(isNaN(f) || f < 0) return null;
-    const ganz = Math.round(f);
-    return { value: noteFromFehler(ganz, key), basis: ganz + " Fehler" };
+    const f = zahlOderNull(roh);
+    if(f === null) return null;
+    if(f > 200) return { fehler: "So viele Fehler sind nicht plausibel. Bitte die Zahl prüfen." };
+    /* Nicht runden: 1,4 Fehler sind mehr als 1 Fehler und dürfen deshalb
+       nicht zur Note für einen Fehler führen. Halbe Fehler sind üblich. */
+    return { value: noteFromFehler(f, key), basis: fmtPct(f) + (f === 1 ? " Fehler" : " Fehler") };
   }
-  const bruch = t.match(/^([\d.]+)\s*(?:\/|von)\s*([\d.]+)$/i);
+
+  const bruch = roh.match(/^(.+?)\s*(?:\/|von)\s*(.+)$/i);
   if(bruch){
-    const a = parseFloat(bruch[1]), b = parseFloat(bruch[2]);
-    if(isNaN(a) || isNaN(b) || b <= 0) return null;
-    const p = Math.max(0, Math.min(100, a / b * 100));
-    return { value: noteFromProzent(p, key), basis: fmtPct(a) + " von " + fmtPct(b) + " Punkten, " + fmtPct(p) + " %" };
+    const a = zahlOderNull(bruch[1]), b = zahlOderNull(bruch[2]);
+    if(a === null || b === null || b <= 0) return null;
+    if(a > b) return { fehler: "Erreicht (" + fmtPct(a) + ") ist mehr als möglich (" + fmtPct(b) + "). Bitte prüfen." };
+    const p = a / b * 100;
+    return { value: noteFromProzent(p, key, sub), basis: fmtPct(a) + " von " + fmtPct(b) + " Punkten, " + fmtPct(p) + " %" };
   }
-  const roh = parseFloat(t.replace("%", ""));
-  if(isNaN(roh)) return null;
-  const p = Math.max(0, Math.min(100, roh));
-  return { value: noteFromProzent(p, key), basis: fmtPct(p) + " %" };
+
+  const p = zahlOderNull(roh.replace("%", "").trim());
+  if(p === null) return null;
+  if(p > 100) return { fehler: "Mehr als 100 % gibt es nicht. Für Punkte bitte „33 von 40“ eingeben." };
+  return { value: noteFromProzent(p, key, sub), basis: fmtPct(p) + " %" };
 }
 
 function paintTiles(){
@@ -2449,6 +2702,10 @@ function paintTiles(){
 function showBasis(){
   const el = document.getElementById("basisHint");
   if(!el) return;
+  if(homeView.eingabeFehler){
+    el.innerHTML = '<span style="color:#B3241C; font-weight:bold;">' + esc(homeView.eingabeFehler) + '</span>';
+    return;
+  }
   el.innerHTML = homeView.noteBasis
     ? "Ergibt Note <b>" + homeView.newNoteGrade + "</b> (" + homeView.noteBasis + ")"
     : "";
@@ -2461,13 +2718,19 @@ function recalcNote(){
   const sub = getSubject(cls, homeView.subjectId);
   const s = getStudent(cls, homeView.studentId);
   const feld = document.getElementById("leistungInput");
-  const res = parseLeistung(feld ? feld.value : "", homeView.newNoteCat, schluesselKey(cls, s));
-  if(res){
+  const res = parseLeistung(feld ? feld.value : "", homeView.newNoteCat, schluesselKey(cls, s, sub), sub);
+  if(res && res.fehler){
+    homeView.newNoteGrade = null;
+    homeView.noteBasis = null;
+    homeView.eingabeFehler = res.fehler;
+  } else if(res){
     homeView.newNoteGrade = res.value;
     homeView.noteBasis = res.basis;
+    homeView.eingabeFehler = null;
   } else {
     homeView.newNoteGrade = null;
     homeView.noteBasis = null;
+    homeView.eingabeFehler = null;
   }
   paintTiles();
   showBasis();
@@ -2498,7 +2761,7 @@ function renderNewNote(){
   let cat = homeView.newNoteCat;
   if(cats.indexOf(cat) === -1){ cat = cats[0] || "mitarbeit"; homeView.newNoteCat = cat; homeView.noteWeight = startWeight(sub, cat); }
   const col = catCol(sub, cat);
-  const key = schluesselKey(cls, s);
+  const key = schluesselKey(cls, s, sub);
 
   const chips = cats.map(k => {
     const c = catCol(sub, k);
@@ -2529,7 +2792,10 @@ function renderNewNote(){
       ${themaFeld("themaInput", homeView.thema, themaVorschlag(cat))}
       <div class="label" style="color:${col.fg};">EINTRAG, EIN TIPP GENÜGT</div>
       <div style="padding:0 16px 12px;">${stufen}</div>
+      <div class="fehlt-btn" onclick="createFehlt()"><span class="stufe-zeichen">&ndash;</span>entschuldigt, zählt nicht</div>
       <div class="helptext">${catLabel(sub, cat)}: ${esc(zaehltText(sub, cat))}. Der Eintrag wird sofort gespeichert.
+        <br><b>Entschuldigt</b> ist nicht dasselbe wie die unterste Stufe: Wer krank war, bekommt nichts angerechnet,
+        weder gut noch schlecht.
         <button class="ghost" onclick="zurBewertung()">ändern</button></div>
     `;
   }
@@ -2587,7 +2853,7 @@ function renderNewNote(){
         <div class="helptext" style="padding:2px 0 0;">
           <button class="ghost" onclick="toggleSchluessel()">${homeView.zeigeSchluessel ? "Schlüssel ausblenden" : "Schlüssel anzeigen"}</button>
         </div>
-        ${homeView.zeigeSchluessel ? `<div class="helptext" style="padding:0;">${cls.stufe === 1 ? "1. Klasse" : NIVEAU_LABELS[key === "standard" ? "standard" : "ahs"]}: ${schluesselText(istDiktat ? "fehler" : "prozent", key)}${istDiktat ? "<br>Textlänge laut Vorlage ca. 45 bis 65 Wörter." : ""}</div>` : ""}
+        ${homeView.zeigeSchluessel ? `<div class="helptext" style="padding:0;">${cls.stufe === 1 ? "1. Klasse" : (hatNiveaus(sub) ? NIVEAU_LABELS[key === "standard" ? "standard" : "ahs"] : "Notenschlüssel")}: ${schluesselText(istDiktat ? "fehler" : "prozent", key, sub)}${istDiktat ? "<br>Textlänge laut Vorlage ca. 45 bis 65 Wörter." : ""}</div>` : ""}
       </div>`;
   }
 
@@ -2609,7 +2875,7 @@ function renderNewNote(){
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
       <span class="title" style="${titleStyle("home")}">Note eintragen</span>
-      <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${cls.stufe === 1 ? "" : " &middot; " + NIVEAU_LABELS[s.niveau]} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
+      <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${(cls.stufe === 1 || !hatNiveaus(sub)) ? "" : " &middot; " + NIVEAU_LABELS[s.niveau]} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
     </div>
     <div class="chips">${chips}</div>
     ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.arbeitNr, "setArbeitNr") : ""}
@@ -2619,7 +2885,7 @@ function renderNewNote(){
       <button type="submit" id="saveNoteBtn" class="gross" ${homeView.newNoteGrade === null ? "disabled" : ""}>Speichern</button>
     </form>
     <div style="padding:0 16px 10px;">
-      <button class="ghost" onclick="createFehlt()">nicht mitgeschrieben, keine Note</button>
+      <button class="ghost" onclick="createFehlt()">${esc(fehltText(sub, cat))}</button>
     </div>
     ${rechner}
     ${gewicht}
@@ -2661,10 +2927,40 @@ function schnellCat(cat){
    eingetragen, danach genügt je Zeile die erreichte Punktezahl. Die Note
    rechnet die App aus dem Leistungsniveau der jeweiligen Person. */
 function schnellMax(wert){
-  const roh = String(wert || "").trim().replace(",", ".");
+  const roh = String(wert || "").trim().replace(/,/g, ".");
   const zahl = parseFloat(roh);
-  homeView.schnellMax = (isNaN(zahl) || zahl <= 0) ? null : zahl;
+  const neu = (isNaN(zahl) || zahl <= 0) ? null : zahl;
+  const alt = homeView.schnellMax;
+  homeView.schnellMax = neu;
+  /* Wer die Höchstpunktezahl richtigstellt, meint die ganze Runde. Bereits
+     gesetzte Zeilen ziehen deshalb mit. Blieben sie stehen, sähe die Liste
+     richtig aus und wäre falsch benotet. */
+  if(neu && alt !== neu) punkteNeuRechnen(alt, neu);
   render();
+}
+
+/* Rechnet alle in dieser Runde über Punkte gesetzten Noten neu. Die erreichte
+   Punktezahl steht in der Grundlage des Eintrags und wird von dort gelesen. */
+function punkteNeuRechnen(alteMax, neueMax){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!sub || !neueMax) return;
+  let geaendert = 0;
+  Object.keys(homeView.schnellIds || {}).forEach(sid => {
+    const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
+    if(!e || e.type !== "note" || !e.basis) return;
+    const treffer = String(e.basis).match(/^([\d.,]+) von /);
+    if(!treffer) return;
+    const punkte = parseFloat(treffer[1].replace(/,/g, "."));
+    if(isNaN(punkte)) return;
+    const st = getStudent(cls, sid);
+    const prozent = (punkte / neueMax) * 100;
+    if(prozent > 100) return;
+    e.value = noteFromProzent(prozent, schluesselKey(cls, st, sub), sub);
+    e.basis = fmtPct(punkte) + " von " + fmtPct(neueMax) + " Punkten, " + fmtPct(prozent) + " %";
+    geaendert++;
+  });
+  if(geaendert) save();
 }
 
 function schnellPunkte(studentId, roh){
@@ -2673,12 +2969,19 @@ function schnellPunkte(studentId, roh){
   const s = getStudent(cls, studentId);
   const max = homeView.schnellMax;
   if(!sub || !s || !max) return;
-  const text = String(roh || "").trim().replace(",", ".");
+  const text = String(roh || "").trim();
   if(text === ""){ schnellLoeschen(studentId); return; }
-  const punkte = parseFloat(text);
-  if(isNaN(punkte) || punkte < 0){ render(); return; }
-  const prozent = Math.max(0, Math.min(100, (punkte / max) * 100));
-  const note = noteFromProzent(prozent, schluesselKey(cls, s));
+  const punkte = zahlOderNull(text);
+  if(punkte === null){ render(); return; }
+  /* Mehr Punkte als vergeben sind ein Vertipper, keine Eins. */
+  if(punkte > max){
+    alert("Bei " + fmtPct(max) + " möglichen Punkten sind " + fmtPct(punkte) + " Punkte nicht möglich.\n\n"
+      + "Falls die Höchstpunktezahl nicht stimmt, bitte oben im Feld „Punkte gesamt“ richtigstellen.");
+    render();
+    return;
+  }
+  const prozent = (punkte / max) * 100;
+  const note = noteFromProzent(prozent, schluesselKey(cls, s, sub), sub);
   const basis = fmtPct(punkte) + " von " + fmtPct(max) + " Punkten, " + fmtPct(prozent) + " %";
   schnellSpeichern(studentId, { value: note, basis: basis });
 }
@@ -2872,9 +3175,11 @@ function renderSchnell(){
       }).join("") + `</div>`;
     }
 
-    /* Feld für alle, die nicht mitgeschrieben haben */
-    const fehltFeld = stufenModus ? "" :
-      `<div class="schnell-tile schnell-fehlt" title="nicht mitgeschrieben"
+    /* Feld für alle, die entschuldigt gefehlt haben. Gibt es in jeder
+       Kategorie, auch bei Hausübung und Mitarbeit: eine kranke Person darf
+       nicht als "nicht gemacht" in der Rechnung landen. */
+    const fehltFeld =
+      `<div class="schnell-tile schnell-fehlt" title="entschuldigt, zählt nicht"
             style="${fehlt ? "background:#4A4943; border-color:#4A4943; color:#fff;" : "background:#F1EFE8; border-color:#4A4943; color:#4A4943;"}"
             onclick="schnellFehlt('${s.id}')">&ndash;</div>`;
 
@@ -3057,11 +3362,40 @@ document.getElementById("cameraInput").addEventListener("change", function(ev){
   });
 });
 
+/* Vorschläge für die Zuordnung eines Fotos: die Beurteilungsarten dieses
+   Fachs, dazu die, die in der Praxis am häufigsten vorkommen. Der Text
+   bleibt trotzdem frei, weil nicht jedes Foto in eine Kategorie passt. */
+function fotoVorschlaege(sub){
+  const aus = activeCats(sub).map(k => catLabel(sub, k));
+  ["Schülerarbeit", "Mitschrift", "Tafelbild"].forEach(t => {
+    if(aus.indexOf(t) === -1) aus.push(t);
+  });
+  return aus;
+}
+
+function fotoTagSetzen(text){
+  pendingPhotoTag = text;
+  const el = document.getElementById("fotoTagInput");
+  if(el) el.value = text;
+}
+
 function assignPhoto(tag){
   const cls = getClass(homeView.classId);
   const sub = getSubject(cls, homeView.subjectId);
-  sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"foto", dataUrl: pendingPhoto, tag: tag, ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+  if(!sub || !pendingPhoto) return;
+  const feld = document.getElementById("fotoTagInput");
+  const text = String(tag || (feld ? feld.value : pendingPhotoTag) || "").trim();
+  /* Ohne Beschriftung nicht speichern: ein Foto, von dem in zwei Monaten
+     niemand mehr weiß, wozu es gehört, ist keine Dokumentation. */
+  if(!text){
+    alert("Bitte kurz eintragen, wozu das Foto gehört.\n\nAntippen genügt, wenn einer der Vorschläge passt.");
+    if(feld) feld.focus();
+    return;
+  }
+  sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"foto",
+    dataUrl: pendingPhoto, tag: text, ts: Date.now(), sem: semesterFuerNeu(), date: today() });
   pendingPhoto = null;
+  pendingPhotoTag = null;
   save();
   render();
 }
@@ -3259,7 +3593,7 @@ function wordDokument(){
         const pn = countPosNeg(sub, s.id, "alle");
         return [
           s.name,
-          (cls.stufe === 1) ? "-" : NIVEAU_LABELS[s.niveau],
+          (cls.stufe === 1 || !hatNiveaus(sub)) ? "-" : NIVEAU_LABELS[s.niveau],
           fmt(computeSchnitt(sub, s.id, 1)),
           fmt(computeSchnitt(sub, s.id, 2)),
           fmt(computeSchnitt(sub, s.id, "alle")),
@@ -3333,7 +3667,7 @@ function wordDokument(){
             const zeilen = rest.map(e => [
               e.date,
               e.type === "positiv" ? "Positiv" : (e.type === "negativ" ? "Negativ" : (e.type === "fehlt" ? catLabel(sub, e.cat) : "Notiz")),
-              (e.type === "fehlt" ? "nicht mitgeschrieben, keine Note" : (e.text || "")) +
+              (e.type === "fehlt" ? fehltText(sub, e.cat) : (e.text || "")) +
                 (e.thema ? "  \u00b7  " + e.thema : "")
             ]);
             body += wTable(["Datum","Art","Eintrag"], zeilen, [1100,1500,5800]);
@@ -3525,6 +3859,9 @@ function sicherungsDaten(){
   return { version: 4, geraet: state.settings.geraet || "", classes: state.classes, settings: state.settings, exportedAt: new Date().toISOString() };
 }
 
+/* Die fertige Sicherung, solange sie noch nicht abgeholt wurde. */
+let sicherungBereit = null;
+
 async function sicherungErstellen(){
   const stempel = datumsStempel();
   const wordBlob = new Blob([docxBytes()], { type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
@@ -3533,24 +3870,76 @@ async function sicherungErstellen(){
   const jsonName = "Klassenheft_Sicherung_" + stempel + ".json";
 
   const handle = await ordnerBereit();
-  let wohin;
+  let imOrdner = false;
   if(handle){
     try{
       await inOrdnerSchreiben(handle, wordName, wordBlob);
       await inOrdnerSchreiben(handle, jsonName, jsonBlob);
-      wohin = "in deinen Sicherungsordner";
-    }catch(e){ wohin = null; }
-  }
-  if(!wohin){
-    download(wordBlob, wordName);
-    setTimeout(function(){ download(jsonBlob, jsonName); }, 700);
-    wohin = "in den Ordner für Downloads bzw. in die Dateien-App";
+      imOrdner = true;
+    }catch(e){ imOrdner = false; }
   }
 
   state.settings.lastBackup = new Date().toISOString();
   save();
+
+  if(imOrdner){
+    sicherungBereit = null;
+    render();
+    alert("Wochensicherung erstellt und in deinen Sicherungsordner gelegt:\n\n"
+      + wordName + " zum Nachlesen und Bearbeiten\n"
+      + jsonName + " zum Zurückspielen in die App");
+    return;
+  }
+
+  /* Ohne Sicherungsordner geht es über den Download-Weg. Zwei Downloads
+     unmittelbar nacheinander lässt nicht jeder Browser durch: Safari
+     unterdrückt den zweiten stillschweigend, und dann fehlt ausgerechnet die
+     Datendatei, mit der man den Stand zurückspielt. Deshalb wird hier nichts
+     automatisch heruntergeladen, sondern beides zum Antippen hingelegt.
+     Ein Tipp ist ein Download, und den lässt jeder Browser durch. */
+  sicherungBereit = { wordBlob: wordBlob, jsonBlob: jsonBlob, wordName: wordName, jsonName: jsonName };
   render();
-  alert("Wochensicherung erstellt und " + wohin + " gelegt:\n\n" + wordName + " zum Nachlesen und Bearbeiten\n" + jsonName + " zum Zurückspielen in die App");
+  const feld = document.getElementById("sicherungBereitBlock");
+  if(feld && feld.scrollIntoView) feld.scrollIntoView({ block: "center" });
+}
+
+/* Eine der beiden Dateien abholen. Der Aufruf kommt aus einem echten Tipp,
+   damit der Browser den Download nicht als ungefragt einstuft. */
+function sicherungHolen(welche){
+  if(!sicherungBereit) return;
+  if(welche === "json") download(sicherungBereit.jsonBlob, sicherungBereit.jsonName);
+  else download(sicherungBereit.wordBlob, sicherungBereit.wordName);
+  if(welche === "json") sicherungBereit.jsonGeholt = true;
+  else sicherungBereit.wordGeholt = true;
+  render();
+}
+
+function sicherungFertig(){ sicherungBereit = null; render(); }
+
+/* Nur die Datendatei, ohne Word. Für den häufigsten Fall: schnell den Stand
+   sichern, um ihn auf dem anderen Gerät zusammenzuführen. */
+function nurDatenSichern(){
+  const stempel = datumsStempel();
+  const jsonBlob = new Blob([JSON.stringify(sicherungsDaten(), null, 2)], { type:"application/json" });
+  download(jsonBlob, "Klassenheft_Daten_" + stempel + ".json");
+}
+
+function sicherungBereitBlock(){
+  if(!sicherungBereit) return "";
+  const g = (da) => da ? " &#10003;" : "";
+  return `<div class="banner" id="sicherungBereitBlock" style="display:block;">
+    <div class="txt" style="margin-bottom:8px;"><b>Sicherung fertig.</b> Beide Dateien einzeln antippen, damit sie wirklich ankommen.
+      Manche Browser lassen nur einen Download auf einmal durch.</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="green" onclick="sicherungHolen('json')">Datendatei (.json) sichern${g(sicherungBereit.jsonGeholt)}</button>
+      <button onclick="sicherungHolen('word')">Word-Datei zum Nachlesen${g(sicherungBereit.wordGeholt)}</button>
+      <button class="ghost" onclick="sicherungFertig()">fertig</button>
+    </div>
+    <div class="txt" style="margin-top:8px; font-size:11px;">
+      Die <b>Datendatei .json</b> ist die wichtige: nur mit ihr lässt sich der Stand zurückspielen oder
+      mit einem anderen Gerät zusammenführen. Die Word-Datei ist zum Nachlesen und Ausdrucken.
+    </div>
+  </div>`;
 }
 
 function tageSeitSicherung(){
@@ -3653,6 +4042,13 @@ function mergeState(basis, fremd){
         if(fsub.stufenWerte && typeof fsub.stufenWerte === "object"){
           bsub.stufenWerte = JSON.parse(JSON.stringify(fsub.stufenWerte));
         }
+        /* Notenschlüssel und Leistungsniveaus gehören genauso mit. Ohne sie
+           würde dasselbe Fach auf dem anderen Gerät nach anderen Prozentsätzen
+           rechnen, und das fällt niemandem auf. */
+        if(typeof fsub.niveaus === "boolean") bsub.niveaus = fsub.niveaus;
+        if(fsub.schluessel && typeof fsub.schluessel === "object"){
+          bsub.schluessel = JSON.parse(JSON.stringify(fsub.schluessel));
+        }
         bc.subjects.push(bsub);
         bericht.faecher++;
       } else {
@@ -3672,6 +4068,10 @@ function mergeState(basis, fremd){
           Object.keys(fsub.stufenTexte).forEach(k => {
             if(!Array.isArray(bsub.stufenTexte[k])) bsub.stufenTexte[k] = fsub.stufenTexte[k].slice();
           });
+        }
+        if(typeof bsub.niveaus !== "boolean" && typeof fsub.niveaus === "boolean") bsub.niveaus = fsub.niveaus;
+        if(!bsub.schluessel && fsub.schluessel && typeof fsub.schluessel === "object"){
+          bsub.schluessel = JSON.parse(JSON.stringify(fsub.schluessel));
         }
       }
 
@@ -3832,7 +4232,7 @@ function ansichtenZuruecksetzen(){
                zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
                  thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null };
   statView = { screen:"list", classId:null, subjectId:null };
-  settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null, stufenOffen:null };
+  settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null, stufenOffen:null, schluesselOffen:null };
 }
 
 document.getElementById("importInput").addEventListener("change", function(ev){
@@ -3892,7 +4292,7 @@ function svgEsc(t){ return esc(t); }
 function verlaufSvg(sub, studentId, sem, breite, hoehe){
   /* Genau die Werte, die auch in den Notenschnitt eingehen. Sonst würde die
      strichlierte Mittellinie nicht zu den Punkten passen. */
-  const noten = wertendeNoten(sub, studentId, sem);
+  const noten = nachDatum(wertendeNoten(sub, studentId, sem));
   if(noten.length < 2) return "";
 
   const b = breite || 380, h = hoehe || 130;
@@ -4038,7 +4438,10 @@ function verteilungSvg(sub, sem, breite, hoehe, fertig){
     const stab = wert === 0 ? "" :
       `<rect x="${xPos.toFixed(1)}" y="${yPos.toFixed(1)}" width="${balkenBreite.toFixed(1)}" height="${hoeheBalken.toFixed(1)}"
              rx="3" fill="${g.bg}" stroke="${g.fg}" stroke-width="1.5"><title>Note ${i+1}: ${wert}×</title></rect>`;
-    const anteil = gesamtZahl ? Math.round((wert * 100) / gesamtZahl) : 0;
+    /* Dieselbe Rundung wie in der Tabelle. Vorher rundete die Grafik auf
+       ganze Prozent und die Tabelle auf eine Stelle, dann standen für
+       dieselbe Note zwei verschiedene Zahlen auf einem Blatt. */
+    const anteil = gesamtZahl ? fmtPct((wert * 100) / gesamtZahl) : "0";
     const zahl = `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${(wert === 0 ? oben + iH - 4 : yPos - 5).toFixed(1)}"
              text-anchor="middle" font-size="11" font-weight="bold" fill="#000000">${wert}</text>` +
       (wert ? `<text x="${(i * spalte + spalte / 2).toFixed(1)}" y="${(wert === 0 ? oben + iH + 6 : yPos + 12).toFixed(1)}"
@@ -4125,7 +4528,8 @@ function kopfMeta(){
 /* Klassenschnitt des Fachs im gewählten Zeitraum. Auf dem Elternblatt ist
    das die nützlichste zweite Zahl: erst im Vergleich sagt ein Schnitt etwas. */
 function klassenSchnittVon(cls, sub, sem){
-  const werte = cls.students.map(s => computeSchnitt(sub, s.id, sem)).filter(v => v !== null);
+  const werte = cls.students.map(s => computeSchnitt(sub, s.id, sem))
+    .filter(v => v !== null && !isNaN(v));
   if(!werte.length) return null;
   return werte.reduce((a, b) => a + b, 0) / werte.length;
 }
@@ -4200,7 +4604,7 @@ function verlaufTabelle(sub, studentId){
   if(!liste.length) return "";
   const zeilen = liste.map(e => {
     const art = e.type === "positiv" ? "Positiv" : (e.type === "negativ" ? "Negativ" : (e.type === "fehlt" ? catLabel(sub, e.cat) : "Notiz"));
-    const text = (e.type === "fehlt" ? "nicht mitgeschrieben, keine Note" : (e.text || "")) +
+    const text = (e.type === "fehlt" ? fehltText(sub, e.cat) : (e.text || "")) +
                  (e.thema ? " \u00b7 " + e.thema : "");
     return `<tr><td style="width:14%;">${esc(e.date)}</td><td style="width:18%;">${esc(art)}</td><td>${esc(text)}</td></tr>`;
   }).join("");
@@ -4230,7 +4634,7 @@ function blattSchueler(cls, s){
           ? '<div><div class="v">' + pn.pos + " / " + pn.neg + '</div><div class="l">Positiv / Negativ</div></div>'
           : ""}
         ${entriesOf(sub, s.id).filter(e => e.type === "fehlt").length
-          ? '<div><div class="v">' + entriesOf(sub, s.id).filter(e => e.type === "fehlt").length + '</div><div class="l">nicht mitgeschrieben</div></div>'
+          ? '<div><div class="v">' + entriesOf(sub, s.id).filter(e => e.type === "fehlt").length + '</div><div class="l">entschuldigt gefehlt</div></div>'
           : ""}
       </div>
       ${grafik ? '<div class="pr-chart">' + grafik + "</div>" : ""}
@@ -4241,7 +4645,11 @@ function blattSchueler(cls, s){
       ${semesterZeile(sub, s.id)}`;
   }).join("");
 
-  const niveau = (cls.stufe === 1) ? "" : " &middot; " + NIVEAU_LABELS[s.niveau];
+  /* Das Niveau steht im Kopf des Blattes nur, wenn wenigstens ein Fach
+     dieser Klasse Niveaus führt. In einer Klasse aus lauter Nebenfächern
+     wäre die Angabe sinnlos. */
+  const niveauRelevant = (cls.subjects || []).some(f => hatNiveaus(f));
+  const niveau = (cls.stufe === 1 || !niveauRelevant) ? "" : " &middot; " + NIVEAU_LABELS[s.niveau];
   return `<div class="pr-page">
     <div class="pr-head">
       <div>
@@ -4264,9 +4672,9 @@ function blattSchueler(cls, s){
    Konferenz oder im Gespräch mit der Fachgruppe auf dem Tisch liegt. */
 function blattArbeit(cls, sub, cat, kennung){
   const liste = arbeiten(sub, cat);
-  const a = liste.find(x => arbeitKennung(x) === String(kennung));
-  if(!a) return "";
-  const i = liste.indexOf(a);
+  const i = arbeitIndex(liste, kennung);
+  if(i === -1) return "";
+  const a = liste[i];
   const v = arbeitVergleich(liste, i);
   const label = catLabel(sub, cat);
   const alle = arbeitEintraege(cls, sub, cat, arbeitKennung(a));
@@ -4276,21 +4684,21 @@ function blattArbeit(cls, sub, cat, kennung){
 
   const zeilen = mitNote.map(x => `<tr>
       <td>${esc(x.s.name)}</td>
-      <td>${cls.stufe === 1 ? "&ndash;" : esc(NIVEAU_LABELS[x.s.niveau])}</td>
+      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(NIVEAU_LABELS[x.s.niveau])}</td>
       <td>${esc(x.e.basis || "")}</td>
       <td style="text-align:center; font-weight:bold;">${x.e.value}</td>
     </tr>`).join("") +
     ohneNote.map(x => `<tr>
       <td>${esc(x.s.name)}</td>
-      <td>${cls.stufe === 1 ? "&ndash;" : esc(NIVEAU_LABELS[x.s.niveau])}</td>
-      <td>nicht mitgeschrieben</td>
+      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(NIVEAU_LABELS[x.s.niveau])}</td>
+      <td>${esc(fehltText(sub, x.e.cat))}</td>
       <td style="text-align:center;">&ndash;</td>
     </tr>`).join("");
 
   return `<div class="pr-page">
     <div class="pr-head">
       <div>
-        <div class="pr-h1">${a.nummer}. ${esc(label)}</div>
+        <div class="pr-h1">${a.nummer}.${a.semHinweis} ${esc(label)}</div>
         <div style="font-size:11pt; margin-top:1mm;">Klasse ${esc(cls.name)} &middot; ${esc(sub.fach)} &middot; ${esc(a.datum)}</div>
         ${a.thema ? '<div style="font-size:10pt; margin-top:1mm;">Thema: ' + esc(a.thema) + "</div>" : ""}
       </div>
@@ -4324,7 +4732,7 @@ function blattAlleArbeiten(cls, sub, cat){
   const bloecke = liste.map((a, i) => {
     const v = arbeitVergleich(liste, i);
     return `<div style="margin-top:5mm; border-top:1px solid #000000; padding-top:3mm;">
-      <div class="pr-h2" style="margin-top:0;">${a.nummer}. ${esc(label)} &middot; ${esc(a.datum)}${
+      <div class="pr-h2" style="margin-top:0;">${a.nummer}.${a.semHinweis} ${esc(label)} &middot; ${esc(a.datum)}${
         a.thema ? " &middot; " + esc(a.thema) : ""}</div>
       <div style="display:flex; gap:6mm; align-items:flex-start;">
         <div style="flex:1;">
@@ -4374,7 +4782,14 @@ function printArbeit(classId, subjectId, cat, kennung){
   const cls = getClass(classId);
   const sub = getSubject(cls, subjectId);
   if(!cls || !sub) return;
-  document.getElementById("printArea").innerHTML = blattArbeit(cls, sub, cat, kennung);
+  const blatt = blattArbeit(cls, sub, cat, kennung);
+  /* Leeres Blatt nicht drucken: das passiert, wenn zu dieser Arbeit gar
+     keine Note steht, etwa wenn alle entschuldigt gefehlt haben. */
+  if(!blatt){
+    alert("Zu dieser " + catLabel(sub, cat) + " gibt es im gewählten Zeitraum keine Noten zum Drucken.");
+    return;
+  }
+  document.getElementById("printArea").innerHTML = blatt;
   window.print();
 }
 
@@ -4384,7 +4799,7 @@ function blattKlasse(cls, sub){
   const klassenschnitt = avgs.length ? avgs.reduce((a,b) => a+b, 0) / avgs.length : null;
   const zeilen = je.map(p => `<tr>
       <td>${esc(p.s.name)}</td>
-      <td>${cls.stufe === 1 ? "&ndash;" : esc(NIVEAU_LABELS[p.s.niveau])}</td>
+      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(NIVEAU_LABELS[p.s.niveau])}</td>
       <td style="text-align:center;">${p.pos}</td>
       <td style="text-align:center;">${p.neg}</td>
       <td style="text-align:center; font-weight:bold;">${fmt(p.schnitt)}</td>
@@ -4399,7 +4814,7 @@ function blattKlasse(cls, sub){
     const zeilen = liste.map((a, i) => {
       const v = arbeitVergleich(liste, i);
       return `<tr>
-        <td style="text-align:center; font-weight:bold;">${a.nummer}.</td>
+        <td style="text-align:center; font-weight:bold;">${a.nummer}.${a.semHinweis}</td>
         <td>${esc(a.datum)}${a.thema ? " &middot; " + esc(a.thema) : ""}</td>
         <td style="text-align:center; font-weight:bold;">${fmt(a.schnitt)}</td>
         <td style="text-align:center;">${a.verteilung.join(" &middot; ")}</td>
@@ -4506,10 +4921,9 @@ function renderStatArbeit(){
   const sub = getSubject(cls, statView.subjectId);
   if(!cls || !sub) return renderStatList();
   const liste = arbeiten(sub, statView.arbeitCat);
-  const a = liste.find(x => arbeitKennung(x) === statView.arbeitKennung);
-  if(!a) return renderStatDetail();
-
-  const i = liste.indexOf(a);
+  const i = arbeitIndex(liste, statView.arbeitKennung);
+  if(i === -1) return renderStatDetail();
+  const a = liste[i];
   const v = arbeitVergleich(liste, i);
   const label = catLabel(sub, statView.arbeitCat);
   const alle = arbeitEintraege(cls, sub, statView.arbeitCat, arbeitKennung(a));
@@ -4664,7 +5078,7 @@ function renderStatDetail(){
       return `<div style="flex:1; min-width:132px; border:2px solid #000; border-radius:8px;
                    padding:10px; background:${tf.bg}; cursor:pointer;"
                    onclick="goArbeit('${cls.id}','${sub.id}','${k}','${arbeitKennung(a)}')">
-        <div style="font-size:12px; font-weight:bold;">${a.nummer}. ${esc(catShort(sub, k))}</div>
+        <div style="font-size:12px; font-weight:bold;">${a.nummer}.${a.semHinweis} ${esc(catShort(sub, k))}</div>
         <div style="font-size:26px; font-weight:bold; line-height:1.1; color:${tf.fg};">${fmtO(a.schnitt)}</div>
         <div style="font-size:10px;">${esc(a.datum)}${a.thema ? " &middot; " + esc(a.thema) : ""}</div>
         <div style="font-size:10px; margin-top:3px;">${a.anzahl} geschrieben${
@@ -4690,7 +5104,7 @@ function renderStatDetail(){
       const farbe = !v ? "" : (v.richtung === "besser" ? "#2A6B2E" : (v.richtung === "schlechter" ? "#A8241C" : "#4A4943"));
       const pfeil = !v ? "" : (v.richtung === "besser" ? "\u2197" : (v.richtung === "schlechter" ? "\u2198" : "\u2192"));
       return `<tr class="vgl-zeile" onclick="goArbeit('${cls.id}','${sub.id}','${k}','${arbeitKennung(a)}')" title="Diese ${esc(label)} für sich ansehen">
-        <td style="font-weight:bold; text-decoration:underline;">${a.nummer}.</td>
+        <td style="font-weight:bold; text-decoration:underline;">${a.nummer}.${a.semHinweis}</td>
         <td>${esc(a.datum)}${a.thema ? '<br><span style="font-size:11px;">' + esc(a.thema) + "</span>" : ""}</td>
         <td style="text-align:center; font-weight:bold;">${fmt(a.schnitt)}</td>
         <td style="text-align:center;">${a.anzahl}${a.fehlt ? '<br><span style="font-size:11px;">+' + a.fehlt + " fehlt</span>" : ""}</td>
@@ -4707,7 +5121,7 @@ function renderStatDetail(){
     /* Kleine Vielfache: je Arbeit dieselbe Verteilungsgrafik */
     const kleine = liste.map(a => `
       <div style="flex:1; min-width:150px;">
-        <div style="font-size:11px; font-weight:bold; padding:0 0 2px;">${a.nummer}. ${esc(a.datum)} &middot; Ø ${fmt(a.schnitt)}</div>
+        <div style="font-size:11px; font-weight:bold; padding:0 0 2px;">${a.nummer}.${a.semHinweis} ${esc(a.datum)} &middot; Ø ${fmt(a.schnitt)}</div>
         ${verteilungSvg(sub, undefined, 220, 100, a.verteilung)}
         <div style="font-size:10px; line-height:1.5;">${notenspiegel(a.verteilung)
           .filter(z => z.anzahl > 0)
@@ -4834,6 +5248,7 @@ function renderSettingsList(){
       <div class="sub">Bewertung je Fach, Sicherung und Geräte</div>
     </div>
     ${backupBanner()}
+    ${sicherungBereitBlock()}
     <div class="label">FÄCHER</div>
     ${rows || '<div class="helptext">Noch nichts angelegt.</div>'}
 
@@ -4902,7 +5317,7 @@ function renderSettingsList(){
     })()}
 
     <div class="label" style="border-top:2px solid #000;">FASSUNG</div>
-    <div class="helptext">Geladen ist <b>Klassenheft, Version ${APP_FASSUNG}</b>.${
+    <div class="helptext">Geladen ist <b>${esc(APP_NAME)}, Version ${APP_FASSUNG}</b>.${
       neuereFassung
         ? " Auf der Adresse liegt bereits <b>Version " + esc(neuereFassung) +
           "</b>. Dein Browser zeigt noch die alte, weil er sie zwischengespeichert hat."
@@ -5116,8 +5531,21 @@ function renderSettingsDetail(){
 
     <div class="label" style="border-top:2px solid #000;">NOTENSCHLÜSSEL</div>
     <div class="chips">${stufeChips}</div>
-    <div class="helptext">Gilt für die ganze Klasse ${cls.name}. Ab der 2. Klasse zählt zusätzlich das Leistungsniveau, das du je Schüler:in einstellst.</div>
+    <div class="helptext">Die Schulstufe gilt für die ganze Klasse ${cls.name}.</div>
+
+    ${(cls.stufe || 2) === 1 ? "" : `
+    <div class="feinbereich" style="border-top:none;">
+      <label class="comp-check" style="padding:4px 0;">
+        <input type="checkbox" ${hatNiveaus(sub) ? "checked" : ""} onchange="setNiveaus(this.checked)">
+        <span>Leistungsniveaus in diesem Fach führen</span>
+      </label>
+      <div class="helptext" style="padding:4px 0 0;">${IST_FREI
+        ? "Zwei Leistungsniveaus nebeneinander, jedes mit eigenem Schlüssel. Braucht nur, wer in diesem Fach nach Niveaus differenziert. In Österreich ist das in Deutsch, Mathematik und Englisch der Fall."
+        : "Die beiden Niveaus gibt es nur in den Hauptgegenständen, also in Deutsch, Mathematik und Englisch. In den theoretischen und praktischen Nebengegenständen gibt es sie nicht; dort gilt <b>ein</b> Schlüssel für alle."}
+        Ausgeschaltet verschwindet die Niveau-Auswahl bei den Schüler:innen und auf den Blättern.</div>
+    </div>`}
     ${schluesselBereich(cls, sub)}
+    ${schluesselEditor(cls, sub)}
 
     <div class="label" style="border-top:2px solid #000;">KATEGORIEN</div>
     <div class="helptext">Nur angehakte Kategorien erscheinen bei der Notenvergabe.</div>
@@ -5307,6 +5735,118 @@ function setBonusMax(wert){
    setStufenWirkung, damit nie beides gleichzeitig gesetzt sein kann. */
 function setStufeZaehlt(cat, an){
   setStufenWirkung(cat, an ? "anteil" : "nichts");
+}
+
+/* Leistungsniveaus für dieses Fach ein- oder ausschalten. Eingetragene
+   Noten bleiben; was sich ändert, ist der Schlüssel für neue Eingaben und
+   was auf den Blättern steht. */
+function setNiveaus(an){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  sub.niveaus = !!an;
+  save();
+  render();
+}
+
+/* ---------- EIGENER SCHLÜSSEL: BEDIENUNG ---------- */
+
+function schluesselOffen(){
+  /* In der freien Ausgabe ist der Editor von Haus aus offen: dort ist er
+     nicht die Ausnahme, sondern der übliche Weg. */
+  if(settingsView.schluesselOffen === undefined || settingsView.schluesselOffen === null) return IST_FREI;
+  return !!settingsView.schluesselOffen;
+}
+function toggleSchluesselEditor(){
+  settingsView.schluesselOffen = !schluesselOffen();
+  render();
+}
+
+/* Die Werte, die gerade im Editor stehen: entweder die eigenen oder,
+   solange keine hinterlegt sind, die Vorgabe als Ausgangspunkt. */
+function schluesselWerte(sub, key){
+  /* Absichtlich die gespeicherten Rohwerte, auch wenn sie gerade keinen
+     gültigen Schlüssel ergeben. Sonst verschwindet beim Ausbessern die eben
+     eingetippte Zahl, weil die Vorgabe zurückspringt, und man kommt nie zu
+     einem gültigen Stand. Gerechnet wird trotzdem nur mit gültigen Werten. */
+  const roh = sub && sub.schluessel && (sub.schluessel[key] || sub.schluessel.alle);
+  if(Array.isArray(roh) && roh.length === 4) return roh.map(Number);
+  const t = PROZENT_KEYS[key] || PROZENT_KEYS.ahs;
+  return [t[0][0], t[1][0], t[2][0], t[3][0]];
+}
+
+function setSchluesselWert(key, index, wert){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  if(!sub.schluessel) sub.schluessel = {};
+  const aktuell = schluesselWerte(sub, key).slice();
+  const zahl = parseFloat(String(wert).replace(/,/g, "."));
+  aktuell[index] = isNaN(zahl) ? aktuell[index] : zahl;
+  sub.schluessel[key] = aktuell;
+  /* Ungültiges wird angenommen und angezeigt, aber nicht gerechnet:
+     wer 90/77/64/51 auf 90/77/77/51 ändert, soll die Zahl korrigieren
+     können, ohne dass die App den ganzen Schlüssel wegwirft. */
+  save();
+  render();
+}
+
+function schluesselZuruecksetzen(){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  if(!confirm("Den eigenen Notenschlüssel dieses Fachs verwerfen und wieder die Vorgabe verwenden?\n\nEingetragene Noten bleiben unverändert.")) return;
+  delete sub.schluessel;
+  save();
+  render();
+}
+
+/* Der Editor. Eine Spalte je Niveau, vier Zahlen je Spalte. */
+function schluesselEditor(cls, sub){
+  const spalten = schluesselSpalten(cls, sub);
+  const eigen = hatEigenenSchluessel(sub);
+  const kopf = `
+    <div class="label" style="border-top:2px solid #000;">EIGENER NOTENSCHLÜSSEL</div>
+    <div class="helptext">
+      ${eigen
+        ? "Dieses Fach rechnet mit <b>deinem eigenen</b> Schlüssel. Die Tabelle oben zeigt ihn."
+        : (IST_FREI
+            ? "Dieses Fach rechnet noch mit einem <b>Ausgangswert</b> (90 / 77 / 64 / 51 %). <b>Bitte auf die Prozentsätze deiner Schule umstellen</b>, bevor du benotest."
+            : "Dieses Fach rechnet mit der <b>Vorgabe</b> für die österreichische Mittelschule.")}
+      ${IST_FREI
+        ? "Jede Schule und jedes Fach kann eigene Prozentsätze haben. Hier stellst du sie je Fach ein."
+        : "Andere Schultypen, andere Bundesländer und Fächer wie Englisch arbeiten mit anderen Prozentsätzen. Hier stellst du sie je Fach selbst ein."}
+      <button class="ghost" onclick="toggleSchluesselEditor()">${schluesselOffen() ? "zuklappen" : (eigen ? "ändern" : "selbst festlegen")}</button>
+    </div>`;
+  if(!schluesselOffen()) return kopf;
+
+  const bloecke = spalten.map(([key, lbl]) => {
+    const w = schluesselWerte(sub, key);
+    const gut = grenzenGueltig(w);
+    const felder = [0,1,2,3].map(i => `
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+        <span style="width:132px; font-size:12px;">Note ${i+1} ab</span>
+        <input type="number" min="1" max="100" step="0.5" value="${w[i]}"
+               style="margin-bottom:0; width:88px;"
+               onchange="setSchluesselWert('${key}', ${i}, this.value)">
+        <span style="font-size:12px;">%</span>
+      </div>`).join("");
+    return `<div style="padding:0 16px 10px;">
+      ${spalten.length > 1 ? '<div style="font-size:12px; font-weight:bold; padding:4px 0;">' + esc(lbl) + "</div>" : ""}
+      ${felder}
+      <div style="font-size:11px; color:${gut ? "#4A4943" : "#B3241C"};">
+        ${gut
+          ? "Alles darunter ist eine 5. Gerechnet wird mit " + w[0] + " / " + w[1] + " / " + w[2] + " / " + w[3] + " %."
+          : "<b>Diese Zahlen ergeben keinen Schlüssel.</b> Jede muss kleiner sein als die darüber und zwischen 1 und 100 liegen. Bis das stimmt, rechnet das Fach weiter mit der Vorgabe."}
+      </div>
+    </div>`;
+  }).join("");
+
+  return kopf + bloecke + `
+    <div style="padding:0 16px 12px;">
+      <button class="ghost" onclick="schluesselZuruecksetzen()">Wieder die Vorgabe verwenden</button>
+    </div>
+    <div class="helptext" style="padding-top:0;">
+      <b>Bereits eingetragene Noten ändern sich dadurch nicht.</b> Der neue Schlüssel gilt für alles, was du ab jetzt
+      über Prozent oder Punkte eingibst. Wer eine alte Note neu bewertet haben will, trägt sie neu ein.
+    </div>`;
 }
 
 function setStufenCat(cat, aufStufen){

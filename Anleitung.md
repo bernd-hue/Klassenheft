@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.1
+# Klassenheft, Version 17.3
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -55,7 +55,11 @@ Für eine einzelne Note gibt es weiterhin den Weg über die Schüler:in. Diese M
 
 ## Fotos am Handy
 
-**Foto aufnehmen** in der Schüleransicht öffnet am Handy die rückwärtige Kamera, **Foto aufnehmen** beim Porträt die vordere, **aus Mediathek** die Fotoauswahl. Nach der Aufnahme fragt die App, wozu das Foto gehört: Hausübung oder Schülerarbeit.
+**Foto aufnehmen** in der Schüleransicht öffnet am Handy die rückwärtige Kamera, **Foto aufnehmen** beim Porträt die vordere, **aus Mediathek** die Fotoauswahl.
+
+Nach der Aufnahme fragt die App, wozu das Foto gehört. **Der Text ist frei** — schreib hinein, was es wirklich ist: *Schularbeit Bruchrechnung*, *Test vom 14.11.*, *Mitschrift*, *Hausübung Seite 42*. Darunter liegen Vorschläge zum Antippen: die Beurteilungsarten dieses Fachs sowie *Schülerarbeit*, *Mitschrift* und *Tafelbild*. Ein Tipp füllt das Feld, ändern kannst du es danach trotzdem.
+
+Ohne Text speichert die App nicht. Ein Foto, von dem in zwei Monaten niemand mehr weiß, wozu es gehört, ist keine Dokumentation.
 
 Jedes Bild wird **vor dem Speichern verkleinert**: ein Eintragsfoto auf 480 Punkte Breite, ein Porträtfoto auf 200 mal 200 quadratisch aus der Mitte. Aus einem 10 MB großen Kamerabild werden dabei etwa 40 KB. Das Original bleibt in deiner Fotos-App unberührt, die App legt nur die verkleinerte Fassung ab.
 
@@ -199,6 +203,33 @@ In jeder Eingabemaske gibt es ein freiwilliges Feld **Thema**: Bruchrechnung, Gl
 
 In der Sammelerfassung gilt das Thema für die ganze Runde. Du kannst es auch nachtragen, wenn schon die halbe Klasse eingetragen ist — die bereits gesetzten Zeilen ziehen mit.
 
+## Leistungsniveaus: nur in den Hauptgegenständen
+
+Die Unterscheidung **Standard AHS** und **Standard** gibt es nur in **Deutsch, Mathematik und Englisch**. In den theoretischen Nebengegenständen (Geografie, Geschichte, Biologie, Physik, …) und in den praktischen (Musik, Bildnerische Erziehung, Werken, Bewegung und Sport) gibt es sie nicht — dort gilt **ein** Schlüssel für alle.
+
+Die App schlägt das beim Anlegen selbst vor: Fächer mit Deutsch, Mathematik oder Englisch im Namen bekommen Niveaus, die Nebenfach-Vorlagen nicht. Ändern kannst du es jederzeit unter *Einstellungen*, Fach auswählen, Abschnitt **NOTENSCHLÜSSEL**, Häkchen **Leistungsniveaus in diesem Fach führen**.
+
+Ist es ausgeschaltet:
+
+- die Niveau-Auswahl verschwindet aus der Schüleransicht
+- die Schlüsseltabelle hat nur **eine** Spalte, überschrieben mit *Notenschlüssel*
+- auf den Blättern steht kein Niveau mehr
+- alle bekommen für denselben Prozentwert **dieselbe** Note
+
+Das war vorher anders: Die App hat das Niveau in jedem Fach angesetzt. In Geografie bekamen damit zwei Kinder für dieselbe Prozentzahl zwei verschiedene Noten, je nachdem, was in Deutsch eingestellt war.
+
+## Eigener Notenschlüssel
+
+*Einstellungen*, Fach auswählen, Abschnitt **EIGENER NOTENSCHLÜSSEL**, Knopf **selbst festlegen**.
+
+Dort stehen vier Zahlen: ab wie viel Prozent es eine 1, eine 2, eine 3 und eine 4 gibt. Alles darunter ist eine 5. Führt das Fach Leistungsniveaus, gibt es die vier Zahlen zweimal, einmal je Niveau.
+
+Jede Zahl muss kleiner sein als die darüber und zwischen 1 und 100 liegen. Solange das nicht stimmt, steht es in Rot darunter, und das Fach rechnet weiter mit dem bisherigen Schlüssel — es entsteht also nie ein halbfertiger Schlüssel, mit dem benotet wird.
+
+**Bereits eingetragene Noten ändern sich dadurch nicht.** Der neue Schlüssel gilt für alles, was du ab dann über Prozent oder Punkte eingibst. Eine alte Note, die nach dem neuen Schlüssel anders ausfallen soll, trägst du neu ein.
+
+Mit **Wieder die Vorgabe verwenden** kommst du zum voreingestellten Schlüssel zurück.
+
 ## Welcher Notenschlüssel gilt
 
 *Einstellungen*, Klasse und Fach auswählen, Abschnitt **NOTENSCHLÜSSEL**. Dort steht der Schlüssel als Tabelle zum Nachlesen, Note für Note, mit **beiden Leistungsniveaus nebeneinander**:
@@ -230,6 +261,31 @@ Die App zeigt nur die Tabellen, die im geöffneten Fach auch zum Tragen kommen �
 In der **1. Klasse** gibt es nur eine Spalte, dort sind die Leistungsniveaus noch nicht getrennt. Der Schlüssel entspricht dem von Standard AHS, mit einem größeren Bereich beim Genügend (25 bis 63 %).
 
 Die Tabellen sind reine Auskunft. Gerechnet wird damit, sobald du beim Eintragen Prozent, Punkte oder Fehler eingibst. Eine Note direkt antippen kannst du immer, dann greift kein Schlüssel.
+
+## Krank oder nicht gemacht
+
+Das ist in der App **nicht dasselbe**, und zwar in **jeder** Kategorie.
+
+In jeder Eingabemaske steht unter den Stufen beziehungsweise neben den Notenkacheln ein eigenes, gestricheltes Feld:
+
+> **– entschuldigt, zählt nicht**
+
+Was damit eingetragen wird, ist festgehalten, aber **fließt in keine Rechnung ein**: nicht in den Notenschnitt, nicht in den Bonus, nicht in den Klassenschnitt einer Schularbeit, nicht in den Notenspiegel. Es steht im Verlauf, auf dem Elternsprechtag-Blatt und in der Sicherung, damit nachvollziehbar bleibt, warum an dieser Stelle nichts steht.
+
+Die **unterste Stufe** — *nicht gemacht*, *keine Mitarbeit* — ist dagegen eine Bewertung und wirkt auch so.
+
+| Situation | Eintrag | Wirkung auf die Note |
+|---|---|---|
+| Hausübung nicht gemacht | unterste Stufe *nicht gemacht* | verschlechtert (als Bonus oder als Anteil, je nach Einstellung) |
+| Hausübung wegen Krankheit nicht gemacht | **entschuldigt, zählt nicht** | **keine** |
+| Schularbeit nicht mitgeschrieben | **entschuldigt, zählt nicht** | **keine**, der Schnitt bleibt unverändert |
+| Kompetenz-Check versäumt | **entschuldigt, zählt nicht** | **keine** |
+
+Bei Schularbeiten, Diktaten und Überprüfungen heißt der Eintrag *nicht mitgeschrieben, keine Note*, sonst *entschuldigt, zählt nicht*. Gemeint ist beides Mal dasselbe.
+
+**In der Sammelerfassung** steht dafür in jeder Zeile rechts das graue Feld mit dem Strich — auch bei Hausübung und Mitarbeit. Ein Tipp darauf ersetzt eine bereits gesetzte Stufe.
+
+Häuft sich das Fehlen, weist die Klassenliste darauf hin (*„3× entschuldigt gefehlt"*). Das ist eine Erinnerung, kein Vorwurf: versäumte Leistungsfeststellungen wollen nachgeholt werden.
 
 ## Was benotet wird und was nicht
 
@@ -362,12 +418,20 @@ Zusätzlich legt die App bei jeder neuen Fassungsnummer von selbst eine Sicherhe
 
 ## Wochensicherung
 
-Die App erinnert nach sieben Tagen mit einem gelben Balken. Ein Tipp auf *Jetzt sichern* erzeugt zwei Dateien:
+*Einstellungen*, Knopf **Jetzt sichern**. Es entstehen immer **zwei** Dateien:
 
-- `Klassenheft_Sicherung_JJJJ-MM-TT.docx` zum Nachlesen, Ausdrucken und Weiterverwenden in Word, nach Semestern gegliedert
-- `Klassenheft_Sicherung_JJJJ-MM-TT.json` zum Zurückspielen in die App
+| Datei | wofür |
+|---|---|
+| `Klassenheft_Sicherung_JJJJ-MM-TT.**json**` | die **wichtige**: nur damit lässt sich der Stand zurückspielen oder mit einem anderen Gerät zusammenführen |
+| `Klassenheft_Sicherung_JJJJ-MM-TT.**docx**` | zum Nachlesen und Ausdrucken |
 
-Am Mac und in Windows lässt sich unter *Einstellungen* einmalig ein fester Sicherungsordner wählen. Ab dann landet die Sicherung automatisch dort. Am iPad und am Handy landet sie in der Dateien-App bzw. bei den Downloads.
+Hast du einen **Sicherungsordner** eingerichtet (geht nur in Chrome und Edge am Rechner), legt die App beide Dateien von selbst dorthin.
+
+Sonst — also am iPhone, iPad und in Safari am Mac — erscheint nach dem Sichern ein Kasten mit **zwei Knöpfen**, einen je Datei. Du tippst sie nacheinander an.
+
+Das ist Absicht und kein Umweg: Zwei Downloads unmittelbar hintereinander lässt **Safari nicht durch**, es unterdrückt den zweiten stillschweigend. Genau so ist früher die Word-Datei angekommen und die Datendatei nicht — und ohne die kann man nichts zusammenführen. Ein Tipp ist ein Download, und den lässt jeder Browser durch.
+
+Wer nur schnell den Datenstand braucht, etwa um ihn auf dem anderen Gerät zusammenzuführen, nimmt **Nur die Datendatei (.json)**.
 
 ## Handy und Rechner zusammenführen
 
