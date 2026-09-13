@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.3
+# Klassenheft, Version 17.6
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 

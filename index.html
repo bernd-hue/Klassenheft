@@ -250,7 +250,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.3";
+const APP_FASSUNG = "17.6";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -269,7 +269,13 @@ const APP_NAME = IST_FREI ? "Klassenheft frei" : "Klassenheft";
 
 /* Der Ort im Gerät, an dem die Daten liegen. Nicht ändern, sonst findet die
    App die schon eingetragenen Noten nicht mehr. */
-const STORAGE_KEY = "klassenheft_daten_v1";
+/* Der Speicher gehört zur Adresse, nicht zum Ordner: zwei Apps unter
+   derselben Adresse teilen sich denselben Browserspeicher, auch wenn sie in
+   verschiedenen Unterordnern liegen. Ein eigener Schlüssel je Ausgabe ist
+   deshalb die einzige verlässliche Trennung. Ohne ihn würden sich die
+   Mittelschul-Ausgabe und die freie Ausgabe gegenseitig überschreiben. */
+const SCHLUESSEL_ZUSATZ = IST_FREI ? "_frei" : "";
+const STORAGE_KEY = "klassenheft" + SCHLUESSEL_ZUSATZ + "_daten_v1";
 
 /* Drei Reiter: Team ist bewusst entfernt (kein Sync geplant, siehe Projektnotizen) */
 const TAB_COLORS = {
@@ -324,42 +330,46 @@ const DEFAULT_WEIGHTS = { schularbeit: 2.0, mitarbeit: 0.5, kompetenz: 1.0, haus
 const SUBJECT_TEMPLATES = {
   allgemein: {
     label: "Allgemein",
-    note:  "Faktor je Note. Schularbeit zählt doppelt, Mitarbeit halb.",
+    note:  "<b>Der Ausgangspunkt für jedes Fach, das nicht zu den anderen Vorlagen passt.</b><br>Jede Note zählt mit einem Faktor statt mit einem Prozentanteil: Schularbeit doppelt, Kompetenz-Check einfach.<br><b>Mitarbeit und Hausübung laufen ohne Note.</b> Die Mitarbeit wirkt als Bonus von höchstens einer halben Notenstufe, die Hausübung wird nur vermerkt. Beides lässt sich in den Einstellungen ändern.",
     mode:  "multiplikator",
     cats:  ["schularbeit","mitarbeit","kompetenz","hausuebung"],
     weights: { schularbeit:2.0, mitarbeit:0.5, kompetenz:1.0, hausuebung:0.3 }
   },
   deutsch1: {
-    label: "Deutsch Variante 1",
-    note:  "Schularbeiten 40 %, Hausübung + Mitarbeit + Diktate 60 % (je 20 %).",
+    label: "Deutsch 1: mit Diktaten",
+    nurMittelschule: true,
+    note:  "<b>Wenn Sie regelmäßig Diktate schreiben.</b><br><b>In die Note gehen Schularbeit und Diktat ein</b>, im Verhältnis 40 zu 20, das sind zwei Drittel zu einem Drittel. Die Schularbeit zählt damit weniger als in den anderen beiden Varianten.<br>Mitarbeit und Hausübung laufen ohne Note. Vorbereitet sind je 20 %, falls Sie sie in den Einstellungen auf <i>eigener Anteil</i> stellen.",
     mode:  "prozent",
     cats:  ["schularbeit","diktat","mitarbeit","hausuebung"],
     weights: { schularbeit:40, diktat:20, mitarbeit:20, hausuebung:20 }
   },
   deutsch2: {
-    label: "Deutsch Variante 2",
-    note:  "Schularbeiten 50 %, Grammatik-WH 15 %, Rechtschreib-Überprüfung 15 %, Mitarbeit 10 %, Hausübung 10 %.",
+    label: "Deutsch 2: mit Grammatik und Rechtschreibung",
+    nurMittelschule: true,
+    note:  "<b>Wenn Sie statt Diktaten eigene Überprüfungen zu Grammatik und Rechtschreibung schreiben.</b><br><b>In die Note gehen Schularbeit 50 %, Grammatik-WH 15 % und Rechtschreib-Überprüfung 15 % ein.</b><br>Mitarbeit und Hausübung laufen ohne Note. Vorbereitet sind je 10 %, falls Sie sie in den Einstellungen auf <i>eigener Anteil</i> stellen.",
     mode:  "prozent",
     cats:  ["schularbeit","grammatik","rechtschreib","mitarbeit","hausuebung"],
     weights: { schularbeit:50, grammatik:15, rechtschreib:15, mitarbeit:10, hausuebung:10 }
   },
   deutsch3: {
-    label: "Deutsch Variante 3",
-    note:  "Schularbeiten 50 %, Mitarbeit 50 % (davon 10 % Diktate, 45 % Hausübung, 45 % mündlich).",
+    label: "Deutsch 3: Schularbeit und Mitarbeit je zur Hälfte",
+    nurMittelschule: true,
+    note:  "<b>Wenn die Schularbeit die Hälfte zählen soll und der Rest aus der laufenden Mitarbeit kommt.</b><br>Damit das so wirkt, müssen Sie Mitarbeit und Hausübung in den Einstellungen auf <i>eigener Anteil</i> stellen. Vorbereitet sind Schularbeit 50 %, Mitarbeit 22,5 %, Hausübung 22,5 %, Diktat 5 %.<br><b>Unverändert übernommen laufen Mitarbeit und Hausübung ohne Note</b>: in die Note gehen dann nur Schularbeit und Diktat ein, die Mitarbeit wirkt als Bonus.",
     mode:  "prozent",
     cats:  ["schularbeit","diktat","mitarbeit","hausuebung"],
     weights: { schularbeit:50, diktat:5, mitarbeit:22.5, hausuebung:22.5 }
   },
   mathematik: {
     label: "Mathematik",
-    note:  "Schularbeiten 60 %, Mitarbeit 25 %, Hausübung 15 %. Kompetenz-Check zusätzlich einschaltbar.",
+    note:  "<b>Für Mathematik und ähnlich aufgebaute Fächer mit Schularbeiten.</b><br><b>Die Note kommt aus der Schularbeit.</b> Mitarbeit und Hausübung laufen ohne Note: die Mitarbeit wirkt als Bonus von höchstens einer halben Notenstufe, die Hausübung wird nur vermerkt.<br>Sollen sie mit festen Anteilen mitrechnen (vorbereitet sind 25 % und 15 %), stellen Sie sie in den Einstellungen auf <i>eigener Anteil</i>. Den Kompetenz-Check können Sie dort ebenfalls dazuschalten.",
     mode:  "prozent",
     cats:  ["schularbeit","mitarbeit","hausuebung"],
     weights: { schularbeit:60, mitarbeit:25, hausuebung:15 }
   },
   nebenfachTest: {
     label: "Nebenfach mit Tests",
-    note:  "Für Geografie, Geschichte, Biologie, Physik und ähnliche Fächer: Test 50 %, Mitarbeit 35 %, Hausübung 15 %.",
+    niveaus: false,
+    note:  "<b>Für Fächer ohne Schularbeit, in denen Sie Tests schreiben: Geografie, Geschichte, Biologie, Physik und ähnliche.</b><br><b>Die Note kommt aus den Tests.</b> Mitarbeit und Hausübung laufen ohne Note, die Mitarbeit als Bonus. Vorbereitet sind 35 % und 15 %, falls Sie sie auf <i>eigener Anteil</i> stellen.<br>Leistungsniveaus sind hier ausgeschaltet, es gilt ein Schlüssel für alle.",
     mode:  "prozent",
     cats:  ["x_test","mitarbeit","hausuebung"],
     weights: { x_test:50, mitarbeit:35, hausuebung:15 },
@@ -367,7 +377,8 @@ const SUBJECT_TEMPLATES = {
   },
   nebenfachPraktisch: {
     label: "Nebenfach praktisch",
-    note:  "Für Sport, Musik, Werken und Bildnerische Erziehung: praktische Leistung 60 %, Mitarbeit und Einsatz 40 %.",
+    niveaus: false,
+    note:  "<b>Für Fächer, in denen die praktische Leistung zählt: Bewegung und Sport, Musik, Werken, Bildnerische Erziehung.</b><br><b>Die Note kommt aus der praktischen Leistung.</b> Mitarbeit und Einsatz laufen ohne Note und wirken als Bonus; vorbereitet sind 40 %, falls Sie sie auf <i>eigener Anteil</i> stellen.<br>Keine schriftlichen Überprüfungen, keine Leistungsniveaus.",
     mode:  "prozent",
     cats:  ["x_praktisch","mitarbeit"],
     weights: { x_praktisch:60, mitarbeit:40 },
@@ -510,7 +521,33 @@ function semesterLabel(){ return SEM_LABELS[aktivesSemester()]; }
 /* Kategorien, für die es einen Notenschlüssel gibt */
 const PROZENT_CATS = ["schularbeit","grammatik","rechtschreib"];
 
+/* Welche Vorlagen diese Ausgabe anbietet. Die drei Deutsch-Varianten
+   stammen aus der Vorlage einer österreichischen Deutschkollegin und
+   beschreiben deren Aufteilung. An einer anderen Schule wären sie eine
+   Behauptung über eine Praxis, die dort nicht gilt, deshalb fehlen sie in
+   der freien Ausgabe. */
+function vorlagenKeys(){
+  return Object.keys(SUBJECT_TEMPLATES)
+    .filter(k => !(IST_FREI && SUBJECT_TEMPLATES[k].nurMittelschule));
+}
+
+/* Eine Vorlage, die in dieser Ausgabe nicht angeboten wird, kann trotzdem an
+   einem Fach hängen, etwa nach dem Zusammenführen mit einem anderen Gerät.
+   Sie bleibt dann in der Auswahl stehen, damit sie nicht stillschweigend
+   gegen eine andere getauscht wird. */
+function vorlagenKeysFuer(sub){
+  const liste = vorlagenKeys();
+  if(sub && sub.template && SUBJECT_TEMPLATES[sub.template] && liste.indexOf(sub.template) === -1){
+    return liste.concat([sub.template]);
+  }
+  return liste;
+}
+
 function stufeFromKlasse(name){
+  /* "1. Klasse" ist die österreichische Mittelschule. Anderswo heißen
+     Klassen 10a, 11b oder Kurs 13, und die erste Ziffer sagt dort gar
+     nichts. In der freien Ausgabe gibt es diese Einteilung deshalb nicht. */
+  if(IST_FREI) return 2;
   const m = String(name || "").match(/\d/);
   return m && m[0] === "1" ? 1 : 2;
 }
@@ -537,6 +574,25 @@ function niveausVorschlag(fach, template){
 
 /* Führt dieses Fach Leistungsniveaus? Fehlt die Einstellung, entscheidet
    der Vorschlag, damit Altbestand sich nicht von selbst ändert. */
+/* Die Namen der beiden Niveaus. "Standard AHS" und "Standard" sind die
+   Begriffe der österreichischen Mittelschule. An einer AHS-Oberstufe, einer
+   HTL oder einer Schule außerhalb Österreichs heißen sie anders oder gar
+   nicht. Deshalb sind sie je Fach frei benennbar; intern bleiben die
+   Schlüssel "ahs" und "standard", damit eingetragene Daten gültig bleiben. */
+function niveauLabel(sub, key){
+  const eigen = sub && sub.niveauNamen;
+  const i = (key === "standard") ? 1 : 0;
+  if(Array.isArray(eigen) && typeof eigen[i] === "string" && eigen[i].trim()){
+    return eigen[i].trim();
+  }
+  return IST_FREI ? (i === 0 ? "Niveau 1" : "Niveau 2") : NIVEAU_LABELS[key === "standard" ? "standard" : "ahs"];
+}
+
+function hatEigeneNiveauNamen(sub){
+  return !!(sub && Array.isArray(sub.niveauNamen)
+    && sub.niveauNamen.some(n => typeof n === "string" && n.trim()));
+}
+
 function hatNiveaus(sub){
   if(!sub) return true;
   if(typeof sub.niveaus === "boolean") return sub.niveaus;
@@ -581,8 +637,13 @@ function eigeneGrenzen(sub, key){
   return grenzenGueltig(g) ? g.map(Number) : null;
 }
 
-function hatEigenenSchluessel(sub){
-  return !!(sub && sub.schluessel && (eigeneGrenzen(sub, "ahs") || eigeneGrenzen(sub, "standard")));
+function hatEigenenSchluessel(sub, cls){
+  if(!sub || !sub.schluessel) return false;
+  /* Maßgeblich sind die Spalten, die in diesem Fach gerade gelten. Sonst
+     behauptet der Text "dein eigener Schlüssel", während die App für die
+     tatsächlich verwendete Spalte längst wieder die Vorgabe rechnet. */
+  if(cls) return schluesselSpalten(cls, sub).some(([k]) => !!eigeneGrenzen(sub, k));
+  return ["ahs", "standard", "stufe1", "alle"].some(k => !!eigeneGrenzen(sub, k));
 }
 
 /* Die Tabelle, nach der tatsächlich gerechnet wird. */
@@ -619,9 +680,13 @@ function prozentBereich(key, note, sub){
   const i = note - 1;
   if(i < 0 || i >= t.length) return "";
   const unten = t[i][0];
-  if(i === t.length - 1) return "unter " + t[i-1][0] + " %";
-  const oben = i === 0 ? 100 : t[i-1][0] - 1;
-  return unten + " bis " + oben + " %";
+  if(i === t.length - 1) return "unter " + fmtPct(t[i-1][0]) + " %";
+  if(i === 0) return fmtPct(unten) + " % und mehr";
+  /* Kein Abzug von 1: die Rechnung kennt keine ganzen Prozent. Bei "51 bis
+     63 %" und "64 bis 76 %" stünden 63,08 % in keiner Zeile, obwohl die App
+     dafür sehr wohl eine Note vergibt. Mit Kommagrenzen wird die Lücke noch
+     größer. "bis unter" beschreibt genau das, was gerechnet wird. */
+  return fmtPct(unten) + " bis unter " + fmtPct(t[i-1][0]) + " %";
 }
 
 function fehlerBereich(key, note){
@@ -639,7 +704,7 @@ function fehlerBereich(key, note){
 function schluesselSpalten(cls, sub){
   if((cls.stufe || 2) === 1) return [["stufe1", "1. Klasse"]];
   if(sub && !hatNiveaus(sub)) return [["ahs", "Notenschlüssel"]];
-  return [["ahs", NIVEAU_LABELS.ahs], ["standard", NIVEAU_LABELS.standard]];
+  return [["ahs", niveauLabel(sub, "ahs")], ["standard", niveauLabel(sub, "standard")]];
 }
 
 /* Eine Tabelle, Note für Note. art ist "prozent" oder "fehler". */
@@ -681,7 +746,9 @@ function schluesselBereich(cls, sub){
 
   if(mitDiktat){
     teile.push(`
-      <div class="helptext" style="padding-bottom:4px;"><b>Nach Fehleranzahl:</b> ${esc(catLabel(sub, "diktat"))}, geübtes Diktat, Textlänge laut Vorlage etwa 45 bis 65 Wörter</div>
+      <div class="helptext" style="padding-bottom:4px;"><b>Nach Fehleranzahl:</b> ${esc(catLabel(sub, "diktat"))}, geübtes Diktat${IST_FREI
+        ? ". Dieser Schlüssel ist fest eingebaut und lässt sich derzeit nicht selbst einstellen."
+        : ", Textlänge laut Vorlage etwa 45 bis 65 Wörter"}</div>
       <div style="padding:0 16px 10px;">${schluesselTabelle(cls, "fehler", sub)}</div>`);
   }
 
@@ -705,7 +772,12 @@ function schluesselBereich(cls, sub){
     </div>`;
 }
 
-function stufeLabel(cls){ return (cls.stufe || 2) === 1 ? "1. Klasse" : "2. bis 4. Klasse"; }
+function stufeLabel(cls){
+  /* Die Einteilung "1. Klasse / 2. bis 4. Klasse" ist die der österreichischen
+     Mittelschule. Anderswo sagt sie nichts, dort steht die Klasse für sich. */
+  if(IST_FREI) return "";
+  return (cls.stufe || 2) === 1 ? "1. Klasse" : "2. bis 4. Klasse";
+}
 
 /* ---------- KATEGORIEN ----------
    Sieben fest eingebaute Kategorien plus beliebig viele, die die Lehrkraft
@@ -720,14 +792,27 @@ function allCatKeys(sub){ return CAT_ORDER.concat(customCats(sub).map(c => c.key
 
 function findCustom(sub, key){ return customCats(sub).find(c => c.key === key); }
 
+/* Auch die eingebauten Beurteilungsarten lassen sich je Fach umbenennen.
+   "Schularbeit" und "Hausübung" sind österreichische Begriffe; anderswo
+   heißt das Klassenarbeit und Hausaufgabe. Umbenannt wird nur die
+   Beschriftung, der Schlüssel bleibt, damit eingetragene Noten gültig
+   bleiben und Schlüssel und Vorlagen weiter greifen. */
+function eigenerCatName(sub, key){
+  const n = sub && sub.catNamen ? sub.catNamen[key] : null;
+  return (typeof n === "string" && n.trim()) ? n.trim() : null;
+}
+
 function catLabel(sub, key){
   const c = findCustom(sub, key);
-  return c ? c.label : (CAT_LABELS[key] || key);
+  if(c) return c.label;
+  return eigenerCatName(sub, key) || CAT_LABELS[key] || key;
 }
 
 function catShort(sub, key){
   const c = findCustom(sub, key);
-  return c ? (c.short || c.label) : (CAT_SHORT[key] || key);
+  if(c) return c.short || c.label;
+  const eigen = eigenerCatName(sub, key);
+  return eigen ? kurzName(eigen) : (CAT_SHORT[key] || key);
 }
 
 function catCol(sub, key){
@@ -816,7 +901,11 @@ function noteBezeichnung(sub, n){
 }
 
 function activeCats(sub){
-  const list = (sub && Array.isArray(sub.cats) && sub.cats.length) ? sub.cats : DEFAULT_CATS;
+  /* Eine ausdrücklich leere Liste bleibt leer. Vorher sprang die Vorgabe
+     ein: wer alle Häkchen entfernte, bekam wortlos Schularbeit, Mitarbeit,
+     Kompetenz-Check und Hausübung zurück und konnte das nicht rückgängig
+     machen. Fehlt die Liste ganz, etwa bei Altbestand, gilt die Vorgabe. */
+  const list = (sub && Array.isArray(sub.cats)) ? sub.cats : DEFAULT_CATS;
   return allCatKeys(sub).filter(k => list.indexOf(k) !== -1);
 }
 
@@ -908,11 +997,12 @@ function bonusMax(sub){
 
 /* Bonuswert einer einzelnen Stufe. Minus verbessert. */
 function bonusWert(sub, cat, index){
+  const anzahl = stufenListe(sub, cat).length;
   const eigene = sub && sub.bonusWerte && Array.isArray(sub.bonusWerte[cat]) ? sub.bonusWerte[cat] : null;
   const liste = eigene || STUFEN_BONUS[cat];
-  if(liste && typeof liste[index] === "number") return liste[index];
-  /* Ohne eigene Vorgabe: die beste Stufe verbessert, die schwächste verschlechtert */
-  const anzahl = stufenListe(sub, cat).length;
+  /* Auch hier gilt die Liste nur bei passender Stufenzahl, siehe stufenWert. */
+  if(liste && liste.length === anzahl && typeof liste[index] === "number") return liste[index];
+  /* Ohne passende Vorgabe: die beste Stufe verbessert, die schwächste verschlechtert */
   if(anzahl < 2) return 0;
   return -0.15 + (0.3 * index) / (anzahl - 1);
 }
@@ -954,10 +1044,15 @@ function bonusText(wert){
 
 /* Wert einer Stufe auf der Notenskala */
 function stufenWert(sub, e){
+  const anzahl = stufenListe(sub, e.cat).length;
   const eigene = sub && sub.stufenWerte && Array.isArray(sub.stufenWerte[e.cat]) ? sub.stufenWerte[e.cat] : null;
   const liste = eigene || STUFEN_WERTE[e.cat];
-  if(liste && typeof liste[e.stufe] === "number") return liste[e.stufe];
-  const anzahl = stufenListe(sub, e.cat).length;
+  /* Die hinterlegte Werteliste gilt nur, solange sie zur tatsächlichen Zahl
+     der Stufen passt. Wer eine Stufe hinzufügt oder entfernt, hat sonst eine
+     Liste für vier Stufen und fünf Stufen auf dem Bildschirm: die neue Stufe
+     bekäme denselben Wert wie die schlechteste, und ein Eintrag könnte allein
+     durch das Umstellen der Stufenzahl eine andere Note bedeuten. */
+  if(liste && liste.length === anzahl && typeof liste[e.stufe] === "number") return liste[e.stufe];
   return anzahl > 1 ? 1 + (4 * e.stufe) / (anzahl - 1) : 3;
 }
 
@@ -965,7 +1060,7 @@ function stufenWert(sub, e){
    Notenkategorien und zusätzlich jene Stufen-Kategorien, für die die
    Lehrkraft das ausdrücklich eingeschaltet hat. */
 function notenCats(sub){
-  return activeCats(sub).filter(k => !istStufenCat(sub, k) || stufeZaehlt(sub, k));
+  return activeCats(sub).filter(k => catZaehlt(sub, k));
 }
 
 /* Alle Stufeneinträge einer Person */
@@ -1008,10 +1103,13 @@ function defaultCompetencies(fach){
    Immer nur ein Vorschlag, die Lehrkraft kann jede Vorlage wählen. */
 function templateKeyForFach(fach){
   const f = String(fach || "").toLowerCase();
-  if(f.indexOf("deutsch") !== -1) return "deutsch3";
-  if(f.indexOf("mathe") !== -1) return "mathematik";
-  if(/sport|bewegung|turnen|musik|werken|technisch|bildner|zeichn|kochen|ernährung|ernaehrung/.test(f)) return "nebenfachPraktisch";
-  if(/geografie|geographie|geschichte|biologie|physik|chemie|politische|gw|informatik|religion/.test(f)) return "nebenfachTest";
+  /* Nur vorschlagen, was diese Ausgabe auch anbietet. Sonst steht die
+     Auswahlliste leer da, weil der vorgeschlagene Eintrag darin fehlt. */
+  const da = k => vorlagenKeys().indexOf(k) !== -1 ? k : "allgemein";
+  if(f.indexOf("deutsch") !== -1) return da("deutsch3");
+  if(f.indexOf("mathe") !== -1) return da("mathematik");
+  if(/sport|bewegung|turnen|musik|werken|technisch|bildner|zeichn|kochen|ernährung|ernaehrung/.test(f)) return da("nebenfachPraktisch");
+  if(/geografie|geographie|geschichte|biologie|physik|chemie|politische|gw|informatik|religion/.test(f)) return da("nebenfachTest");
   return "allgemein";
 }
 
@@ -1027,6 +1125,10 @@ function applyTemplate(sub, key){
   (t.customCats || []).forEach(c => {
     if(!sub.customCats.some(x => x.key === c.key)) sub.customCats.push(Object.assign({}, c));
   });
+  /* Sagt die Vorlage etwas über die Leistungsniveaus, muss sie es auch tun.
+     Der Text der Nebenfach-Vorlagen behauptet sonst, sie seien ausgeschaltet,
+     während zwei Spalten stehen bleiben. */
+  if(typeof t.niveaus === "boolean") sub.niveaus = t.niveaus;
   return sub;
 }
 
@@ -1364,8 +1466,17 @@ function noteWeight(sub, n){
    Das war bis Version 17.1 anders und hat Schnitte verzogen: die
    Einstellungsseite hat "zählt nicht mehr in den Notenschnitt" versprochen,
    gerechnet wurde trotzdem weiter. */
+/* Gewicht 0 heißt: zählt nicht. Vorher rechnete die App richtig, schrieb
+   aber daneben "zählt in den Notenschnitt", und die Noten tauchten weder
+   dort noch bei den nicht zählenden auf. */
+function gewichtNull(sub, cat){
+  if(isProzentMode(sub)) return (sub.weights[cat] ?? 0) <= 0;
+  return (sub.weights[cat] ?? 1) <= 0;
+}
+
 function catZaehlt(sub, cat){
   if(activeCats(sub).indexOf(cat) === -1) return false;
+  if(gewichtNull(sub, cat)) return false;
   if(istStufenCat(sub, cat)) return stufeZaehlt(sub, cat);
   return true;
 }
@@ -1396,7 +1507,10 @@ function wertendeNoten(sub, studentId, sem){
   return entriesOf(sub, studentId, sem).map(e => {
     if(e.type === "note") return catZaehlt(sub, e.cat) ? e : null;
     if(e.type === "stufe" && catZaehlt(sub, e.cat)){
-      return Object.assign({}, e, { value: stufenWert(sub, e), w: typeof e.w === "number" ? e.w : 1, ausStufe: true });
+      /* Kein festes Gewicht setzen: noteWeight nimmt sonst die 1 und das
+         Kategoriegewicht im Faktormodus bliebe wirkungslos, obwohl der
+         Regler danebensteht und die Einstellungen es ausdrücklich zusagen. */
+      return Object.assign({}, e, { value: stufenWert(sub, e), ausStufe: true });
     }
     return null;
   }).filter(Boolean);
@@ -1433,8 +1547,8 @@ function schnittAus(sub, notes){
       let s = 0, w = 0;
       inCat.forEach(n => {
         const nw = Math.max(0, noteWeight(sub, n));
-        const v = Number(n.value);
-        if(isNaN(v)) return;
+        const v = n.value;
+        if(typeof v !== "number" || isNaN(v)) return;
         s += v * nw; w += nw;
       });
       if(w <= 0) return;
@@ -1451,8 +1565,8 @@ function schnittAus(sub, notes){
   let sum = 0, wsum = 0;
   notes.forEach(n => {
     const w = Math.max(0, noteWeight(sub, n));
-    const v = Number(n.value);
-    if(isNaN(v)) return;
+    const v = n.value;
+    if(typeof v !== "number" || isNaN(v)) return;
     sum += v * w; wsum += w;
   });
   return wsum > 0 ? sum / wsum : null;
@@ -1712,15 +1826,30 @@ function arbeitsNummernNachziehen(sub){
       const ohne = drin.filter(e => !arbeitNr(e));
       if(!ohne.length) return;
       const belegt = {};
-      drin.forEach(e => { const n = arbeitNr(e); if(n) belegt[n] = true; });
+      /* Welche Nummer an einem Tag schon vergeben ist. Ein Eintrag ohne
+         Nummer an einem Tag, an dem die übrigen längst eine haben, gehört
+         zu derselben Arbeit. Ohne diesen Schritt entstand daneben eine
+         zweite, erfundene Arbeit mit denselben Kindern am selben Tag. */
+      const nummerAmTag = {};
+      drin.forEach(e => {
+        const n = arbeitNr(e);
+        if(!n) return;
+        belegt[n] = true;
+        if(e.date && nummerAmTag[e.date] === undefined) nummerAmTag[e.date] = n;
+      });
+      ohne.forEach(e => {
+        if(e.date && nummerAmTag[e.date] !== undefined) e.arbeit = nummerAmTag[e.date];
+      });
+      const nochOhne = ohne.filter(e => !arbeitNr(e));
+      if(!nochOhne.length) return;
       const termine = [];
-      ohne.forEach(e => { if(termine.indexOf(e.date) === -1) termine.push(e.date); });
+      nochOhne.forEach(e => { if(termine.indexOf(e.date) === -1) termine.push(e.date); });
       termine.sort((a, b) => schuljahrOrdnung(a) - schuljahrOrdnung(b));
       let naechste = 1;
       termine.forEach(tag => {
         while(belegt[naechste]) naechste++;
         belegt[naechste] = true;
-        ohne.filter(e => e.date === tag).forEach(e => { e.arbeit = naechste; });
+        nochOhne.filter(e => e.date === tag).forEach(e => { e.arbeit = naechste; });
         naechste++;
       });
     });
@@ -2062,11 +2191,11 @@ function renderNewSubject(){
 
   /* Die erste Vorlage in der Liste ist beim Öffnen ausgewählt. Ihr
      Erklärungstext muss deshalb auch gleich sichtbar sein. */
-  const vorlagenKeys = Object.keys(SUBJECT_TEMPLATES);
-  const vorlageJetzt = vorlagenKeys[0];
-  const tplOpts = vorlagenKeys.map(k =>
+  const keys = vorlagenKeys();
+  const vorlageJetzt = keys[0];
+  const tplOpts = keys.map(k =>
     `<option value="${k}">${SUBJECT_TEMPLATES[k].label}</option>`).join("");
-  const tplNotes = vorlagenKeys.map(k =>
+  const tplNotes = keys.map(k =>
     `<div id="tplNote_${k}" style="display:${k === vorlageJetzt ? "block" : "none"};">${SUBJECT_TEMPLATES[k].note}</div>`).join("");
 
   const klasseFeld = ersteKlasse
@@ -2176,7 +2305,7 @@ function renderRoster(){
     const schnitt = computeSchnitt(sub, s.id);
     const bad = schnitt !== null && schnitt >= 4.0;
     const gruende = auffaellig(sub, s.id);
-    const niveau = (cls.stufe === 1 || !hatNiveaus(sub)) ? "" : `<div class="sub">${esc(NIVEAU_LABELS[s.niveau])}</div>`;
+    const niveau = (cls.stufe === 1 || !hatNiveaus(sub)) ? "" : `<div class="sub">${esc(niveauLabel(sub, s.niveau))}</div>`;
     /* Gedeckt, nicht grell: die Zeile bleibt lesbar, der Balken links
        trägt die Auffälligkeit. Der Grund steht daneben in Worten, damit
        die Farbe nicht der einzige Träger ist. */
@@ -2231,11 +2360,16 @@ function renderRoster(){
 function renderNewStudent(){
   const cls = getClass(homeView.classId);
   if(!cls) return renderHomeList();
-  const niveauFeld = (cls.stufe === 1) ? "" : `
+  /* Das Niveau gilt für die ganze Klasse, die Benennung hängt aber am Fach.
+     Beim Anlegen gilt deshalb das Fach, aus dem man gekommen ist, sonst das
+     erste, das Niveaus führt. Führt keines welche, entfällt die Frage. */
+  const nFach = getSubject(cls, homeView.subjectId) || (cls.subjects || []).find(f => hatNiveaus(f));
+  const zeigeNiveau = (cls.stufe || 2) !== 1 && (cls.subjects || []).some(f => hatNiveaus(f));
+  const niveauFeld = !zeigeNiveau ? "" : `
       <span class="field-label">Leistungsniveau</span>
       <select id="niveauInput">
-        <option value="ahs">Standard AHS</option>
-        <option value="standard">Standard</option>
+        <option value="ahs">${esc(niveauLabel(nFach, "ahs"))}</option>
+        <option value="standard">${esc(niveauLabel(nFach, "standard"))}</option>
       </select>`;
   return `
     <div class="header" style="${headerStyle("home")}">
@@ -2471,8 +2605,8 @@ function renderStudent(){
     <div style="padding:10px 16px; border-bottom:1px solid #000; display:flex; align-items:center; gap:10px;">
       <span style="font-size:12px; font-weight:bold;">Leistungsniveau</span>
       <select style="margin-bottom:0; flex:1;" onchange="setNiveau(this.value)">
-        <option value="ahs" ${s.niveau !== "standard" ? "selected" : ""}>Standard AHS</option>
-        <option value="standard" ${s.niveau === "standard" ? "selected" : ""}>Standard</option>
+        <option value="ahs" ${s.niveau !== "standard" ? "selected" : ""}>${esc(niveauLabel(sub, "ahs"))}</option>
+        <option value="standard" ${s.niveau === "standard" ? "selected" : ""}>${esc(niveauLabel(sub, "standard"))}</option>
       </select>
     </div>`;
 
@@ -2853,7 +2987,7 @@ function renderNewNote(){
         <div class="helptext" style="padding:2px 0 0;">
           <button class="ghost" onclick="toggleSchluessel()">${homeView.zeigeSchluessel ? "Schlüssel ausblenden" : "Schlüssel anzeigen"}</button>
         </div>
-        ${homeView.zeigeSchluessel ? `<div class="helptext" style="padding:0;">${cls.stufe === 1 ? "1. Klasse" : (hatNiveaus(sub) ? NIVEAU_LABELS[key === "standard" ? "standard" : "ahs"] : "Notenschlüssel")}: ${schluesselText(istDiktat ? "fehler" : "prozent", key, sub)}${istDiktat ? "<br>Textlänge laut Vorlage ca. 45 bis 65 Wörter." : ""}</div>` : ""}
+        ${homeView.zeigeSchluessel ? `<div class="helptext" style="padding:0;">${cls.stufe === 1 ? "1. Klasse" : (hatNiveaus(sub) ? niveauLabel(sub, key) : "Notenschlüssel")}: ${schluesselText(istDiktat ? "fehler" : "prozent", key, sub)}${istDiktat && !IST_FREI ? "<br>Textlänge laut Vorlage ca. 45 bis 65 Wörter." : ""}</div>` : ""}
       </div>`;
   }
 
@@ -2875,7 +3009,7 @@ function renderNewNote(){
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
       <span class="title" style="${titleStyle("home")}">Note eintragen</span>
-      <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${(cls.stufe === 1 || !hatNiveaus(sub)) ? "" : " &middot; " + NIVEAU_LABELS[s.niveau]} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
+      <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${(cls.stufe === 1 || !hatNiveaus(sub)) ? "" : " &middot; " + esc(niveauLabel(sub, s.niveau))} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
     </div>
     <div class="chips">${chips}</div>
     ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.arbeitNr, "setArbeitNr") : ""}
@@ -2946,6 +3080,7 @@ function punkteNeuRechnen(alteMax, neueMax){
   const sub = getSubject(cls, homeView.subjectId);
   if(!sub || !neueMax) return;
   let geaendert = 0;
+  const zuHoch = [];
   Object.keys(homeView.schnellIds || {}).forEach(sid => {
     const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
     if(!e || e.type !== "note" || !e.basis) return;
@@ -2955,12 +3090,26 @@ function punkteNeuRechnen(alteMax, neueMax){
     if(isNaN(punkte)) return;
     const st = getStudent(cls, sid);
     const prozent = (punkte / neueMax) * 100;
-    if(prozent > 100) return;
+    /* Mehr Punkte als jetzt möglich: die Zeile stehen zu lassen wäre das
+       Schlimmste, dann stünden in einer Schularbeit zwei Höchstpunktezahlen
+       nebeneinander und niemand sähe es. Der Eintrag kommt weg und wird
+       benannt, damit er neu eingegeben wird. */
+    if(prozent > 100){
+      zuHoch.push((st ? st.name : "?") + " mit " + fmtPct(punkte) + " Punkten");
+      sub.entries = sub.entries.filter(x => x.id !== e.id);
+      delete homeView.schnellIds[sid];
+      return;
+    }
     e.value = noteFromProzent(prozent, schluesselKey(cls, st, sub), sub);
     e.basis = fmtPct(punkte) + " von " + fmtPct(neueMax) + " Punkten, " + fmtPct(prozent) + " %";
     geaendert++;
   });
-  if(geaendert) save();
+  if(geaendert || zuHoch.length) save();
+  if(zuHoch.length){
+    alert("Bei " + fmtPct(neueMax) + " möglichen Punkten passen diese Eingaben nicht mehr:\n\n"
+      + zuHoch.join("\n")
+      + "\n\nDiese Eintragungen wurden entfernt. Bitte neu eingeben.");
+  }
 }
 
 function schnellPunkte(studentId, roh){
@@ -3593,7 +3742,7 @@ function wordDokument(){
         const pn = countPosNeg(sub, s.id, "alle");
         return [
           s.name,
-          (cls.stufe === 1 || !hatNiveaus(sub)) ? "-" : NIVEAU_LABELS[s.niveau],
+          (cls.stufe === 1 || !hatNiveaus(sub)) ? "-" : niveauLabel(sub, s.niveau),
           fmt(computeSchnitt(sub, s.id, 1)),
           fmt(computeSchnitt(sub, s.id, 2)),
           fmt(computeSchnitt(sub, s.id, "alle")),
@@ -3786,8 +3935,8 @@ function datumsStempel(){
    Umstieg etwas schiefgeht. Fotos bleiben bewusst draußen, sonst wird die
    Kopie zu groß für den Speicher des Browsers. */
 
-const KOPIE_KEY = "klassenheft_sicherheitskopie";
-const FASSUNG_KEY = "klassenheft_fassung";
+const KOPIE_KEY = "klassenheft" + SCHLUESSEL_ZUSATZ + "_sicherheitskopie";
+const FASSUNG_KEY = "klassenheft" + SCHLUESSEL_ZUSATZ + "_fassung";
 
 function ohneFotos(klassen){
   return klassen.map(c => ({
@@ -3856,7 +4005,8 @@ function fassungPruefen(){
 }
 
 function sicherungsDaten(){
-  return { version: 4, geraet: state.settings.geraet || "", classes: state.classes, settings: state.settings, exportedAt: new Date().toISOString() };
+  return { version: 4, ausgabe: AUSGABE, geraet: state.settings.geraet || "",
+           classes: state.classes, settings: state.settings, exportedAt: new Date().toISOString() };
 }
 
 /* Die fertige Sicherung, solange sie noch nicht abgeholt wurde. */
@@ -3985,6 +4135,22 @@ function starteImport(modus){
 /* Führt einen fremden Datenstand mit dem Stand auf diesem Gerät zusammen.
    Zuordnung über die IDs, ersatzweise über die Bezeichnung. Bei zwei Fassungen
    desselben Eintrags gewinnt die neuere. Es wird nichts gelöscht. */
+/* Jedes Feld, das eine Einstellung des Fachs trägt. Wird beim Zusammenführen
+   eines neuen Fachs vollständig übernommen. */
+const EINSTELLUNGSFELDER = [
+  "stufenCats", "stufenZaehlt", "stufenBonus", "stufenStand", "bonusMax",
+  "stufenTexte", "stufenWerte", "bonusWerte",
+  "niveaus", "niveauNamen", "schluessel", "catNamen"
+];
+
+function uebernehmen(ziel, quelle, feld){
+  const v = quelle[feld];
+  if(v === undefined || v === null) return;
+  if(Array.isArray(v)) ziel[feld] = v.slice();
+  else if(typeof v === "object") ziel[feld] = JSON.parse(JSON.stringify(v));
+  else ziel[feld] = v;
+}
+
 function mergeState(basis, fremd){
   const bericht = { klassen:0, schueler:0, faecher:0, eintraege:0 };
 
@@ -4030,25 +4196,11 @@ function mergeState(basis, fremd){
            der Lehrkraft ist weg. Schlimmer noch: ohne stufenStand hält
            normaliseClass das Fach für alt und zieht eine einmalige Umstellung
            ein zweites Mal nach, die auf diese Daten längst angewendet wurde. */
-        if(Array.isArray(fsub.stufenCats))   bsub.stufenCats   = fsub.stufenCats.slice();
-        if(Array.isArray(fsub.stufenZaehlt)) bsub.stufenZaehlt = fsub.stufenZaehlt.slice();
-        if(Array.isArray(fsub.stufenBonus))  bsub.stufenBonus  = fsub.stufenBonus.slice();
-        if(typeof fsub.bonusMax === "number") bsub.bonusMax    = fsub.bonusMax;
-        if(typeof fsub.stufenStand === "number") bsub.stufenStand = fsub.stufenStand;
-        /* arbeitsNummernNachziehen() greift danach über normaliseClass, falls nötig */
-        if(fsub.stufenTexte && typeof fsub.stufenTexte === "object"){
-          bsub.stufenTexte = JSON.parse(JSON.stringify(fsub.stufenTexte));
-        }
-        if(fsub.stufenWerte && typeof fsub.stufenWerte === "object"){
-          bsub.stufenWerte = JSON.parse(JSON.stringify(fsub.stufenWerte));
-        }
-        /* Notenschlüssel und Leistungsniveaus gehören genauso mit. Ohne sie
-           würde dasselbe Fach auf dem anderen Gerät nach anderen Prozentsätzen
-           rechnen, und das fällt niemandem auf. */
-        if(typeof fsub.niveaus === "boolean") bsub.niveaus = fsub.niveaus;
-        if(fsub.schluessel && typeof fsub.schluessel === "object"){
-          bsub.schluessel = JSON.parse(JSON.stringify(fsub.schluessel));
-        }
+        /* Ein neues Fach übernimmt sämtliche Einstellungen des Herkunftsgeräts.
+           Die Liste steht bewusst an einer einzigen Stelle: jedes Feld, das
+           hier fehlt, führt dazu, dass dasselbe Fach auf zwei Geräten
+           verschieden rechnet, und das fällt niemandem auf. */
+        EINSTELLUNGSFELDER.forEach(f => uebernehmen(bsub, fsub, f));
         bc.subjects.push(bsub);
         bericht.faecher++;
       } else {
@@ -4061,17 +4213,15 @@ function mergeState(basis, fremd){
         });
         /* Beim bestehenden Fach gilt die Einstellung dieses Geräts. Nur was
            hier noch gar nicht gesetzt ist, wird vom anderen Gerät übernommen. */
-        if(!Array.isArray(bsub.stufenCats) && Array.isArray(fsub.stufenCats)) bsub.stufenCats = fsub.stufenCats.slice();
-        if(typeof bsub.stufenStand !== "number" && typeof fsub.stufenStand === "number") bsub.stufenStand = fsub.stufenStand;
+        /* Bei einem bereits vorhandenen Fach gilt die Einstellung dieses
+           Geräts. Vom anderen kommt nur, was hier noch gar nicht gesetzt ist.
+           Sonst überschriebe ein Zusammenführen stillschweigend Entscheidungen,
+           die jemand an diesem Gerät bewusst getroffen hat. */
         if(fsub.stufenTexte){
           if(!bsub.stufenTexte) bsub.stufenTexte = {};
           Object.keys(fsub.stufenTexte).forEach(k => {
             if(!Array.isArray(bsub.stufenTexte[k])) bsub.stufenTexte[k] = fsub.stufenTexte[k].slice();
           });
-        }
-        if(typeof bsub.niveaus !== "boolean" && typeof fsub.niveaus === "boolean") bsub.niveaus = fsub.niveaus;
-        if(!bsub.schluessel && fsub.schluessel && typeof fsub.schluessel === "object"){
-          bsub.schluessel = JSON.parse(JSON.stringify(fsub.schluessel));
         }
       }
 
@@ -4419,7 +4569,9 @@ function verteilungSvg(sub, sem, breite, hoehe, fertig){
   } else {
     const noten = wertendeNotenAlle(sub, sem);
     if(!noten.length) return "";
-    anzahl = [1,2,3,4,5].map(n => noten.filter(e => e.value === n).length);
+    /* Genauso runden wie der Notenspiegel, sonst stehen auf einem Blatt zwei
+       verschiedene Summen für dieselben Noten. */
+    anzahl = spiegelVerteilung(sub, sem);
   }
   const groesste = Math.max.apply(null, anzahl) || 1;
   const gesamtZahl = anzahl.reduce((a, v) => a + v, 0);
@@ -4462,6 +4614,9 @@ function verteilungSvg(sub, sem, breite, hoehe, fertig){
    richtet sich immer nach der Einstellung im Fach, damit auf dem Ausdruck
    nichts behauptet wird, was nicht stimmt. */
 function zaehltText(sub, cat){
+  if(gewichtNull(sub, cat) && !istBonusCat(sub, cat)){
+    return "auf " + (isProzentMode(sub) ? "0 % Anteil" : "Faktor \u00d70,0") + " gestellt, zählt damit nicht in den Notenschnitt";
+  }
   if(!istStufenCat(sub, cat)) return "wird benotet";
   if(istBonusCat(sub, cat)){
     const liste = stufenListe(sub, cat).map((t, i) => {
@@ -4539,7 +4694,12 @@ function semesterZeile(sub, studentId){
   const s2 = computeSchnitt(sub, studentId, 2);
   const ges = computeSchnitt(sub, studentId, "alle");
   const zeig = v => v === null ? "keine Note" : fmtO(v);
-  return `<div class="pr-note" style="margin-top:2mm;">1. Semester ${zeig(s1)} &middot; 2. Semester ${zeig(s2)} &middot; ganzes Jahr ${zeig(ges)}</div>`;
+  /* Das ganze Jahr ist nicht das Mittel der beiden Semesternoten, sondern
+     wird aus allen Leistungen beider Semester zusammen gerechnet. Das ist
+     ein Unterschied, sobald in einem Semester mehr Leistungen vorliegen,
+     und es gehört dazugeschrieben, statt dass es jemand nachrechnet. */
+  return `<div class="pr-note" style="margin-top:2mm;">1. Semester ${zeig(s1)} &middot; 2. Semester ${zeig(s2)} &middot; ganzes Jahr ${zeig(ges)}<br>
+    <span style="font-size:8pt;">Das ganze Jahr ist aus allen Leistungen beider Semester gerechnet, nicht als Mittel der beiden Semesterwerte.</span></div>`;
 }
 
 function noteTabelle(sub, studentId){
@@ -4649,7 +4809,10 @@ function blattSchueler(cls, s){
      dieser Klasse Niveaus führt. In einer Klasse aus lauter Nebenfächern
      wäre die Angabe sinnlos. */
   const niveauRelevant = (cls.subjects || []).some(f => hatNiveaus(f));
-  const niveau = (cls.stufe === 1 || !niveauRelevant) ? "" : " &middot; " + NIVEAU_LABELS[s.niveau];
+  /* Auf dem Blatt über alle Fächer gilt der Name des ersten Fachs, das
+     Niveaus führt. Mehrere Namen nebeneinander wären im Kopf nicht lesbar. */
+  const niveauFach = (cls.subjects || []).find(f => hatNiveaus(f));
+  const niveau = (cls.stufe === 1 || !niveauRelevant) ? "" : " &middot; " + esc(niveauLabel(niveauFach, s.niveau));
   return `<div class="pr-page">
     <div class="pr-head">
       <div>
@@ -4684,13 +4847,13 @@ function blattArbeit(cls, sub, cat, kennung){
 
   const zeilen = mitNote.map(x => `<tr>
       <td>${esc(x.s.name)}</td>
-      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(NIVEAU_LABELS[x.s.niveau])}</td>
+      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(niveauLabel(sub, x.s.niveau))}</td>
       <td>${esc(x.e.basis || "")}</td>
       <td style="text-align:center; font-weight:bold;">${x.e.value}</td>
     </tr>`).join("") +
     ohneNote.map(x => `<tr>
       <td>${esc(x.s.name)}</td>
-      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(NIVEAU_LABELS[x.s.niveau])}</td>
+      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(niveauLabel(sub, x.s.niveau))}</td>
       <td>${esc(fehltText(sub, x.e.cat))}</td>
       <td style="text-align:center;">&ndash;</td>
     </tr>`).join("");
@@ -4799,7 +4962,7 @@ function blattKlasse(cls, sub){
   const klassenschnitt = avgs.length ? avgs.reduce((a,b) => a+b, 0) / avgs.length : null;
   const zeilen = je.map(p => `<tr>
       <td>${esc(p.s.name)}</td>
-      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(NIVEAU_LABELS[p.s.niveau])}</td>
+      <td>${(cls.stufe === 1 || !hatNiveaus(sub)) ? "&ndash;" : esc(niveauLabel(sub, p.s.niveau))}</td>
       <td style="text-align:center;">${p.pos}</td>
       <td style="text-align:center;">${p.neg}</td>
       <td style="text-align:center; font-weight:bold;">${fmt(p.schnitt)}</td>
@@ -5367,8 +5530,23 @@ function renderSettingsDetail(){
   const prozent = isProzentMode(sub);
   const cats = activeCats(sub);
 
-  const tplOpts = Object.keys(SUBJECT_TEMPLATES).map(k =>
+  /* Wer die Gewichtung ändert, bekommt sub.template = "eigen". Ohne eigenen
+     Eintrag stünde die Liste dann auf der ersten Vorlage, und ein Tipp auf
+     "Vorlage anwenden" überschriebe die eigene Einstellung mit etwas, das
+     man nie ausgewählt hat. */
+  const eigeneVorlage = !SUBJECT_TEMPLATES[sub.template];
+  const tplOpts = (eigeneVorlage
+      ? `<option value="eigen" selected>Eigene Einstellung</option>`
+      : "")
+    + vorlagenKeysFuer(sub).map(k =>
     `<option value="${k}" ${sub.template === k ? "selected" : ""}>${SUBJECT_TEMPLATES[k].label}</option>`).join("");
+  /* Auch hier gehört die Erklärung dazu. Wer eine Vorlage anwendet, ohne zu
+     wissen, was sie enthält, stellt danach seine Gewichtung neu ein. */
+  const tplNotesEin = (eigeneVorlage
+      ? `<div id="tplNoteEin_eigen" style="display:block;">Die Gewichtung dieses Fachs haben Sie selbst eingestellt. Eine Vorlage anzuwenden überschreibt sie.</div>`
+      : "")
+    + vorlagenKeysFuer(sub).map(k =>
+    `<div id="tplNoteEin_${k}" style="display:${sub.template === k ? "block" : "none"};">${SUBJECT_TEMPLATES[k].note}</div>`).join("");
 
   const stufeChips = [[1,"1. Klasse"],[2,"2. bis 4. Klasse"]].map(([k,lbl]) => {
     const active = (cls.stufe || 2) === k;
@@ -5379,10 +5557,18 @@ function renderSettingsDetail(){
   const catToggles = allCatKeys(sub).map(k => {
     const c = catCol(sub, k);
     const on = cats.indexOf(k) !== -1;
-    return `<label class="comp-check" style="padding:8px 0;">
-      <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCat('${k}', this.checked)">
-      <span class="catdot" style="background:${c.fg};"></span> ${catLabel(sub,k)}
-    </label>`;
+    const eigen = isCustomCat(k);
+    return `<div style="padding:6px 0; border-bottom:1px solid #E4E2DC;">
+      <label class="comp-check" style="padding:2px 0;">
+        <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCat('${k}', this.checked)">
+        <span class="catdot" style="background:${c.fg};"></span> ${esc(catLabel(sub,k))}
+      </label>
+      ${(on && !eigen) ? `<div style="display:flex; gap:6px; align-items:center; padding:4px 0 0 26px;">
+        <span style="font-size:11px;">heißt bei Ihnen</span>
+        <input type="text" value="${esc(catLabel(sub, k))}" style="margin-bottom:0; flex:1; min-width:110px;"
+               onchange="setCatName('${k}', this.value)">
+      </div>` : ""}
+    </div>`;
   }).join("");
 
   const modeChips = [["multiplikator","Faktor je Note"],["prozent","Anteil in Prozent"]].map(([k,lbl]) => {
@@ -5524,14 +5710,17 @@ function renderSettingsDetail(){
 
     <div class="label" style="border-top:2px solid #000;">BEWERTUNGSVORLAGE</div>
     <div style="padding:0 16px;">
-      <select id="tplSelect">${tplOpts}</select>
+      <select id="tplSelect" onchange="tplNotizZeigen(this.value)">${tplOpts}</select>
+    </div>
+    <div class="helptext" style="padding-bottom:6px;">${tplNotesEin}</div>
+    <div style="padding:0 16px;">
       <button onclick="reapplyTemplate()">Vorlage anwenden</button>
     </div>
     <div class="helptext">Setzt Kategorien und Gewichtung neu. Eingetragene Noten bleiben erhalten.</div>
 
     <div class="label" style="border-top:2px solid #000;">NOTENSCHLÜSSEL</div>
-    <div class="chips">${stufeChips}</div>
-    <div class="helptext">Die Schulstufe gilt für die ganze Klasse ${cls.name}.</div>
+    ${IST_FREI ? "" : `<div class="chips">${stufeChips}</div>
+    <div class="helptext">Die Schulstufe gilt für die ganze Klasse ${esc(cls.name)}.</div>`}
 
     ${(cls.stufe || 2) === 1 ? "" : `
     <div class="feinbereich" style="border-top:none;">
@@ -5539,16 +5728,30 @@ function renderSettingsDetail(){
         <input type="checkbox" ${hatNiveaus(sub) ? "checked" : ""} onchange="setNiveaus(this.checked)">
         <span>Leistungsniveaus in diesem Fach führen</span>
       </label>
+      ${hatNiveaus(sub) ? `
+      <div style="padding:6px 0 2px;">
+        <div style="font-size:11px; font-weight:bold; padding-bottom:4px;">Wie die beiden Niveaus bei Ihnen heißen</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input type="text" value="${esc(niveauLabel(sub, "ahs"))}" style="margin-bottom:0; flex:1; min-width:120px;"
+                 onchange="setNiveauName(0, this.value)">
+          <input type="text" value="${esc(niveauLabel(sub, "standard"))}" style="margin-bottom:0; flex:1; min-width:120px;"
+                 onchange="setNiveauName(1, this.value)">
+        </div>
+        ${hatEigeneNiveauNamen(sub)
+          ? '<button class="ghost" style="margin-top:6px;" onclick="niveauNamenZuruecksetzen()">Wieder die Vorgabe verwenden</button>'
+          : ""}
+      </div>` : ""}
       <div class="helptext" style="padding:4px 0 0;">${IST_FREI
-        ? "Zwei Leistungsniveaus nebeneinander, jedes mit eigenem Schlüssel. Braucht nur, wer in diesem Fach nach Niveaus differenziert. In Österreich ist das in Deutsch, Mathematik und Englisch der Fall."
-        : "Die beiden Niveaus gibt es nur in den Hauptgegenständen, also in Deutsch, Mathematik und Englisch. In den theoretischen und praktischen Nebengegenständen gibt es sie nicht; dort gilt <b>ein</b> Schlüssel für alle."}
+        ? "Zwei Niveaus nebeneinander, jedes mit eigenem Notenschlüssel. Das braucht nur, wer in diesem Fach nach Niveaus differenziert. Die Namen können Sie frei wählen, zum Beispiel Grundkurs und Leistungskurs."
+        : "Die beiden Niveaus gibt es nur in den Hauptgegenständen, also in Deutsch, Mathematik und Englisch. In den theoretischen und praktischen Nebengegenständen gibt es sie nicht; dort gilt <b>ein</b> Schlüssel für alle. An einer höheren Schule können Sie sie umbenennen."}
         Ausgeschaltet verschwindet die Niveau-Auswahl bei den Schüler:innen und auf den Blättern.</div>
     </div>`}
     ${schluesselBereich(cls, sub)}
     ${schluesselEditor(cls, sub)}
 
     <div class="label" style="border-top:2px solid #000;">KATEGORIEN</div>
-    <div class="helptext">Nur angehakte Kategorien erscheinen bei der Notenvergabe.</div>
+    <div class="helptext">Nur angehakte Kategorien erscheinen bei der Notenvergabe.${cats.length ? "" :
+      ' <b style="color:#B3241C;">Gerade ist keine einzige eingeschaltet. Solange das so bleibt, lässt sich in diesem Fach nichts eintragen.</b>'}</div>
     <div style="padding:0 16px 8px;">${catToggles}</div>
 
     <div class="label" style="border-top:2px solid #000;">BENOTET ODER NUR VERMERKT</div>
@@ -5668,7 +5871,20 @@ function reapplyTemplate(){
   if(!sel) return;
   const t = SUBJECT_TEMPLATES[sel.value];
   if(!t) return;
-  if(!confirm("Vorlage " + t.label + " anwenden? Kategorien und Gewichtung werden überschrieben, eingetragene Noten bleiben erhalten.")) return;
+  /* Welche Noten durch die neue Kategorienliste aus der Rechnung fallen.
+     Das ist der Punkt, an dem ein Schnitt ohne Vorwarnung verschwindet. */
+  const kuenftig = (t.cats || []).concat((t.customCats || []).map(c => c.key));
+  const verlieren = {};
+  sub.entries.forEach(e => {
+    if(e.type !== "note") return;
+    if(kuenftig.indexOf(e.cat) === -1) verlieren[e.cat] = (verlieren[e.cat] || 0) + 1;
+  });
+  const namen = Object.keys(verlieren).map(k => verlieren[k] + "\u00d7 " + catLabel(sub, k));
+  const warnung = namen.length
+    ? "\n\nACHTUNG: Diese Beurteilungsarten sind in der Vorlage nicht enthalten und zählen danach nicht mehr in den Notenschnitt:\n"
+      + namen.join("\n") + "\n\nDie Einträge bleiben erhalten und lassen sich über die Kategorien wieder einschalten."
+    : "";
+  if(!confirm("Vorlage " + t.label + " anwenden? Kategorien und Gewichtung werden überschrieben, eingetragene Noten bleiben erhalten." + warnung)) return;
   applyTemplate(sub, sel.value);
   save();
   render();
@@ -5740,6 +5956,50 @@ function setStufeZaehlt(cat, an){
 /* Leistungsniveaus für dieses Fach ein- oder ausschalten. Eingetragene
    Noten bleiben; was sich ändert, ist der Schlüssel für neue Eingaben und
    was auf den Blättern steht. */
+/* Zeigt die Beschreibung der gerade gewählten Vorlage. Ohne Neuzeichnen,
+   damit die Auswahl in der Liste stehen bleibt. */
+function tplNotizZeigen(key){
+  vorlagenKeys().concat([key, "eigen"]).forEach(k => {
+    const el = document.getElementById("tplNoteEin_" + k);
+    if(el) el.style.display = (k === key) ? "block" : "none";
+  });
+}
+
+/* Namen der Niveaus je Fach. Nur die Beschriftung ändert sich, die
+   gespeicherten Werte bleiben "ahs" und "standard". Eingetragene Noten sind
+   davon nicht berührt. */
+/* Eine eingebaute Beurteilungsart umbenennen. Ein leerer Text stellt die
+   ursprüngliche Bezeichnung wieder her. */
+function setCatName(key, wert){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  const text = String(wert || "").trim().slice(0, 40);
+  if(!sub.catNamen) sub.catNamen = {};
+  if(!text || text === CAT_LABELS[key]) delete sub.catNamen[key];
+  else sub.catNamen[key] = text;
+  if(!Object.keys(sub.catNamen).length) delete sub.catNamen;
+  save();
+  render();
+}
+
+function setNiveauName(index, wert){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  if(!Array.isArray(sub.niveauNamen)) sub.niveauNamen = ["", ""];
+  sub.niveauNamen[index] = String(wert || "").trim().slice(0, 40);
+  if(!sub.niveauNamen.some(n => n)) delete sub.niveauNamen;
+  save();
+  render();
+}
+
+function niveauNamenZuruecksetzen(){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  delete sub.niveauNamen;
+  save();
+  render();
+}
+
 function setNiveaus(an){
   const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
   if(!sub) return;
@@ -5774,14 +6034,25 @@ function schluesselWerte(sub, key){
   return [t[0][0], t[1][0], t[2][0], t[3][0]];
 }
 
+/* Unter welchem Namen ein eingestellter Schlüssel abgelegt wird. Gibt es
+   nur eine Spalte, gilt er für alles: sonst wäre er weg, sobald jemand die
+   Schulstufe umstellt oder die Leistungsniveaus einschaltet, und die App
+   würde kommentarlos wieder mit der Vorgabe rechnen. */
+function schluesselSlot(sub, key){
+  const cls = getClass(settingsView.classId);
+  const spalten = cls ? schluesselSpalten(cls, sub) : [];
+  return spalten.length > 1 ? key : "alle";
+}
+
 function setSchluesselWert(key, index, wert){
   const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
   if(!sub) return;
   if(!sub.schluessel) sub.schluessel = {};
+  const slot = schluesselSlot(sub, key);
   const aktuell = schluesselWerte(sub, key).slice();
   const zahl = parseFloat(String(wert).replace(/,/g, "."));
   aktuell[index] = isNaN(zahl) ? aktuell[index] : zahl;
-  sub.schluessel[key] = aktuell;
+  sub.schluessel[slot] = aktuell;
   /* Ungültiges wird angenommen und angezeigt, aber nicht gerechnet:
      wer 90/77/64/51 auf 90/77/77/51 ändert, soll die Zahl korrigieren
      können, ohne dass die App den ganzen Schlüssel wegwirft. */
@@ -5801,14 +6072,14 @@ function schluesselZuruecksetzen(){
 /* Der Editor. Eine Spalte je Niveau, vier Zahlen je Spalte. */
 function schluesselEditor(cls, sub){
   const spalten = schluesselSpalten(cls, sub);
-  const eigen = hatEigenenSchluessel(sub);
+  const eigen = hatEigenenSchluessel(sub, cls);
   const kopf = `
     <div class="label" style="border-top:2px solid #000;">EIGENER NOTENSCHLÜSSEL</div>
     <div class="helptext">
       ${eigen
         ? "Dieses Fach rechnet mit <b>deinem eigenen</b> Schlüssel. Die Tabelle oben zeigt ihn."
         : (IST_FREI
-            ? "Dieses Fach rechnet noch mit einem <b>Ausgangswert</b> (90 / 77 / 64 / 51 %). <b>Bitte auf die Prozentsätze deiner Schule umstellen</b>, bevor du benotest."
+            ? "Dieses Fach rechnet noch mit einem <b>Ausgangswert</b> (" + schluesselWerte(sub, spalten[0][0]).map(fmtPct).join(" / ") + " %). <b>Bitte auf die Prozentsätze deiner Schule umstellen</b>, bevor du benotest."
             : "Dieses Fach rechnet mit der <b>Vorgabe</b> für die österreichische Mittelschule.")}
       ${IST_FREI
         ? "Jede Schule und jedes Fach kann eigene Prozentsätze haben. Hier stellst du sie je Fach ein."
@@ -5910,7 +6181,17 @@ function setStufenAnzahl(cat, richtung){
   const liste = stufenListe(sub, cat).slice();
   if(richtung > 0){
     if(liste.length >= 5){ alert("Mehr als fünf Stufen werden beim Eintragen unübersichtlich."); return; }
-    liste.splice(liste.length - 1, 0, "neue Stufe");
+    /* Die neue Stufe kommt vor die letzte. Einträge, die auf der letzten
+       Stufe standen, müssen mitrücken, sonst bedeutet derselbe Eintrag
+       plötzlich "neue Stufe" statt "nicht gemacht". */
+    const letzteVorher = liste.length - 1;
+    liste.splice(letzteVorher, 0, "neue Stufe");
+    sub.entries.forEach(e => {
+      if(e.type === "stufe" && e.cat === cat && e.stufe >= letzteVorher){
+        e.stufe = e.stufe + 1;
+        e.label = liste[e.stufe];
+      }
+    });
   } else {
     if(liste.length <= 2){ alert("Weniger als zwei Stufen ergeben keine Auswahl."); return; }
     const letzte = liste.length - 1;
@@ -5919,6 +6200,7 @@ function setStufenAnzahl(cat, richtung){
     liste.splice(letzte - 1, 1);
     sub.entries.forEach(e => {
       if(e.type === "stufe" && e.cat === cat && e.stufe >= liste.length) e.stufe = liste.length - 1;
+      if(e.type === "stufe" && e.cat === cat) e.label = liste[e.stufe];
     });
   }
   sub.stufenTexte[cat] = liste;

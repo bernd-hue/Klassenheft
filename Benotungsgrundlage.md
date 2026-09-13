@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.3 — alles zur Durchsicht
+# Klassenheft, Version 17.6 — alles zur Durchsicht
 
 Stand 08.09.2026. Dieses Blatt listet auf, **was die App als Grundlage für die Note heranzieht**, und wo du überall eingreifen kannst.
 
@@ -98,6 +98,28 @@ Er wird lediglich festgehalten und getrennt ausgewiesen, damit nachvollziehbar i
 Davon zu unterscheiden ist die **unterste Stufe** (*nicht gemacht*, *keine Mitarbeit*). Das ist eine Beurteilung und wirkt auch so — je nach Einstellung als Bonus oder als eigener Anteil.
 
 Dieser Unterschied gilt in **jeder** Kategorie, benotet wie unbenotet.
+
+### 4.3b Wie die Jahresnote entsteht
+
+Die App zeigt drei Werte: 1. Semester, 2. Semester und ganzes Jahr.
+
+**Das ganze Jahr ist nicht das Mittel der beiden Semesterwerte.** Es wird aus **allen Leistungen beider Semester zusammen** gerechnet, nach denselben Regeln wie ein einzelnes Semester.
+
+Beispiel aus der Simulation:
+
+| | 1. Semester | 2. Semester | ganzes Jahr |
+|---|---|---|---|
+| Schularbeiten | 5, 5 | 4 | 5, 5, 4 |
+| Schnitt | 5,0 | 4,0 | 4,67 |
+| mit Bonus | 5,0 | 4,0 | **4,8** |
+
+Das Mittel der beiden Semesterwerte wäre 4,5, die App rechnet 4,8. Der Unterschied entsteht, weil im ersten Semester zwei Schularbeiten vorliegen und im zweiten nur eine: bei der Jahresrechnung zählen beide Fünfer einzeln mit.
+
+**Das ist so gewollt.** Jede einzelne Leistung zählt gleich viel, unabhängig davon, in welchem Semester sie erbracht wurde. Wer im ersten Semester dreimal geprüft wurde und im zweiten einmal, bekommt keine künstliche Aufwertung des einzelnen zweiten Ergebnisses.
+
+Über beide Simulationen hinweg: bei 300 verglichenen Fällen lag der größte Unterschied zwischen beiden Rechenwegen bei **0,34**, und in **17 Fällen** ergab sich eine andere gerundete Note.
+
+**Die Jahresnote der App ist ein Rechenwert, keine Zeugnisnote.** Die Zeugnisnote setzt die Lehrkraft, und sie darf und soll dabei die Entwicklung über das Jahr berücksichtigen. Alle drei Werte stehen nebeneinander, damit diese Entscheidung auf einer sichtbaren Grundlage getroffen wird.
 
 ### 4.4 Direkt
 
