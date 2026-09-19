@@ -198,6 +198,12 @@
   .pr-chart svg{width:100%; height:auto; display:block;}
   .pr-chart .chart-hinweis{font-size:8pt; padding-top:1mm;}
   .pr-note{font-size:9pt; margin-top:4mm;}
+  /* Fotos im Anhang: zwei je Zeile, damit eine Schularbeit lesbar bleibt
+     und trotzdem nicht jedes Bild eine eigene Seite braucht. */
+  .pr-fotos{display:flex; flex-wrap:wrap; gap:4mm; margin-top:3mm;}
+  .pr-foto{width:calc(50% - 2mm); page-break-inside:avoid; border:1px solid #000000; padding:2mm;}
+  .pr-foto img{width:100%; height:auto; display:block;}
+  .pr-foto .bu{font-size:8pt; margin-top:1.5mm;}
   .pr-sign{margin-top:12mm; display:flex; gap:12mm; font-size:9pt;}
   .pr-sign div{flex:1; border-top:1px solid #000000; padding-top:1.5mm;}
   @media print{
@@ -250,7 +256,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.6";
+const APP_FASSUNG = "17.7";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -609,6 +615,127 @@ function noteFromFehler(fehler, key){
   const tbl = DIKTAT_KEYS[key] || DIKTAT_KEYS.ahs;
   for(let i = 0; i < tbl.length; i++){ if(fehler <= tbl[i][0]) return tbl[i][1]; }
   return 5;
+}
+
+/* ---------- NOTEN AUS DER GRUNDLAGE NEU ABLEITEN ----------
+   Eine Note aus Punkten oder Prozent ist keine freie Entscheidung, sondern
+   das Ergebnis aus Leistung und Notenschlüssel. Ändert sich der Schlüssel,
+   weil jemand das Leistungsniveau wechselt, muss die Note mitgehen, sonst
+   stünden im selben Fach zwei verschiedene Maßstäbe nebeneinander.
+
+   Dafür braucht es die Leistung als Zahl. Neue Einträge führen sie in
+   `pct` beziehungsweise `fz` mit. Für Einträge aus früheren Fassungen wird
+   sie aus dem Text der Grundlage gelesen, der schon immer mitgespeichert
+   wurde ("33 von 40 Punkten, 82,5 %").
+
+   Ausdrücklich NICHT betroffen: alles, was die Lehrkraft selbst vergeben
+   hat. Eine angetippte Note, eine Einstufung der Mitarbeit, ein
+   Kompetenz-Check. Diese Urteile gehören der Lehrkraft und werden von
+   keiner Umstellung angefasst. */
+
+function zahlAusText(t){
+  const z = Number(String(t).replace(/\./g, "").replace(",", "."));
+  return isNaN(z) ? null : z;
+}
+
+/* Liefert die Rechengrundlage eines Noteneintrags, wenn es eine gibt. */
+function basisWerte(e){
+  if(!e || e.type !== "note") return { pct: null, fz: null };
+  if(typeof e.pct === "number" && !isNaN(e.pct)) return { pct: e.pct, fz: null };
+  if(typeof e.fz === "number" && !isNaN(e.fz)) return { pct: null, fz: e.fz };
+  const b = String(e.basis || "");
+  if(!b) return { pct: null, fz: null };
+  /* Punkte zuerst: daraus lässt sich der Prozentwert exakt herstellen,
+     während die Prozentangabe im Text auf eine Stelle gerundet ist. */
+  const punkte = b.match(/^([\d.,]+)\s+von\s+([\d.,]+)\s+Punkten/i);
+  if(punkte){
+    const a = zahlAusText(punkte[1]), m = zahlAusText(punkte[2]);
+    if(a !== null && m !== null && m > 0) return { pct: (a / m) * 100, fz: null };
+  }
+  const fehler = b.match(/^([\d.,]+)\s+Fehler/i);
+  if(fehler){
+    const f = zahlAusText(fehler[1]);
+    if(f !== null) return { pct: null, fz: f };
+  }
+  const prozent = b.match(/^([\d.,]+)\s*%/);
+  if(prozent){
+    const p = zahlAusText(prozent[1]);
+    if(p !== null) return { pct: p, fz: null };
+  }
+  return { pct: null, fz: null };
+}
+
+/* Hängt die Note dieses Eintrags am Notenschlüssel? Nur dann darf sie
+   sich mit dem Schlüssel ändern. */
+function haengtAmSchluessel(sub, e){
+  if(!e || e.type !== "note") return false;
+  if(!hasSchluessel(e.cat)) return false;
+  if(istStufenCat(sub, e.cat)) return false;
+  const b = basisWerte(e);
+  return b.pct !== null || b.fz !== null;
+}
+
+/* Welche Note ergäbe dieser Eintrag mit dem angegebenen Schlüssel? */
+function noteMitSchluessel(sub, e, key){
+  const b = basisWerte(e);
+  if(e.cat === "diktat") return b.fz === null ? null : noteFromFehler(b.fz, key);
+  return b.pct === null ? null : noteFromProzent(b.pct, key, sub);
+}
+
+/* Alle Einträge einer Klasse, deren Note sich ändern würde, wenn für
+   diese Person statt `altKey` künftig `neuKey` gilt. Wird sowohl für die
+   Vorschau als auch für das Umstellen selbst verwendet, damit angekündigt
+   und ausgeführt nie auseinanderlaufen können. */
+function schluesselFolgen(cls, student, faecher, neuNiveau){
+  return schluesselFolgenKern(cls, faecher || cls.subjects,
+    (sub, s) => schluesselKey(cls, s, sub),
+    (sub, s) => schluesselKey(cls, { niveau: (s.id === student.id) ? neuNiveau : s.niveau }, sub),
+    s => s.id === student.id);
+}
+
+/* Gemeinsamer Kern: vergleicht für jede betroffene Person und jedes Fach
+   den bisherigen mit dem künftigen Schlüssel und sammelt die Noten, die
+   sich dadurch ändern würden. */
+function schluesselFolgenKern(cls, faecher, altKeyFn, neuKeyFn, gilt){
+  const treffer = [];
+  (faecher || []).forEach(sub => {
+    (cls.students || []).forEach(s => {
+      if(gilt && !gilt(s)) return;
+      const altKey = altKeyFn(sub, s);
+      const neuKey = neuKeyFn(sub, s);
+      if(altKey === neuKey) return;
+      sub.entries.forEach(e => {
+        if(e.studentId !== s.id) return;
+        if(!haengtAmSchluessel(sub, e)) return;
+        const neu = noteMitSchluessel(sub, e, neuKey);
+        if(neu === null || neu === e.value) return;
+        treffer.push({ sub: sub, s: s, e: e, alt: e.value, neu: neu });
+      });
+    });
+  });
+  return treffer;
+}
+
+/* Fragt nach, wenn eine Einstellung bereits vergebene Noten verändern
+   würde. Liefert true, wenn weitergemacht werden darf. */
+function folgenBestaetigen(treffer, titel){
+  if(!treffer.length) return true;
+  const zeilen = treffer.slice(0, 12).map(t =>
+    "  " + (t.s ? t.s.name + " · " : "") + t.sub.fach + " · " + catLabel(t.sub, t.e.cat)
+    + (t.e.basis ? " (" + t.e.basis + ")" : "")
+    + ": " + t.alt + " wird " + t.neu);
+  return confirm(titel + "\n\n"
+    + "Damit gilt ein anderer Notenschlüssel. " + treffer.length
+    + (treffer.length === 1 ? " bereits eingetragene Note ändert sich:" : " bereits eingetragene Noten ändern sich:") + "\n\n"
+    + zeilen.join("\n")
+    + (treffer.length > 12 ? "\n  … und " + (treffer.length - 12) + " weitere" : "")
+    + "\n\nMitarbeit, Hausübung und selbst vergebene Noten bleiben unverändert.");
+}
+
+/* Setzt um, was schluesselFolgen angekündigt hat. */
+function schluesselFolgenAnwenden(treffer){
+  treffer.forEach(t => { t.e.value = t.neu; });
+  return treffer.length;
 }
 
 /* ---------- EIGENER NOTENSCHLÜSSEL JE FACH ----------
@@ -1147,6 +1274,7 @@ function normaliseClass(cls){
     if(typeof s.photo !== "string") s.photo = null;
     if(typeof s.updatedAt !== "number") s.updatedAt = 0;
   });
+  studentenOrdnen(cls);
   if(!Array.isArray(cls.subjects)) cls.subjects = [];
   cls.subjects.forEach(sub => {
     if(!sub.id) sub.id = uid();
@@ -1222,16 +1350,68 @@ function normaliseClass(cls){
          Ältere Einträge ohne Stempel bekommen 0 und verlieren damit nie
          gegen eine neuere Fassung desselben Eintrags. */
       if(typeof e.ts !== "number") e.ts = 0;
-      /* Semester einmalig aus dem Datum ableiten, danach bleibt es fest */
-      if(e.sem !== 1 && e.sem !== 2) e.sem = semesterAusDatum(e.date);
+      /* Semester einmalig aus dem Datum ableiten, danach bleibt es fest.
+         Der Abschluss eines Zeitraums ist kein Leistungseintrag und behält
+         sein Kennzeichen. */
+      if(e.type !== "abschluss" && e.sem !== 1 && e.sem !== 2) e.sem = semesterAusDatum(e.date);
     });
+    /* Einträge chronologisch ablegen, nach Schuljahr gerechnet: September
+       zuerst, August zuletzt. Das ist die Reihenfolge, in der eine
+       Lehrkraft ihre Aufzeichnungen liest, und sie muss auch dann stimmen,
+       wenn Einträge von einem zweiten Gerät dazugekommen sind oder ein
+       Datum nachträglich ausgebessert wurde. */
+    sub.entries = nachDatum(sub.entries);
   });
   return cls;
 }
 
 /* Grundeinstellungen der App, unabhängig von den Klassen */
 function defaultSettings(){
-  return { lehrkraft: "", schuljahr: "", lastBackup: null, intervallTage: 7, geraet: "", semester: semesterHeute(), schrift: "normal" };
+  return { lehrkraft: "", schuljahr: "", lastBackup: null, intervallTage: 7, geraet: "", semester: semesterHeute(),
+           schrift: "normal", ordnung: "vorname", jahresGewicht: "gleich" };
+}
+
+/* ---------- REIHENFOLGE DER KLASSENLISTE ----------
+   Eine Klassenliste ist alphabetisch, sonst sucht man bei 32 Namen jedes
+   Mal. Ob nach Vor- oder Nachname geordnet wird, hängt davon ab, wie die
+   Namen eingetragen sind, und ist deshalb einstellbar.
+   "eingabe" lässt die Reihenfolge, wie sie ist. */
+function nachname(name){
+  const teile = String(name || "").trim().split(/\s+/);
+  return teile.length > 1 ? teile[teile.length - 1] : (teile[0] || "");
+}
+
+/* Die Einstellung wird auch beim Laden gebraucht, also bevor `state` steht.
+   Deshalb abgesichert statt direkt zugegriffen. */
+function ordnungsArt(){
+  try{ return (state && state.settings && state.settings.ordnung) || "vorname"; }
+  catch(e){ return "vorname"; }
+}
+
+function namenVergleich(a, b){
+  const art = ordnungsArt();
+  const A = String(a && a.name || ""), B = String(b && b.name || "");
+  if(art === "nachname"){
+    const v = nachname(A).localeCompare(nachname(B), "de", { sensitivity: "base" });
+    if(v !== 0) return v;
+  }
+  return A.localeCompare(B, "de", { sensitivity: "base", numeric: true });
+}
+
+/* Sortiert die Klassenliste, sofern nicht ausdrücklich die Reihenfolge der
+   Eingabe gewünscht ist. Die Einträge hängen an der Personen-Kennung, nie
+   an der Position, deshalb ist das Umsortieren folgenlos für die Noten. */
+function studentenOrdnen(cls){
+  if(!cls || !Array.isArray(cls.students)) return;
+  if(ordnungsArt() === "eingabe") return;
+  cls.students.sort(namenVergleich);
+}
+
+function setOrdnung(art){
+  state.settings.ordnung = (art === "nachname") ? "nachname" : (art === "eingabe" ? "eingabe" : "vorname");
+  state.classes.forEach(studentenOrdnen);
+  save();
+  render();
 }
 
 function normaliseSettings(s){
@@ -1365,6 +1545,8 @@ function speicherStand(){
   /* Die Obergrenze nennt kein Browser verlässlich. 5 MB ist der Wert, den
      iOS und Android in der Praxis anbieten; lieber vorsichtig rechnen. */
   const grenze = 5 * 1024 * 1024;
+  /* Zwei getrennte Zahlen: was im Datenspeicher liegt und was in der
+     Bilddatenbank. Nur der Datenspeicher ist eng. */
   let fotos = 0, fotoBytes = 0;
   state.classes.forEach(c => {
     c.students.forEach(s => { if(s.photo){ fotos++; fotoBytes += s.photo.length; } });
@@ -1372,11 +1554,14 @@ function speicherStand(){
       if(e.type === "foto" && e.dataUrl){ fotos++; fotoBytes += e.dataUrl.length; }
     }));
   });
+  const ausgelagert = (typeof fotoSpeicherBytes === "function") ? fotoSpeicherBytes() : { anzahl: 0, bytes: 0 };
   return {
     belegt: belegt, grenze: grenze,
     anteil: Math.min(100, (belegt * 100) / grenze),
     fotos: fotos, fotoBytes: fotoBytes,
-    fotoAnteil: belegt ? (fotoBytes * 100) / belegt : 0
+    fotoAnteil: belegt ? (fotoBytes * 100) / belegt : 0,
+    bilderAnzahl: ausgelagert.anzahl, bilderBytes: ausgelagert.bytes,
+    bilderAusgelagert: (typeof fotoBereit !== "undefined") && fotoBereit
   };
 }
 
@@ -1526,12 +1711,118 @@ function schnittOhneBonus(sub, studentId, sem){
 /* Der Notenschnitt, wie er überall angezeigt wird: mit Bonus, begrenzt auf
    die Skala von 1 bis 5. Ohne Noten gibt es keinen Schnitt und damit auch
    keinen Bonus, die Mitarbeit kann also nie allein stehen. */
-function computeSchnitt(sub, studentId, sem){
+/* Der reine Rechenwert aus den Leistungen, ohne Rücksicht darauf, ob ein
+   Zeitraum abgeschlossen ist. */
+function schnittBerechnet(sub, studentId, sem){
   const grund = schnittOhneBonus(sub, studentId, sem);
   if(grund === null) return null;
   const bonus = bonusSumme(sub, studentId, sem).wert;
   if(!bonus) return grund;
   return Math.max(1, Math.min(5, grund + bonus));
+}
+
+/* ---------- SEMESTER ABSCHLIESSEN ----------
+   Der Rechenwert ist ein Vorschlag, die Note vergibt die Lehrkraft. Wird
+   ein Semester abgeschlossen, wird genau diese vergebene Note festgehalten
+   und gilt ab da für diesen Zeitraum.
+
+   Für den Jahreswert hat das eine Folge, die der eigentliche Zweck ist:
+   Ist das 1. Semester abgeschlossen, wird das Jahr nicht mehr aus allen
+   Einzelleistungen beider Semester gerechnet, sondern aus der vergebenen
+   Semesternote und dem 2. Semester. Das 2. Semester beginnt damit bei
+   null, und die Note des 1. Semesters steht fest, statt sich mit jeder
+   neuen Schularbeit noch einmal zu verschieben.
+
+   Ein Abschluss ist jederzeit aufhebbar. Er löscht nichts: alle Einträge
+   bleiben, der Rechenwert steht weiterhin daneben. */
+
+function abschlussEintrag(sub, studentId, zeitraum){
+  if(!sub || !Array.isArray(sub.entries)) return null;
+  const z = String(zeitraum);
+  return sub.entries.find(e => e.type === "abschluss"
+    && e.studentId === studentId && String(e.zeitraum) === z) || null;
+}
+
+function abschlussNote(sub, studentId, zeitraum){
+  const e = abschlussEintrag(sub, studentId, zeitraum);
+  return e && typeof e.value === "number" ? e.value : null;
+}
+
+/* Wie viel das 2. Semester im Jahreswert wiegt, wenn das 1. abgeschlossen
+   ist. Vorgabe: beide gleich. Das ist eine pädagogische Entscheidung und
+   deshalb einstellbar, nicht fest verdrahtet. */
+function jahresGewicht(){
+  try{ return (state && state.settings && state.settings.jahresGewicht === "zweites") ? 2 : 1; }
+  catch(e){ return 1; }
+}
+
+/* Der Jahreswert, wenn das 1. Semester abgeschlossen ist. Gibt null
+   zurück, wenn kein Abschluss vorliegt; dann gilt weiter die Rechnung aus
+   allen Leistungen beider Semester. */
+function jahresWertAusAbschluss(sub, studentId){
+  const n1 = abschlussNote(sub, studentId, 1);
+  if(n1 === null) return null;
+  const w2 = (abschlussNote(sub, studentId, 2) !== null)
+    ? abschlussNote(sub, studentId, 2)
+    : schnittBerechnet(sub, studentId, 2);
+  if(w2 === null) return n1;
+  const g = jahresGewicht();
+  return (n1 + w2 * g) / (1 + g);
+}
+
+function computeSchnitt(sub, studentId, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  const fest = abschlussNote(sub, studentId, z);
+  if(fest !== null) return fest;
+  if(z === "alle"){
+    const ausAbschluss = jahresWertAusAbschluss(sub, studentId);
+    if(ausAbschluss !== null) return ausAbschluss;
+  }
+  return schnittBerechnet(sub, studentId, z);
+}
+
+/* Erklärt in einem Satz, woher der angezeigte Wert kommt. */
+function schnittHerkunft(sub, studentId, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  const fest = abschlussNote(sub, studentId, z);
+  if(fest !== null){
+    const roh = schnittBerechnet(sub, studentId, z);
+    return { fest: true, note: fest, berechnet: roh,
+      text: (z === "alle" ? "Jahresnote" : SEM_LABELS[z] + ": Note") + " " + fest + " vergeben"
+        + (roh === null ? "" : ", Rechenwert " + fmtO(roh)) };
+  }
+  if(z === "alle" && abschlussNote(sub, studentId, 1) !== null){
+    const n1 = abschlussNote(sub, studentId, 1);
+    const w2 = schnittBerechnet(sub, studentId, 2);
+    return { fest: false, note: null, berechnet: computeSchnitt(sub, studentId, "alle"),
+      text: "aus Semesternote " + n1 + " und 2. Semester " + (w2 === null ? "noch keine Leistungen" : fmtO(w2))
+        + (jahresGewicht() === 2 ? " (2. Semester zählt doppelt)" : "") };
+  }
+  return { fest: false, note: null, berechnet: schnittBerechnet(sub, studentId, z), text: "" };
+}
+
+/* Setzt oder ändert den Abschluss eines Zeitraums. */
+function abschlussSetzen(sub, studentId, zeitraum, note){
+  const vorhanden = abschlussEintrag(sub, studentId, zeitraum);
+  const roh = schnittBerechnet(sub, studentId, zeitraum);
+  if(vorhanden){
+    vorhanden.value = note;
+    vorhanden.berechnet = roh;
+    vorhanden.ts = Date.now();
+    vorhanden.date = today();
+    return vorhanden;
+  }
+  const e = { id: uid(), studentId: studentId, type: "abschluss", zeitraum: String(zeitraum),
+    value: note, berechnet: roh, ts: Date.now(), date: today(),
+    sem: (String(zeitraum) === "1") ? 1 : 2 };
+  sub.entries.push(e);
+  return e;
+}
+
+function abschlussAufheben(sub, studentId, zeitraum){
+  const z = String(zeitraum);
+  sub.entries = sub.entries.filter(e =>
+    !(e.type === "abschluss" && e.studentId === studentId && String(e.zeitraum) === z));
 }
 
 function schnittAus(sub, notes){
@@ -1640,30 +1931,79 @@ function tendenzFarbe(v){
 let vorschauAus = [];
 
 function vorschauSchnitt(sub, studentId, sem){
-  if(!vorschauAus.length) return computeSchnitt(sub, studentId, sem);
+  /* Bewusst der Rechenwert: die Vorschau zeigt, was die Rechnung ergäbe,
+     nicht eine bereits vergebene Note. */
+  if(!vorschauAus.length) return schnittBerechnet(sub, studentId, sem);
   const kopie = JSON.parse(JSON.stringify(sub));
   kopie.cats = (kopie.cats || []).filter(k => vorschauAus.indexOf(k) === -1);
   kopie.stufenBonus = (kopie.stufenBonus || []).filter(k => vorschauAus.indexOf(k) === -1);
   kopie.stufenZaehlt = (kopie.stufenZaehlt || []).filter(k => vorschauAus.indexOf(k) === -1);
   kopie.entries = kopie.entries.filter(e => vorschauAus.indexOf(e.cat) === -1);
-  return computeSchnitt(kopie, studentId, sem);
+  return schnittBerechnet(kopie, studentId, sem);
 }
 
 /* Was käme heraus, wenn die Mitarbeit ab jetzt durchgehend die beste Stufe
    wäre? Genau der Satz, den man dem Kind sagen will. */
+/* ---------- WAS-WÄRE-WENN: DIE NÄCHSTE LEISTUNG ----------
+   Die häufigste Frage im Gespräch mit Eltern und Kindern ist nicht
+   "was wäre, wenn die Hausübung nicht zählte", sondern "was brauche ich
+   in der nächsten Schularbeit". Genau das rechnet dieser Teil.
+
+   Gerechnet wird mit einer gedachten zusätzlichen Leistung. Es wird
+   nichts gespeichert und nichts verändert: die Kopie des Fachs bekommt den
+   Eintrag nur für die Dauer der Rechnung. */
+function probeSchnitt(sub, studentId, sem, cat, wert){
+  const gedacht = { id: "__probe", studentId: studentId, type: "note", cat: cat,
+    value: wert, w: startWeight(sub, cat), ts: Date.now(),
+    sem: (sem === undefined || sem === "alle") ? semesterFuerNeu() : sem, date: today() };
+  const kopie = Object.assign({}, sub, { entries: sub.entries.concat([gedacht]) });
+  return schnittBerechnet(kopie, studentId, sem);
+}
+
+/* Für jede mitzählende Beurteilungsart: wohin der Schnitt geht, wenn die
+   nächste Leistung eine 1, 2, 3, 4 oder 5 wird. */
+function naechsteLeistung(sub, studentId, sem){
+  const jetzt = schnittBerechnet(sub, studentId, sem);
+  if(jetzt === null) return [];
+  return notenCats(sub).map(cat => ({
+    cat: cat,
+    label: catLabel(sub, cat),
+    werte: [1,2,3,4,5].map(v => probeSchnitt(sub, studentId, sem, cat, v))
+  })).filter(z => z.werte.some(v => v !== null));
+}
+
+/* Welche Note es in der nächsten Leistung dieser Art mindestens braucht,
+   damit der Schnitt noch auf die gewünschte Note gerundet wird. Gibt null
+   zurück, wenn das mit einer einzigen Leistung nicht mehr geht. */
+function nochNoetig(sub, studentId, sem, cat, ziel){
+  for(let v = 5; v >= 1; v--){
+    const s = probeSchnitt(sub, studentId, sem, cat, v);
+    if(s !== null && Math.round(s) <= ziel) return v;
+  }
+  return null;
+}
+
+/* Der Rahmen, in dem sich die Note mit einer weiteren Leistung noch
+   bewegen kann: bestenfalls eine 1, schlimmstenfalls eine 5. */
+function spielraum(sub, studentId, sem, cat){
+  const gut = probeSchnitt(sub, studentId, sem, cat, 1);
+  const schlecht = probeSchnitt(sub, studentId, sem, cat, 5);
+  if(gut === null || schlecht === null) return null;
+  return { gut: gut, schlecht: schlecht };
+}
+
 function bestenfalls(sub, studentId, sem){
   const bonusCats = activeCats(sub).filter(k => istBonusCat(sub, k));
   if(!bonusCats.length) return null;
   const grund = schnittOhneBonus(sub, studentId, sem);
   if(grund === null) return null;
-  const jetzt = computeSchnitt(sub, studentId, sem);
+  const jetzt = schnittBerechnet(sub, studentId, sem);
 
-  const kopie = JSON.parse(JSON.stringify(sub));
-  kopie.entries = kopie.entries.map(e => {
+  const kopie = Object.assign({}, sub, { entries: sub.entries.map(e => {
     if(e.type === "stufe" && bonusCats.indexOf(e.cat) !== -1) return Object.assign({}, e, { stufe: 0 });
     return e;
-  });
-  const best = computeSchnitt(kopie, studentId, sem);
+  }) });
+  const best = schnittBerechnet(kopie, studentId, sem);
   if(best === null || Math.abs(best - jetzt) < 0.005) return null;
   return { jetzt: jetzt, best: best, cats: bonusCats.map(k => catLabel(sub, k)) };
 }
@@ -2004,6 +2344,103 @@ function auffaellig(sub, studentId, sem){
   return gruende;
 }
 
+/* ---------- GUT DABEI ----------
+   Das Gegenstück zur Auffälligkeit. Wer verlässlich mitarbeitet, soll in
+   der Liste genauso sichtbar sein wie der, über den man reden muss. Sonst
+   fällt beim Durchsehen nur auf, was fehlt.
+
+   Entscheidend ist allein die Mitarbeit, nicht der Notenschnitt: Mitarbeit
+   ist unabhängig vom Leistungsniveau und von den Schularbeiten. */
+const GUT_ANTEIL = 0.7;       /* so viel Anteil guter Einstufungen */
+const GUT_MIN_STUFEN = 4;     /* so viele Einstufungen braucht es dafür */
+const GUT_NOTE = 1.75;        /* falls die Mitarbeit benotet statt eingestuft wird */
+
+function gutDabei(sub, studentId, sem){
+  /* Wer Aufmerksamkeit braucht, wird nicht gleichzeitig gelobt. */
+  if(auffaellig(sub, studentId, sem).length) return null;
+
+  let ergebnis = null;
+  activeCats(sub).forEach(cat => {
+    if(ergebnis) return;
+    if(istStufenCat(sub, cat)){
+      const liste = entriesOf(sub, studentId, sem).filter(e => e.type === "stufe" && e.cat === cat);
+      if(liste.length < GUT_MIN_STUFEN) return;
+      const anzahlStufen = stufenListe(sub, cat).length;
+      /* Als gut gilt die oberste Stufe, ab vier Stufen die obersten zwei.
+         Bei drei Stufen wäre die zweite schon die Mitte. */
+      const bisStufe = anzahlStufen >= 4 ? 1 : 0;
+      const gut = liste.filter(e => (e.stufe || 0) <= bisStufe).length;
+      if(gut / liste.length >= GUT_ANTEIL){
+        ergebnis = { text: catLabel(sub, cat) + ": " + gut + " von " + liste.length + " gut" };
+      }
+      return;
+    }
+    /* Wird die Mitarbeit benotet statt eingestuft, zählt ihr Schnitt. */
+    if(cat !== "mitarbeit") return;
+    const noten = entriesOf(sub, studentId, sem).filter(e => e.type === "note" && e.cat === cat);
+    if(noten.length < GUT_MIN_STUFEN) return;
+    const schnitt = noten.reduce((a, e) => a + e.value, 0) / noten.length;
+    if(schnitt <= GUT_NOTE){
+      ergebnis = { text: catLabel(sub, cat) + " " + fmt(schnitt) };
+    }
+  });
+  return ergebnis;
+}
+
+/* ---------- DIE BESTEN JE BEURTEILUNGSART ----------
+   Am Semesterende will man wissen, wer in der Mitarbeit vorn liegt, wer
+   bei den Kompetenzen und wer bei den Schularbeiten. Das ist nicht
+   dasselbe: gerade die Mitarbeit hängt nicht am Leistungsniveau und
+   nicht an der Schularbeitsnote.
+
+   Zwei Regeln halten die Auszeichnung ehrlich:
+   1. Es braucht mindestens BESTE_MIN Einträge in dieser Art, sonst gewinnt,
+      wer einmal da war.
+   2. Mindestens zwei Personen müssen genug Einträge haben, sonst gäbe es
+      keinen Vergleich, sondern nur eine einzige Person.
+   Gleichstand ist ausdrücklich erlaubt: dann tragen alle die Krone. */
+const BESTE_MIN = 3;
+
+function besteJeKategorie(cls, sub, sem){
+  if(!cls || !sub) return [];
+  const ergebnis = [];
+  activeCats(sub).forEach(cat => {
+    const stufig = istStufenCat(sub, cat);
+    const werte = [];
+    cls.students.forEach(s => {
+      const drin = entriesOf(sub, s.id, sem).filter(e =>
+        stufig ? (e.type === "stufe" && e.cat === cat) : (e.type === "note" && e.cat === cat));
+      if(drin.length < BESTE_MIN) return;
+      /* Kleiner ist besser, bei Noten wie bei Stufen. */
+      const summe = drin.reduce((a, e) => a + (stufig ? (e.stufe || 0) : e.value), 0);
+      werte.push({ s: s, wert: summe / drin.length, anzahl: drin.length });
+    });
+    if(werte.length < 2) return;
+    const bester = Math.min.apply(null, werte.map(x => x.wert));
+    const sieger = werte.filter(x => Math.abs(x.wert - bester) < 0.0001);
+    /* Sind alle gleich gut, zeichnet die Krone niemanden aus. */
+    if(sieger.length === werte.length) return;
+    ergebnis.push({ cat: cat, label: catLabel(sub, cat), stufig: stufig,
+      wert: bester, sieger: sieger.map(x => x.s), anzahl: werte.length });
+  });
+  return ergebnis;
+}
+
+/* Wer trägt in dieser Klasse eine Krone, und wofür. */
+function kronenFuer(cls, sub, studentId, sem){
+  return besteJeKategorie(cls, sub, sem)
+    .filter(b => b.sieger.some(s => s.id === studentId));
+}
+
+/* Eine kleine Krone als SVG. Bewusst kein Emoji: Emojis sehen auf jedem
+   Gerät anders aus und drucken oft gar nicht. */
+function kroneSvg(groesse, farbe){
+  const g = groesse || 14;
+  return `<svg width="${g}" height="${g}" viewBox="0 0 24 20" aria-hidden="true" style="flex-shrink:0;">
+    <path d="M2 17h20l1.5-12-6 4.5L12 2 6.5 9.5.5 5z" fill="${farbe || "#96650F"}" stroke="#000000" stroke-width="1.2" stroke-linejoin="round"/>
+  </svg>`;
+}
+
 /* Fasst die Klasse zusammen, für die Zeile über der Liste. */
 function auffaelligeDerKlasse(cls, sub, sem){
   return cls.students
@@ -2145,6 +2582,7 @@ function renderHome(){
   if(homeView.screen === "newEntry") return renderNewEntry();
   if(homeView.screen === "newNote") return renderNewNote();
   if(homeView.screen === "schnell") return renderSchnell();
+  if(homeView.screen === "abschluss") return renderAbschluss();
   return renderHomeList();
 }
 
@@ -2300,25 +2738,33 @@ function renderRoster(){
   if(!cls || !sub) return renderHomeList();
 
   const auffaellige = auffaelligeDerKlasse(cls, sub);
+  const besten = besteJeKategorie(cls, sub);
 
   const rows = cls.students.map(s => {
+    const kronen = besten.filter(b => b.sieger.some(x => x.id === s.id));
     const schnitt = computeSchnitt(sub, s.id);
     const bad = schnitt !== null && schnitt >= 4.0;
     const gruende = auffaellig(sub, s.id);
+    const gut = gruende.length ? null : gutDabei(sub, s.id);
     const niveau = (cls.stufe === 1 || !hatNiveaus(sub)) ? "" : `<div class="sub">${esc(niveauLabel(sub, s.niveau))}</div>`;
     /* Gedeckt, nicht grell: die Zeile bleibt lesbar, der Balken links
-       trägt die Auffälligkeit. Der Grund steht daneben in Worten, damit
-       die Farbe nicht der einzige Träger ist. */
+       trägt die Kennzeichnung. Der Grund steht daneben in Worten, damit
+       die Farbe nicht der einzige Träger ist. Das ist keine Spielerei:
+       Rot und Grün sind die zwei Farben, die ein Teil der Menschen nicht
+       auseinanderhält. */
     const markiert = gruende.length
-      ? "background:#FAF3E8; border-left:5px solid #96650F;"
-      : "";
+      ? "background:#FBECEA; border-left:5px solid #B3241C;"
+      : (gut ? "background:#EDF6EC; border-left:5px solid #2E7D32;" : "");
     const grundZeile = gruende.length
-      ? `<div class="sub" style="color:#7A5209;">${esc(gruende.map(g => g.text).join(" &middot; ").replace(/&middot;/g, "·"))}</div>`
-      : "";
+      ? `<div class="sub" style="color:#8E1C16;">${esc(gruende.map(g => g.text).join(" · "))}</div>`
+      : (gut ? `<div class="sub" style="color:#215E24;">${esc(gut.text)}</div>` : "");
     return `<div class="row" style="${markiert}" onclick="goHome('student',null,null,'${s.id}')">
       <div style="display:flex; align-items:center; gap:10px; min-width:0;">
         ${avatarHtml(s, true)}
-        <div style="min-width:0;"><div class="name" style="font-size:14px;">${esc(s.name)}</div>${niveau}${grundZeile}</div>
+        <div style="min-width:0;">
+          <div class="name" style="font-size:14px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">${esc(s.name)}${
+            kronen.map(b => kroneSvg(13)).join("")}</div>
+          ${kronen.length ? '<div class="sub" style="color:#7A5209;">Beste:r bei ' + esc(kronen.map(b => b.label).join(", ")) + "</div>" : ""}${niveau}${grundZeile}</div>
       </div>
       <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
         <span class="val ${bad ? "red" : ""}" style="font-size:15px; font-weight:bold; white-space:nowrap;">${fmtO(schnitt)}</span>
@@ -2327,12 +2773,30 @@ function renderRoster(){
     </div>`;
   }).join("");
 
-  const hinweisZeile = !auffaellige.length ? "" : `
-    <div style="padding:10px 16px; background:#FAF3E8; border-bottom:1px solid #000; border-left:5px solid #96650F;">
-      <div style="font-size:13px; font-weight:bold; color:#7A5209;">${auffaellige.length} ${
+  const gutDran = cls.students.map(s => ({ s: s, gut: gutDabei(sub, s.id) })).filter(x => x.gut);
+  const hinweisZeile = (!auffaellige.length ? "" : `
+    <div style="padding:10px 16px; background:#FBECEA; border-bottom:1px solid #000; border-left:5px solid #B3241C;">
+      <div style="font-size:13px; font-weight:bold; color:#8E1C16;">${auffaellige.length} ${
         auffaellige.length === 1 ? "Schüler:in braucht" : "Schüler:innen brauchen"} Aufmerksamkeit</div>
       <div style="font-size:11px; margin-top:2px;">${esc(auffaellige.map(x => x.s.name).join(", "))}</div>
-    </div>`;
+    </div>`) + (!gutDran.length ? "" : `
+    <div style="padding:10px 16px; background:#EDF6EC; border-bottom:1px solid #000; border-left:5px solid #2E7D32;">
+      <div style="font-size:13px; font-weight:bold; color:#215E24;">${gutDran.length} ${
+        gutDran.length === 1 ? "Schüler:in arbeitet" : "Schüler:innen arbeiten"} verlässlich mit</div>
+      <div style="font-size:11px; margin-top:2px;">${esc(gutDran.map(x => x.s.name).join(", "))}</div>
+    </div>`);
+
+  /* Die Bestenliste als eigener Block: am Semesterende ist das die Frage,
+     die tatsächlich gestellt wird. */
+  const bestenBlock = !besten.length ? "" : `
+    <div class="label" style="border-top:2px solid #000;">DIE BESTEN JE BEURTEILUNGSART</div>
+    ${besten.map(b => `<div class="entry">
+      ${kroneSvg(16)}
+      <div class="txt"><b>${esc(b.label)}</b>: ${esc(b.sieger.map(x => x.name).join(", "))}</div>
+      <span class="badge" style="border-color:#96650F; color:#96650F; background:#FAF3E8;">${
+        b.stufig ? esc(stufenListe(sub, b.cat)[Math.round(b.wert)] || "") : fmt(b.wert)}</span>
+    </div>`).join("")}
+    <div class="helptext">Gewertet wird, wer in dieser Beurteilungsart im Schnitt am besten liegt. Es braucht mindestens ${BESTE_MIN} Eintragungen, damit niemand durch eine einzige gute Stunde gewinnt.</div>`;
 
   const andere = cls.subjects.filter(s => s.id !== sub.id);
   const wechsel = andere.length ? `
@@ -2349,10 +2813,12 @@ function renderRoster(){
     ${semesterLeiste("home")}
     ${hinweisZeile}
     ${rows || '<div class="helptext">Noch keine Schüler:innen in der Klasse ' + esc(cls.name) + '.</div>'}
+    ${bestenBlock}
     ${wechsel}
     <div class="footer">
       <button class="gross" onclick="goSchnell()">Ganze Klasse bewerten</button>
       <button onclick="goHome('newStudent')">+ Schüler:in</button>
+      <button onclick="goHome('abschluss')">${esc(aktivesSemester() === "alle" ? "Jahresnoten" : SEM_LABELS[aktivesSemester()] + " abschließen")}</button>
     </div>
   `;
 }
@@ -2394,14 +2860,43 @@ function createStudent(ev){
   const cls = getClass(homeView.classId);
   const niveauEl = document.getElementById("niveauInput");
   cls.students.push({ id: uid(), name: name, niveau: niveauEl ? niveauEl.value : "ahs", photo: null, updatedAt: Date.now() });
+  studentenOrdnen(cls);
   save();
   goHome("roster");
 }
 
+/* Leistungsniveau umstellen.
+
+   Punkte- und Prozentnoten werden dabei neu abgeleitet, weil sie am
+   Notenschlüssel hängen: 60 % sind bei Standard AHS eine andere Note als
+   bei Standard. Würden die alten Noten stehen bleiben, stünden im selben
+   Fach zwei Maßstäbe nebeneinander.
+
+   Mitarbeit, Hausübung, Kompetenz-Checks und jede angetippte Note bleiben
+   unverändert. Sie sind ein Urteil über das Verhalten und die Leistung im
+   Unterricht, nicht das Ergebnis eines Prozentschlüssels.
+
+   Weil sich dabei bereits vergebene Noten ändern, wird vorher gefragt und
+   jede einzelne Änderung benannt. */
 function setNiveau(value){
   const cls = getClass(homeView.classId);
   const s = getStudent(cls, homeView.studentId);
-  s.niveau = (value === "standard") ? "standard" : "ahs";
+  if(!cls || !s) return;
+  const neu = (value === "standard") ? "standard" : "ahs";
+  if(s.niveau === neu) return;
+
+  const sub = getSubject(cls, homeView.subjectId);
+  const folgen = schluesselFolgen(cls, s, cls.subjects, neu);
+
+  if(!folgenBestaetigen(folgen,
+      s.name + " von " + niveauLabel(sub, s.niveau) + " auf " + niveauLabel(sub, neu) + " umstellen?")){
+    render();
+    return;
+  }
+  schluesselFolgenAnwenden(folgen);
+
+  s.niveau = neu;
+  s.updatedAt = Date.now();
   save();
   render();
 }
@@ -2427,7 +2922,7 @@ function renderStudent(){
   const eigene = entriesOf(sub, s.id);
   const alleNoten = eigene.filter(e => e.type === "note");
   const noten = homeView.noteFilter === "alle" ? alleNoten : alleNoten.filter(n => n.cat === homeView.noteFilter);
-  const verlauf = eigene.filter(e => e.type !== "note").slice().reverse();
+  const verlauf = eigene.filter(e => e.type !== "note" && e.type !== "abschluss").slice().reverse();
 
   const anzahlNoten = wertendeNoten(sub, s.id).length;
   const bonus = bonusSumme(sub, s.id);
@@ -2482,7 +2977,10 @@ function renderStudent(){
     const del = `<button class="ghost small" onclick="deleteEntry('${e.id}')" title="löschen">&times;</button>`;
     if(e.type === "positiv") return `<div class="entry positiv"><span>+</span><div class="txt">${esc(e.text)}</div>${datumFeld(e)}${del}</div>`;
     if(e.type === "negativ") return `<div class="entry negativ"><span>&minus;</span><div class="txt">${esc(e.text)}</div>${datumFeld(e)}${del}</div>`;
-    if(e.type === "foto") return `<div class="entry"><img class="thumb" src="${e.dataUrl}"><div class="txt">Foto &ndash; ${esc(e.tag)}</div>${datumFeld(e)}${del}</div>`;
+    if(e.type === "foto"){
+      const bild = fotoBild(e);
+      return `<div class="entry">${bild ? '<img class="thumb" src="' + bild + '">' : '<span>&#9633;</span>'}<div class="txt">Foto &ndash; ${esc(e.tag)}${bild ? "" : " (Bild nicht gefunden)"}</div>${datumFeld(e)}${del}</div>`;
+    }
     if(e.type === "stufe"){
       const c = catCol(sub, e.cat);
       return `<div class="entry">
@@ -2576,6 +3074,38 @@ function renderStudent(){
     notenCats(sub).indexOf(k) !== -1 || istBonusCat(sub, k));
   const vorschauWert = vorschauSchnitt(sub, s.id);
   const best = bestenfalls(sub, s.id);
+  /* ---------- Die nächste Leistung durchspielen ----------
+     Die Frage, die im Gespräch wirklich gestellt wird. */
+  const naechste = naechsteLeistung(sub, s.id);
+  const naechsteBlock = !naechste.length ? "" : `
+    <div class="label" style="border-top:2px solid #000;">WAS BRINGT DIE NÄCHSTE LEISTUNG</div>
+    <div class="helptext">Angenommen, es kommt noch eine Leistung dazu: Das wäre der Schnitt danach. Es wird nichts gespeichert.</div>
+    ${naechste.map(z => {
+      const c = catCol(sub, z.cat);
+      const kacheln = z.werte.map((w, i) => {
+        const g = gradeColor(i + 1);
+        return `<div style="flex:1; min-width:46px; text-align:center; border:1.5px solid ${g.fg}; background:${g.bg}; border-radius:6px; padding:4px 2px;">
+          <div style="font-size:11px; color:${g.fg}; font-weight:bold;">${i + 1}</div>
+          <div style="font-size:14px; font-weight:bold;">${fmtO(w)}</div>
+        </div>`;
+      }).join("");
+      /* Ein Satz dazu: was es für die nächstbessere Note noch braucht. */
+      const jetztNote = Math.round(schnitt);
+      const ziel = Math.max(1, jetztNote - 1);
+      const noetig = (jetztNote > 1) ? nochNoetig(sub, s.id, undefined, z.cat, ziel) : null;
+      const halten = nochNoetig(sub, s.id, undefined, z.cat, jetztNote);
+      const satz = (jetztNote > 1 && noetig !== null)
+        ? "Für eine " + ziel + " im Schnitt braucht es hier mindestens eine " + noetig + "."
+        : (halten !== null && halten < 5
+            ? "Um die " + jetztNote + " zu halten, darf es hier höchstens eine " + halten + " werden."
+            : (jetztNote === 1 ? "" : "Mit einer einzigen Leistung ist die " + ziel + " nicht mehr erreichbar."));
+      return `<div style="padding:4px 16px 10px;">
+        <div style="font-size:12px; font-weight:bold; color:${c.fg};">Nächste ${esc(z.label)}</div>
+        <div style="display:flex; gap:4px; margin-top:4px;">${kacheln}</div>
+        ${satz ? '<div style="font-size:12px; margin-top:4px;">' + esc(satz) + "</div>" : ""}
+      </div>`;
+    }).join("")}`;
+
   const vorschauBlock = (!vorschauCats.length || schnitt === null) ? "" : `
     <div class="label" style="border-top:2px solid #000;">WAS-WÄRE-WENN</div>
     <div class="helptext">Zum Herzeigen: Beurteilungsarten wegschalten und sehen, was das mit der Note macht. Es wird dabei nichts verändert und nichts gespeichert.</div>
@@ -2600,6 +3130,16 @@ function renderStudent(){
         <div style="font-size:15px; font-weight:bold;">Bei durchgehend bester ${esc(best.cats.join(" und "))}: ${fmtO(best.best)}</div>
         <div style="font-size:12px;">statt ${fmtO(best.jetzt)} jetzt. Das ist der Unterschied, den die Mitarbeit noch machen kann.</div>
       </div>` : ""}`;
+
+  const abschlussBlock = abschlussZeile(cls, sub, s);
+
+  /* Kronen dieser Person in diesem Fach. */
+  const kronen = kronenFuer(cls, sub, s.id);
+  const kronenZeile = !kronen.length ? "" : `
+    <div style="padding:8px 16px; border-bottom:1px solid #000; background:#FAF3E8; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      ${kroneSvg(18)}
+      <span style="font-size:13px; font-weight:bold; color:#7A5209;">Beste:r der Klasse bei ${esc(kronen.map(b => b.label).join(", "))}</span>
+    </div>`;
 
   const niveauZeile = (cls.stufe === 1 || !hatNiveaus(sub)) ? "" : `
     <div style="padding:10px 16px; border-bottom:1px solid #000; display:flex; align-items:center; gap:10px;">
@@ -2635,7 +3175,9 @@ function renderStudent(){
       <button class="ghost" onclick="deleteStudent()">löschen</button>
     </div>
     ${niveauZeile}
+    ${kronenZeile}
     ${tendenzBlock}
+    ${abschlussBlock}
     ${katZeile}
     <div class="footer" style="border-bottom:2px solid #000;">
       <button class="gross" onclick="goHome('newNote')">Leistung eintragen</button>
@@ -2645,7 +3187,7 @@ function renderStudent(){
     </div>
     ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
     ${bilanzZeilen}
-    ${vorschauBlock}
+    ${abschlussNote(sub, s.id, aktivesSemester()) === null ? vorschauBlock + naechsteBlock : ""}
     <div style="padding:12px 16px; border-top:2px solid #000000; border-bottom:${homeView.zeigeEintraege ? "1px" : "2px"} solid #000000;">
       <button onclick="toggleEintraege()" style="width:100%;">${homeView.zeigeEintraege
         ? "Einzelne Einträge ausblenden"
@@ -2658,6 +3200,167 @@ function renderStudent(){
       <div class="label" style="border-top:2px solid #000; margin-top:4px;">VERLAUF</div>
       ${verlaufRows || '<div class="helptext">Noch kein Verlauf.</div>'}` : ""}
   `;
+}
+
+/* ---------- ABSCHLUSS: BEDIENUNG ---------- */
+
+function abschlussTitel(z){
+  return z === "alle" ? "Jahresnote" : SEM_LABELS[z] + ": Note";
+}
+
+/* Der Block in der Schüleransicht. Zeigt entweder die vergebene Note oder
+   den Knopf, mit dem der gerade gewählte Zeitraum abgeschlossen wird. */
+function abschlussZeile(cls, sub, s){
+  const z = aktivesSemester();
+  const eintrag = abschlussEintrag(sub, s.id, z);
+  const roh = schnittBerechnet(sub, s.id, z);
+
+  if(eintrag){
+    const jahrHinweis = (z === 1 && abschlussNote(sub, s.id, "alle") === null)
+      ? "<br>Das ganze Jahr wird ab jetzt aus dieser Note und dem 2. Semester gerechnet."
+      : "";
+    return `<div style="padding:10px 16px; border-bottom:1px solid #000; background:#EFEFEF;">
+      <div style="font-size:13px; font-weight:bold;">${esc(abschlussTitel(z))} ${eintrag.value} vergeben${
+        eintrag.date ? " am " + esc(eintrag.date) : ""}</div>
+      <div style="font-size:11px; margin-top:2px;">Rechenwert ${fmtO(roh)}${
+        typeof eintrag.berechnet === "number" && Math.abs(eintrag.berechnet - (roh === null ? eintrag.berechnet : roh)) > 0.005
+          ? " (beim Abschließen " + fmtO(eintrag.berechnet) + ")" : ""}.${jahrHinweis}</div>
+      <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="ghost small" onclick="abschlussFragen('${s.id}')">Note ändern</button>
+        <button class="ghost small" onclick="abschlussLoesen('${s.id}')">Abschluss aufheben</button>
+      </div>
+    </div>`;
+  }
+
+  if(roh === null) return "";
+  return `<div style="padding:10px 16px; border-bottom:1px solid #000; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <span style="font-size:12px; flex:1; min-width:160px;">${esc(SEM_LABELS[z])} abschließen und die Note festhalten. Vorschlag aus der Rechnung: <b>${Math.round(roh)}</b>.</span>
+    <button class="ghost" onclick="abschlussFragen('${s.id}')">${esc(z === "alle" ? "Jahresnote festlegen" : SEM_LABELS[z] + " abschließen")}</button>
+  </div>`;
+}
+
+function abschlussFragen(studentId){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  const s = getStudent(cls, studentId);
+  if(!cls || !sub || !s) return;
+  const z = aktivesSemester();
+  const roh = schnittBerechnet(sub, s.id, z);
+  const alt = abschlussNote(sub, s.id, z);
+  const vorschlag = alt !== null ? alt : (roh === null ? "" : Math.round(roh));
+  const eingabe = prompt(
+    abschlussTitel(z) + " für " + s.name + " in " + sub.fach + "\n\n"
+    + "Rechenwert: " + (roh === null ? "noch keine Leistungen" : fmtO(roh)) + "\n"
+    + "Bitte die Note eintragen, die vergeben wird (1 bis 5).",
+    String(vorschlag));
+  if(eingabe === null) return;
+  const n = Math.round(Number(String(eingabe).trim().replace(",", ".")));
+  if(isNaN(n) || n < 1 || n > 5){ alert("Bitte eine ganze Zahl von 1 bis 5 eintragen."); return; }
+  abschlussSetzen(sub, s.id, z, n);
+  save();
+  render();
+}
+
+function abschlussLoesen(studentId){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  const s = getStudent(cls, studentId);
+  if(!cls || !sub || !s) return;
+  const z = aktivesSemester();
+  if(!confirm(abschlussTitel(z) + " für " + s.name + " aufheben?\n\n"
+    + "Es wird nichts gelöscht. Ab dann gilt wieder der Rechenwert aus den Leistungen.")) return;
+  abschlussAufheben(sub, s.id, z);
+  save();
+  render();
+}
+
+/* ---------- GANZE KLASSE ABSCHLIESSEN ----------
+   Am Semesterende geht man die Klasse einmal durch. Einzeln durch 32
+   Schüleransichten zu tippen wäre die Sorte Arbeit, die man dann doch auf
+   Papier macht. */
+function renderAbschluss(){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return renderHomeList();
+  const z = aktivesSemester();
+
+  const zeilen = cls.students.map(s => {
+    const roh = schnittBerechnet(sub, s.id, z);
+    const fest = abschlussNote(sub, s.id, z);
+    const vorschlag = roh === null ? null : Math.round(roh);
+    const kacheln = [1,2,3,4,5].map(v => {
+      const g = gradeColor(v);
+      const an = (fest === v);
+      const stil = an
+        ? `background:${g.fg}; border-color:${g.fg}; color:#fff;`
+        : `background:${g.bg}; border-color:${g.fg}; color:${g.fg};`
+          + (vorschlag === v ? " box-shadow: inset 0 0 0 2px " + g.fg + ";" : "");
+      return `<div class="chip" style="${stil} min-width:30px; text-align:center;"
+                   onclick="abschlussKlasseSetzen('${s.id}',${v})">${v}</div>`;
+    }).join("");
+    return `<div style="padding:8px 16px; border-bottom:1px solid #000; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:120px;">
+        <div style="font-size:14px; font-weight:bold;">${esc(s.name)}</div>
+        <div style="font-size:11px;">Rechenwert ${fmtO(roh)}${
+          fest === null ? "" : " &middot; vergeben: " + fest}</div>
+      </div>
+      <div style="display:flex; gap:4px;">${kacheln}</div>
+      ${fest === null ? "" : `<button class="ghost small" onclick="abschlussKlasseLoesen('${s.id}')">zurück</button>`}
+    </div>`;
+  }).join("");
+
+  const offen = cls.students.filter(s => abschlussNote(sub, s.id, z) === null
+    && schnittBerechnet(sub, s.id, z) !== null).length;
+
+  return `
+    <div class="header" style="${headerStyle("home")}">
+      <span class="back" style="${titleStyle("home")}" onclick="goHome('roster')">&lsaquo;</span>
+      <span class="title" style="${titleStyle("home")}">${esc(z === "alle" ? "Jahresnoten" : SEM_LABELS[z] + " abschließen")}</span>
+      <div class="sub">${esc(cls.name)} &middot; ${esc(sub.fach)}</div>
+    </div>
+    <div class="helptext">Der Rechenwert ist ein Vorschlag, die Note vergibst du. Die vorgeschlagene Kachel ist dünn umrandet.${
+      z === 1 ? " Sobald das 1. Semester abgeschlossen ist, wird das ganze Jahr aus dieser Note und dem 2. Semester gerechnet." : ""}</div>
+    ${cls.students.length ? `<div style="padding:8px 16px; border-top:2px solid #000; border-bottom:2px solid #000;">
+      <button onclick="abschlussVorschlaegeUebernehmen()" style="width:100%;">Alle Vorschläge übernehmen${
+        offen ? " (" + offen + " offen)" : ""}</button></div>` : ""}
+    ${zeilen || '<div class="helptext">Noch keine Schüler:innen in dieser Klasse.</div>'}
+  `;
+}
+
+function abschlussKlasseSetzen(studentId, note){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return;
+  abschlussSetzen(sub, studentId, aktivesSemester(), note);
+  save();
+  render();
+}
+
+function abschlussKlasseLoesen(studentId){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return;
+  abschlussAufheben(sub, studentId, aktivesSemester());
+  save();
+  render();
+}
+
+function abschlussVorschlaegeUebernehmen(){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return;
+  const z = aktivesSemester();
+  const offen = cls.students.filter(s => abschlussNote(sub, s.id, z) === null
+    && schnittBerechnet(sub, s.id, z) !== null);
+  if(!offen.length){ alert("Es ist nichts offen."); return; }
+  if(!confirm("Für " + offen.length + " " + (offen.length === 1 ? "Schüler:in" : "Schüler:innen")
+    + " die gerundete Note aus der Rechnung übernehmen?\n\n"
+    + "Bereits vergebene Noten bleiben unverändert. Jede Note lässt sich danach einzeln ändern.")) return;
+  offen.forEach(s => {
+    abschlussSetzen(sub, s.id, z, Math.round(schnittBerechnet(sub, s.id, z)));
+  });
+  save();
+  render();
 }
 
 function setNoteFilter(key){ homeView.noteFilter = key; render(); }
@@ -2706,6 +3409,18 @@ function datumAendern(entryId){
   if(!sauber){ alert("Das Datum konnte ich nicht lesen. Bitte als TT.MM. eingeben, zum Beispiel 04.12."); return; }
   e.date = sauber;
   e.ts = Date.now();
+  /* Das Semester wird nicht automatisch mitgezogen: ein Eintrag kann
+     bewusst in einem Semester stehen, dessen Datum schon vorbei ist. Passt
+     beides nicht mehr zusammen, wird gefragt statt entschieden. */
+  const ausDatum = semesterAusDatum(sauber);
+  if(e.type !== "abschluss" && ausDatum !== eintragSemester(e)){
+    if(confirm("Das Datum " + sauber + " liegt im " + ausDatum + ". Semester, der Eintrag zählt aber im "
+      + eintragSemester(e) + ". Semester.\n\nSoll der Eintrag ins " + ausDatum + ". Semester wandern?\n\n"
+      + "Das verändert die Notenschnitte beider Semester.")){
+      e.sem = ausDatum;
+    }
+  }
+  sub.entries = nachDatum(sub.entries);
   save();
   render();
 }
@@ -2714,6 +3429,10 @@ function deleteEntry(entryId){
   const cls = getClass(homeView.classId);
   const sub = getSubject(cls, homeView.subjectId);
   if(!confirm("Diesen Eintrag wirklich löschen?")) return;
+  /* Gehört ein Bild dazu, muss es aus der Bilddatenbank mit, sonst bleibt
+     es dort liegen und belegt Platz, den niemand mehr zuordnen kann. */
+  const weg = sub.entries.find(e => e.id === entryId);
+  if(weg && weg.type === "foto") fotoLoeschen(weg.id);
   sub.entries = sub.entries.filter(e => e.id !== entryId);
   save();
   render();
@@ -2801,7 +3520,7 @@ function parseLeistung(raw, cat, key, sub){
     if(f > 200) return { fehler: "So viele Fehler sind nicht plausibel. Bitte die Zahl prüfen." };
     /* Nicht runden: 1,4 Fehler sind mehr als 1 Fehler und dürfen deshalb
        nicht zur Note für einen Fehler führen. Halbe Fehler sind üblich. */
-    return { value: noteFromFehler(f, key), basis: fmtPct(f) + (f === 1 ? " Fehler" : " Fehler") };
+    return { value: noteFromFehler(f, key), basis: fmtPct(f) + (f === 1 ? " Fehler" : " Fehler"), fz: f };
   }
 
   const bruch = roh.match(/^(.+?)\s*(?:\/|von)\s*(.+)$/i);
@@ -2810,13 +3529,13 @@ function parseLeistung(raw, cat, key, sub){
     if(a === null || b === null || b <= 0) return null;
     if(a > b) return { fehler: "Erreicht (" + fmtPct(a) + ") ist mehr als möglich (" + fmtPct(b) + "). Bitte prüfen." };
     const p = a / b * 100;
-    return { value: noteFromProzent(p, key, sub), basis: fmtPct(a) + " von " + fmtPct(b) + " Punkten, " + fmtPct(p) + " %" };
+    return { value: noteFromProzent(p, key, sub), basis: fmtPct(a) + " von " + fmtPct(b) + " Punkten, " + fmtPct(p) + " %", pct: p };
   }
 
   const p = zahlOderNull(roh.replace("%", "").trim());
   if(p === null) return null;
   if(p > 100) return { fehler: "Mehr als 100 % gibt es nicht. Für Punkte bitte „33 von 40“ eingeben." };
-  return { value: noteFromProzent(p, key, sub), basis: fmtPct(p) + " %" };
+  return { value: noteFromProzent(p, key, sub), basis: fmtPct(p) + " %", pct: p };
 }
 
 function paintTiles(){
@@ -2856,14 +3575,20 @@ function recalcNote(){
   if(res && res.fehler){
     homeView.newNoteGrade = null;
     homeView.noteBasis = null;
+    homeView.notePct = null;
+    homeView.noteFz = null;
     homeView.eingabeFehler = res.fehler;
   } else if(res){
     homeView.newNoteGrade = res.value;
     homeView.noteBasis = res.basis;
+    homeView.notePct = (typeof res.pct === "number") ? res.pct : null;
+    homeView.noteFz = (typeof res.fz === "number") ? res.fz : null;
     homeView.eingabeFehler = null;
   } else {
     homeView.newNoteGrade = null;
     homeView.noteBasis = null;
+    homeView.notePct = null;
+    homeView.noteFz = null;
     homeView.eingabeFehler = null;
   }
   paintTiles();
@@ -2873,6 +3598,10 @@ function recalcNote(){
 function selectNoteGrade(v){
   homeView.newNoteGrade = v;
   homeView.noteBasis = null;
+  /* Eine angetippte Note ist ein eigenes Urteil und hängt an keinem
+     Schlüssel. Deshalb darf keine Rechengrundlage hängen bleiben. */
+  homeView.notePct = null;
+  homeView.noteFz = null;
   const feld = document.getElementById("leistungInput");
   if(feld) feld.value = "";
   paintTiles();
@@ -3102,6 +3831,7 @@ function punkteNeuRechnen(alteMax, neueMax){
     }
     e.value = noteFromProzent(prozent, schluesselKey(cls, st, sub), sub);
     e.basis = fmtPct(punkte) + " von " + fmtPct(neueMax) + " Punkten, " + fmtPct(prozent) + " %";
+    e.pct = prozent;
     geaendert++;
   });
   if(geaendert || zuHoch.length) save();
@@ -3132,12 +3862,12 @@ function schnellPunkte(studentId, roh){
   const prozent = (punkte / max) * 100;
   const note = noteFromProzent(prozent, schluesselKey(cls, s, sub), sub);
   const basis = fmtPct(punkte) + " von " + fmtPct(max) + " Punkten, " + fmtPct(prozent) + " %";
-  schnellSpeichern(studentId, { value: note, basis: basis });
+  schnellSpeichern(studentId, { value: note, basis: basis, pct: prozent });
 }
 
 /* Gemeinsamer Kern: legt an oder bessert den in diesem Durchgang
    erzeugten Eintrag aus, statt einen zweiten anzulegen. */
-function schnellSpeichern(studentId, daten){
+function schnellSpeichern(studentId, daten, leise){
   const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
   const cat = homeView.newNoteCat;
   if(!sub) return;
@@ -3147,6 +3877,11 @@ function schnellSpeichern(studentId, daten){
   if(vorhanden && vorhanden.type === "note"){
     vorhanden.value = daten.value;
     vorhanden.basis = daten.basis || null;
+    /* Wird eine Punkteeingabe durch eine angetippte Note ersetzt, muss die
+       alte Rechengrundlage weg, sonst würde die Note später von einer
+       Schlüsseländerung mitgezogen, obwohl sie ein eigenes Urteil ist. */
+    if(typeof daten.pct === "number"){ vorhanden.pct = daten.pct; } else { delete vorhanden.pct; }
+    if(typeof daten.fz === "number"){ vorhanden.fz = daten.fz; } else { delete vorhanden.fz; }
     vorhanden.thema = thema;
     vorhanden.arbeit = homeView.schnellArbeit || null;
     vorhanden.ts = Date.now();
@@ -3157,9 +3892,12 @@ function schnellSpeichern(studentId, daten){
       basis: daten.basis || null, thema: thema, arbeit: homeView.schnellArbeit || null,
       ts: Date.now(), sem: semesterFuerNeu(), date: today(),
       label: catLabel(sub, cat) };
+    if(typeof daten.pct === "number") eintrag.pct = daten.pct;
+    if(typeof daten.fz === "number") eintrag.fz = daten.fz;
     sub.entries.push(eintrag);
     homeView.schnellIds[studentId] = eintrag.id;
   }
+  if(leise) return;
   save();
   render();
 }
@@ -3187,7 +3925,7 @@ function schnellNote(studentId, wert){
   schnellSpeichern(studentId, { value: wert, basis: null });
 }
 
-function schnellStufe(studentId, index){
+function schnellStufe(studentId, index, leise){
   const cls = getClass(homeView.classId);
   const sub = getSubject(cls, homeView.subjectId);
   const cat = homeView.newNoteCat;
@@ -3211,6 +3949,32 @@ function schnellStufe(studentId, index){
     sub.entries.push(eintrag);
     homeView.schnellIds[studentId] = eintrag.id;
   }
+  if(leise) return;
+  save();
+  render();
+}
+
+/* ---------- ALLE OFFENEN ZEILEN AUF EINMAL ----------
+   Läuft über dieselben Funktionen wie ein einzelner Tipp, damit nie zwei
+   verschiedene Wege entstehen, auf denen ein Eintrag zustande kommt. */
+function schnellAlleNote(wert){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return;
+  const offen = cls.students.filter(s => !homeView.schnellIds[s.id]);
+  if(!offen.length){ alert("Es ist keine Zeile mehr offen."); return; }
+  offen.forEach(s => schnellSpeichern(s.id, { value: wert, basis: null }, true));
+  save();
+  render();
+}
+
+function schnellAlleStufe(index){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return;
+  const offen = cls.students.filter(s => !homeView.schnellIds[s.id]);
+  if(!offen.length){ alert("Es ist keine Zeile mehr offen."); return; }
+  offen.forEach(s => schnellStufe(s.id, index, true));
   save();
   render();
 }
@@ -3366,6 +4130,34 @@ function renderSchnell(){
       </div>
     </div>`;
 
+  /* ---------- ALLE AUF EINMAL ----------
+     Wenn eine ganze Stunde gut gelaufen ist, ist jede Zeile einzeln
+     anzutippen reine Arbeit ohne Ertrag. Der Knopf setzt deshalb alle
+     Zeilen, die noch offen sind; die Ausnahmen tippt man danach einzeln.
+
+     Bewusst nur die offenen Zeilen: so kann ein Tipp daneben nie etwas
+     überschreiben, was schon eingetragen war. */
+  const offeneZeilen = cls.students.filter(s => !homeView.schnellIds[s.id]).length;
+  const sammelKnoepfe = punkteModus ? "" : (stufenModus
+    ? stufen.map((t, i) => {
+        const g = stufenFarbe(i, stufen.length);
+        return `<div class="chip" style="background:${g.bg}; border-color:${g.fg}; color:${g.fg};"
+                     onclick="schnellAlleStufe(${i})">alle ${esc(stufenZeichen(cat, i, stufen.length))} ${esc(t)}</div>`;
+      }).join("")
+    : [1,2,3,4,5].map(v => {
+        const g = gradeColor(v);
+        return `<div class="chip" style="background:${g.bg}; border-color:${g.fg}; color:${g.fg};"
+                     onclick="schnellAlleNote(${v})">alle ${v}</div>`;
+      }).join(""));
+
+  const sammelZeile = (!sammelKnoepfe || !cls.students.length) ? "" : `
+    <div class="feinbereich" style="border-top:none; padding-bottom:6px;">
+      <div class="feinlabel" style="display:block; margin-bottom:4px;">Alle auf einmal${
+        offeneZeilen === cls.students.length ? "" : " (" + offeneZeilen + " noch offen)"}</div>
+      <div class="chips" style="padding:0;">${sammelKnoepfe}</div>
+      <div class="helptext" style="padding:2px 0 0;">Setzt nur die Zeilen, die noch leer sind. Abweichungen danach einzeln antippen.</div>
+    </div>`;
+
   const gewichtZeile = stufenModus ? "" : `
     <div class="feinbereich" style="border-top:none;">
       <div class="feinzeile">
@@ -3388,6 +4180,7 @@ function renderSchnell(){
       : "Ein Tipp je Zeile genügt, die Note wird sofort gespeichert. Nochmal tippen bessert aus."}</div>
     ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.schnellArbeit, "setSchnellArbeit") : ""}
     ${themaZeile}
+    ${sammelZeile}
     ${gewichtZeile}
     ${punkteZeile}
     ${zeilen || '<div class="helptext">Noch keine Schüler:innen in dieser Klasse.</div>'}
@@ -3459,19 +4252,180 @@ function createNote(ev){
       ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
   } else {
     if(homeView.newNoteGrade === null) return;
-    sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
+    const eintrag = { id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       value: homeView.newNoteGrade, w: w, basis: homeView.noteBasis || null, thema: thema,
       arbeit: homeView.arbeitNr || null,
-      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
+      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) };
+    if(typeof homeView.notePct === "number") eintrag.pct = homeView.notePct;
+    if(typeof homeView.noteFz === "number") eintrag.fz = homeView.noteFz;
+    sub.entries.push(eintrag);
   }
   homeView.newNoteGrade = null;
   homeView.noteBasis = null;
+  homeView.notePct = null;
+  homeView.noteFz = null;
   homeView.thema = null;
   save();
   goHome("student");
 }
 
-/* ---------- FOTO ---------- */
+/* ---------- FOTO ----------
+
+   Fotos sind das, was den Speicher füllt. Alles andere in dieser App sind
+   Zahlen und kurze Texte; ein Schuljahr Noten für vier Klassen bleibt unter
+   200 Kilobyte. Ein einziges Handyfoto ist ein Vielfaches davon.
+
+   Deshalb zwei Maßnahmen:
+
+   1. Die Bilder liegen nicht mehr im selben Speicher wie die Daten, sondern
+      in der Bilddatenbank des Browsers (IndexedDB). Der Datenspeicher, in
+      dem die Noten stehen, fasst je nach Gerät nur etwa 5 Megabyte, und der
+      ist nach wenigen Fotos voll. Die Bilddatenbank ist um Größenordnungen
+      größer. Vor allem aber: Geht dort der Platz aus, sind die Noten nicht
+      betroffen.
+
+   2. Die Bilder werden vor dem Speichern auf eine Zielgröße gerechnet,
+      nicht auf eine feste Qualität. Ein Foto einer Schularbeit mit viel
+      Text braucht mehr Daten als ein Foto einer Zeichnung; die App probiert
+      deshalb so lange, bis die Datei unter der Zielgröße liegt.
+
+   Liefert der Browser keine Bilddatenbank, bleibt alles beim Alten: Das
+   Bild wandert wie bisher in den Datenspeicher. Nichts geht verloren, es
+   wird nur wieder enger. */
+
+const FOTO_DB = "klassenheft" + SCHLUESSEL_ZUSATZ + "_bilder";
+const FOTO_STORE = "fotos";
+let fotoDb = null;              /* offene Verbindung, oder null */
+let fotoCache = {};             /* id -> dataUrl, damit alles Zeichnen synchron bleibt */
+let fotoBereit = false;         /* steht die Bilddatenbank zur Verfügung? */
+
+/* Drei Stufen. Die Zielgrößen sind das, was am Ende im Speicher liegt;
+   die Kantenlänge ist die Obergrenze, nicht die garantierte Größe. */
+const FOTO_STUFEN = {
+  klein:  { kante: 640,  ziel:  35000, text: "klein, etwa 35 kB je Foto" },
+  mittel: { kante: 1000, ziel:  75000, text: "mittel, etwa 75 kB je Foto" },
+  genau:  { kante: 1500, ziel: 170000, text: "genau, etwa 170 kB je Foto" }
+};
+
+function fotoStufe(){
+  try{
+    const s = state && state.settings ? state.settings.fotoQualitaet : null;
+    return FOTO_STUFEN[s] ? s : "mittel";
+  }catch(e){ return "mittel"; }
+}
+
+function setJahresGewicht(wert){
+  state.settings.jahresGewicht = (wert === "zweites") ? "zweites" : "gleich";
+  save();
+  render();
+}
+
+function setFotoQualitaet(wert){
+  state.settings.fotoQualitaet = FOTO_STUFEN[wert] ? wert : "mittel";
+  save();
+  render();
+}
+
+/* Öffnet die Bilddatenbank und lädt alle Bilder in den Arbeitsspeicher.
+   Danach ist jeder Zugriff synchron, und der gesamte übrige Programmteil
+   muss von der Datenbank nichts wissen. */
+function fotoDbStarten(fertig){
+  const weiter = () => { if(fertig) fertig(); };
+  let idb = null;
+  try{ idb = window.indexedDB; }catch(e){ idb = null; }
+  if(!idb){ fotoBereit = false; return weiter(); }
+  let anfrage;
+  try{ anfrage = idb.open(FOTO_DB, 1); }catch(e){ fotoBereit = false; return weiter(); }
+  anfrage.onupgradeneeded = function(){
+    const db = anfrage.result;
+    if(!db.objectStoreNames.contains(FOTO_STORE)) db.createObjectStore(FOTO_STORE);
+  };
+  anfrage.onerror = function(){ fotoBereit = false; weiter(); };
+  anfrage.onsuccess = function(){
+    fotoDb = anfrage.result;
+    fotoBereit = true;
+    try{
+      const tx = fotoDb.transaction(FOTO_STORE, "readonly");
+      const store = tx.objectStore(FOTO_STORE);
+      const alle = store.openCursor();
+      alle.onsuccess = function(ev){
+        const c = ev.target.result;
+        if(c){ fotoCache[c.key] = c.value; c.continue(); }
+        else weiter();
+      };
+      alle.onerror = function(){ weiter(); };
+    }catch(e){ weiter(); }
+  };
+}
+
+/* Schreibt ein Bild in die Bilddatenbank. Der Rückruf sagt, ob es geklappt
+   hat: nur dann darf der Eintrag ohne eigenes Bild gespeichert werden. */
+function fotoAblegen(id, dataUrl, fertig){
+  fotoCache[id] = dataUrl;
+  if(!fotoBereit || !fotoDb) return fertig(false);
+  try{
+    const tx = fotoDb.transaction(FOTO_STORE, "readwrite");
+    tx.objectStore(FOTO_STORE).put(dataUrl, id);
+    tx.oncomplete = function(){ fertig(true); };
+    tx.onerror = function(){ fertig(false); };
+    tx.onabort = function(){ fertig(false); };
+  }catch(e){ fertig(false); }
+}
+
+function fotoLoeschen(id){
+  delete fotoCache[id];
+  if(!fotoBereit || !fotoDb) return;
+  try{
+    const tx = fotoDb.transaction(FOTO_STORE, "readwrite");
+    tx.objectStore(FOTO_STORE).delete(id);
+  }catch(e){}
+}
+
+/* Das Bild zu einem Eintrag, egal wo es liegt. */
+function fotoBild(e){
+  if(!e) return null;
+  if(typeof e.dataUrl === "string" && e.dataUrl) return e.dataUrl;
+  return fotoCache[e.id] || null;
+}
+
+/* Alle Foto-Einträge, die es in diesem Fach für diese Person gibt. */
+function fotosVon(sub, studentId, sem){
+  return entriesOf(sub, studentId, sem)
+    .filter(e => e.type === "foto" && fotoBild(e));
+}
+
+/* Fotos, die noch im Datenspeicher liegen, in die Bilddatenbank auslagern.
+   Das betrifft alles aus früheren Fassungen und alles, was gerade von einem
+   anderen Gerät hereingekommen ist. Erst wenn ein Bild sicher in der
+   Datenbank steht, wird es aus dem Eintrag genommen. */
+function fotosEinlagern(fertig){
+  const ende = n => { if(fertig) fertig(n); };
+  if(!fotoBereit || !fotoDb) return ende(0);
+  const offen = [];
+  state.classes.forEach(c => c.subjects.forEach(sub => sub.entries.forEach(e => {
+    if(e.type === "foto" && typeof e.dataUrl === "string" && e.dataUrl) offen.push(e);
+  })));
+  if(!offen.length) return ende(0);
+  let erledigt = 0, geschafft = 0;
+  offen.forEach(e => {
+    const bild = e.dataUrl;
+    fotoAblegen(e.id, bild, function(geklappt){
+      if(geklappt){ e.dataUrl = null; e.bytes = bild.length; geschafft++; }
+      erledigt++;
+      if(erledigt === offen.length){
+        if(geschafft) save();
+        ende(geschafft);
+      }
+    });
+  });
+}
+
+/* Wie viel Platz die Bilder brauchen. */
+function fotoSpeicherBytes(){
+  let n = 0, bytes = 0;
+  Object.keys(fotoCache).forEach(k => { n++; bytes += String(fotoCache[k] || "").length; });
+  return { anzahl: n, bytes: bytes };
+}
 
 /* Bilder werden vor dem Speichern verkleinert. Beim Porträt zusätzlich
    quadratisch aus der Mitte beschnitten, damit der runde Avatar passt. */
@@ -3501,11 +4455,46 @@ function verkleinern(file, maxKante, quality, quadratisch, fertig){
   reader.readAsDataURL(file);
 }
 
+/* Auf eine Zielgröße rechnen statt auf eine feste Qualität.
+
+   Erst wird die Qualität heruntergenommen, dann die Kantenlänge. Das ist
+   die Reihenfolge, die Text am längsten lesbar hält: ein leicht
+   verrauschtes großes Bild ist besser lesbar als ein sauberes kleines. */
+function verkleinernZiel(file, stufe, fertig){
+  const v = FOTO_STUFEN[stufe] || FOTO_STUFEN.mittel;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const versuche = [
+        [v.kante, 0.62], [v.kante, 0.5], [v.kante, 0.4],
+        [Math.round(v.kante * 0.75), 0.5], [Math.round(v.kante * 0.75), 0.4],
+        [Math.round(v.kante * 0.55), 0.45], [Math.round(v.kante * 0.4), 0.4]
+      ];
+      let letzte = null;
+      for(let i = 0; i < versuche.length; i++){
+        const [kante, q] = versuche[i];
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, kante / Math.max(img.width, img.height));
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        letzte = canvas.toDataURL("image/jpeg", q);
+        if(letzte.length <= v.ziel) break;
+      }
+      fertig(letzte);
+    };
+    img.onerror = function(){ alert("Dieses Bild konnte nicht gelesen werden."); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 document.getElementById("cameraInput").addEventListener("change", function(ev){
   const file = ev.target.files[0];
   ev.target.value = "";
   if(!file) return;
-  verkleinern(file, 480, 0.7, false, function(dataUrl){
+  verkleinernZiel(file, fotoStufe(), function(dataUrl){
     pendingPhoto = dataUrl;
     render();
   });
@@ -3541,12 +4530,22 @@ function assignPhoto(tag){
     if(feld) feld.focus();
     return;
   }
-  sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"foto",
-    dataUrl: pendingPhoto, tag: text, ts: Date.now(), sem: semesterFuerNeu(), date: today() });
-  pendingPhoto = null;
-  pendingPhotoTag = null;
-  save();
-  render();
+  const bild = pendingPhoto;
+  const eintrag = { id: uid(), studentId: homeView.studentId, type:"foto",
+    dataUrl: null, bytes: bild.length, tag: text, ts: Date.now(),
+    sem: semesterFuerNeu(), date: today() };
+
+  /* Erst in die Bilddatenbank, dann den Eintrag. Klappt das Ablegen nicht,
+     wandert das Bild wie früher in den Eintrag selbst, damit es auf keinen
+     Fall verloren geht. */
+  fotoAblegen(eintrag.id, bild, function(geklappt){
+    if(!geklappt) eintrag.dataUrl = bild;
+    sub.entries.push(eintrag);
+    pendingPhoto = null;
+    pendingPhotoTag = null;
+    if(!save()) fotoLoeschen(eintrag.id);
+    render();
+  });
 }
 
 /* ---------- PORTRÄTFOTO JE SCHÜLER:IN ----------
@@ -3780,6 +4779,19 @@ function wordDokument(){
                    "  |  2. Semester " + fmtO(computeSchnitt(sub, s.id, 2)) +
                    "  |  ganzes Jahr " + fmtO(computeSchnitt(sub, s.id, "alle")), { size:18, after:60 });
 
+        /* Vergebene Semester- und Jahresnoten gehören in die Sicherung:
+           sie sind die eigentliche Beurteilung, nicht der Rechenwert. */
+        const abschluesse = sub.entries.filter(e => e.type === "abschluss" && e.studentId === s.id);
+        if(abschluesse.length){
+          body += wTable(["abgeschlossener Zeitraum","vergebene Note","Rechenwert","Datum"],
+            abschluesse.map(e => [
+              e.zeitraum === "alle" ? "Ganzes Jahr" : (SEM_LABELS[Number(e.zeitraum)] || String(e.zeitraum)),
+              String(e.value),
+              typeof e.berechnet === "number" ? fmt(e.berechnet) : "-",
+              e.date || ""
+            ]), [2600,2000,2000,2000]);
+        }
+
         [1, 2].forEach(sem => {
           const eigene = entriesOf(sub, s.id, sem);
           if(!eigene.length) return;
@@ -3824,6 +4836,7 @@ function wordDokument(){
 
           const fotos = eigene.filter(e => e.type === "foto");
           if(fotos.length) body += wP(fotos.length + " Foto(s) in der App gespeichert, in dieser Word-Datei nicht enthalten.", { size:16, after:80 });
+
         });
       });
     });
@@ -3985,6 +4998,7 @@ function sicherheitskopieZurueck(){
               "Porträtfotos sind in der Kopie nicht enthalten.")) return;
   const bericht = mergeState(state, migrate(JSON.parse(JSON.stringify(k.daten))));
   save();
+  fotosEinlagern(function(v){ if(v) render(); });
   ansichtenZuruecksetzen();
   switchTab("home");
   alert("Zurückgeholt.\n\nNeu dazugekommen:\n" +
@@ -4004,9 +5018,23 @@ function fassungPruefen(){
   }
 }
 
+/* Die Sicherung enthält die Bilder, auch wenn sie im laufenden Betrieb in
+   der Bilddatenbank liegen. Eine Sicherung ohne Fotos wäre keine. */
+function mitFotos(klassen){
+  return klassen.map(c => Object.assign({}, c, {
+    subjects: c.subjects.map(sub => Object.assign({}, sub, {
+      entries: sub.entries.map(e => {
+        if(e.type !== "foto" || e.dataUrl) return e;
+        const bild = fotoBild(e);
+        return bild ? Object.assign({}, e, { dataUrl: bild }) : e;
+      })
+    }))
+  }));
+}
+
 function sicherungsDaten(){
   return { version: 4, ausgabe: AUSGABE, geraet: state.settings.geraet || "",
-           classes: state.classes, settings: state.settings, exportedAt: new Date().toISOString() };
+           classes: mitFotos(state.classes), settings: state.settings, exportedAt: new Date().toISOString() };
 }
 
 /* Die fertige Sicherung, solange sie noch nicht abgeholt wurde. */
@@ -4332,6 +5360,7 @@ function ablageHolen(){
       if(!confirm("Daten" + woher + " mit diesem Gerät zusammenführen? Es wird nichts gelöscht, fehlende Einträge kommen dazu.")) return;
       const bericht = mergeState(state, migrate(daten));
       save();
+      fotosEinlagern(function(v){ if(v) render(); });
       ansichtenZuruecksetzen();
       switchTab("home");
       alert("Zusammengeführt.\n\nNeu dazugekommen:\n" +
@@ -4406,6 +5435,7 @@ document.getElementById("importInput").addEventListener("change", function(ev){
       state = fremd;
       state.settings = normaliseSettings(state.settings);
       save();
+      fotosEinlagern(function(v){ if(v) render(); });
       ansichtenZuruecksetzen();
       switchTab("home");
       alert("Sicherung eingespielt.");
@@ -4414,6 +5444,7 @@ document.getElementById("importInput").addEventListener("change", function(ev){
     if(!confirm("Daten aus der Datei mit diesem Gerät zusammenführen? Es wird nichts gelöscht, fehlende Einträge kommen dazu.")) return;
     const bericht = mergeState(state, fremd);
     save();
+    fotosEinlagern(function(v){ if(v) render(); });
     ansichtenZuruecksetzen();
     switchTab("home");
     alert("Zusammengeführt.\n\nNeu dazugekommen:\n" +
@@ -4694,6 +5725,25 @@ function semesterZeile(sub, studentId){
   const s2 = computeSchnitt(sub, studentId, 2);
   const ges = computeSchnitt(sub, studentId, "alle");
   const zeig = v => v === null ? "keine Note" : fmtO(v);
+
+  /* Ist ein Zeitraum abgeschlossen, steht dort eine vergebene Note und
+     kein Rechenwert. Das gehört auf dem Blatt auseinandergehalten, sonst
+     rechnet jemand nach und findet einen Widerspruch, den es nicht gibt. */
+  const a1 = abschlussNote(sub, studentId, 1);
+  const a2 = abschlussNote(sub, studentId, 2);
+  const aj = abschlussNote(sub, studentId, "alle");
+  if(a1 !== null || a2 !== null || aj !== null){
+    const teil = (z, wert, fest) => (fest !== null)
+      ? z + " <b>" + fest + "</b> (vergeben)"
+      : z + " " + zeig(wert);
+    return `<div class="pr-note" style="margin-top:2mm;">${
+      teil("1. Semester", s1, a1)} &middot; ${teil("2. Semester", s2, a2)} &middot; ${teil("ganzes Jahr", ges, aj)}<br>
+      <span style="font-size:8pt;">${aj !== null
+        ? "Die Jahresnote wurde von der Lehrkraft vergeben."
+        : (a1 !== null
+            ? "Das 1. Semester ist abgeschlossen. Das ganze Jahr wird aus der vergebenen Semesternote und dem 2. Semester gerechnet."
+            : "Das ganze Jahr ist aus allen Leistungen beider Semester gerechnet, nicht als Mittel der beiden Semesterwerte.")}</span></div>`;
+  }
   /* Das ganze Jahr ist nicht das Mittel der beiden Semesternoten, sondern
      wird aus allen Leistungen beider Semester zusammen gerechnet. Das ist
      ein Unterschied, sobald in einem Semester mehr Leistungen vorliegen,
@@ -4773,6 +5823,32 @@ function verlaufTabelle(sub, studentId){
   </table>`;
 }
 
+/* ---------- FOTOS IM AUSDRUCK ----------
+   Ein Foto einer Schularbeit ist das stärkste Argument, das man am
+   Elternsprechtag auf den Tisch legen kann. Es gehört deshalb auf das
+   Blatt, nicht nur in die App. Weil Bilder den Lesefluss der Tabellen
+   zerreißen, stehen sie am Ende, auf einer eigenen Seite. */
+function fotoAnhang(paare, titel){
+  const mit = paare.filter(p => fotoBild(p.e));
+  if(!mit.length) return "";
+  const bilder = mit.map(p => `<div class="pr-foto">
+      <img src="${fotoBild(p.e)}" alt="${esc(p.e.tag || "Foto")}">
+      <div class="bu"><b>${esc(p.e.tag || "Foto")}</b>${p.e.date ? " &middot; " + esc(p.e.date) : ""}${
+        p.wo ? " &middot; " + esc(p.wo) : ""}</div>
+    </div>`).join("");
+  return `<div class="pr-page">
+    <div class="pr-head">
+      <div>
+        <div class="pr-h1">${esc(titel)}</div>
+        <div style="font-size:10pt; margin-top:1mm;">${mit.length} ${mit.length === 1 ? "Foto" : "Fotos"} &middot; ${esc(SEM_LABELS[aktivesSemester()])}</div>
+      </div>
+      <div class="pr-meta">${kopfMeta()}</div>
+    </div>
+    <div class="pr-fotos">${bilder}</div>
+    <div class="pr-note">Die Fotos wurden zur Dokumentation der Leistung aufgenommen und bleiben auf dem Gerät der Lehrkraft.</div>
+  </div>`;
+}
+
 /* Ein Blatt je Schüler:in, über alle Fächer dieser Klasse. Genau das,
    was am Elternsprechtag auf dem Tisch liegen und mitgegeben werden soll. */
 function blattSchueler(cls, s){
@@ -4828,7 +5904,10 @@ function blattSchueler(cls, s){
       <div>Unterschrift Lehrkraft</div>
       <div>Unterschrift Erziehungsberechtigte</div>
     </div>
-  </div>`;
+  </div>` + fotoAnhang(
+    cls.subjects.reduce((liste, sub) => liste.concat(
+      fotosVon(sub, s.id).map(e => ({ e: e, wo: sub.fach }))), []),
+    "Fotos zu " + s.name);
 }
 
 /* Ein Blatt für genau eine Arbeit. Das ist das Papier, das bei einer
@@ -4882,7 +5961,13 @@ function blattArbeit(cls, sub, cat, kennung){
       <tr><th>Name</th><th style="width:20%;">Leistungsniveau</th><th style="width:30%;">Grundlage</th><th style="width:10%;">Note</th></tr>
       ${zeilen || '<tr><td colspan="4">Keine Einträge.</td></tr>'}
     </table>
-  </div>`;
+  </div>` + fotoAnhang(
+    /* Fotos vom Tag dieser Arbeit. Das Datum ist die verlässlichste
+       Verbindung: die Beschriftung ist freier Text und kann alles sein. */
+    cls.students.reduce((liste, st) => liste.concat(
+      fotosVon(sub, st.id).filter(e => e.date && e.date === a.datum)
+        .map(e => ({ e: e, wo: st.name }))), []),
+    "Fotos zur " + a.nummer + ". " + label);
 }
 
 /* Alle Arbeiten einer Kategorie auf einem Blatt, je Arbeit ein eigener
@@ -5023,8 +6108,23 @@ function blattKlasse(cls, sub){
       ${zeilen || '<tr><td colspan="5">Noch keine Schüler:innen.</td></tr>'}
     </table>
     ${proKat ? '<div class="pr-h2">Mittelwerte je Beurteilung</div><table class="pr-tbl"><tr><th>Beurteilung</th><th style="width:14%;">Noten</th><th style="width:14%;">Schnitt</th></tr>' + proKat + "</table>" : ""}
+    ${(function(){
+      const besten = besteJeKategorie(cls, sub);
+      if(!besten.length) return "";
+      return '<div class="pr-h2">Die Besten je Beurteilungsart</div><table class="pr-tbl">'
+        + '<tr><th>Beurteilung</th><th>Beste:r</th><th style="width:16%;">Schnitt</th></tr>'
+        + besten.map(b => "<tr><td>" + esc(b.label) + "</td><td>" + esc(b.sieger.map(x => x.name).join(", "))
+            + '</td><td style="text-align:center;">'
+            + (b.stufig ? esc(stufenListe(sub, b.cat)[Math.round(b.wert)] || "") : fmt(b.wert))
+            + "</td></tr>").join("")
+        + '</table><div class="pr-note">Gewertet wird der Schnitt in dieser Beurteilungsart, ab mindestens '
+        + BESTE_MIN + " Eintragungen.</div>";
+    })()}
     ${vergleichDruck}
-  </div>`;
+  </div>` + fotoAnhang(
+    cls.students.reduce((liste, st) => liste.concat(
+      fotosVon(sub, st.id).map(e => ({ e: e, wo: st.name }))), []),
+    "Fotos " + cls.name + " " + sub.fach);
 }
 
 function drucken(html){
@@ -5396,6 +6496,24 @@ function renderSettingsList(){
     return `<div class="chip" style="${style}" onclick="setSchrift('${k}')">${lbl}</div>`;
   }).join("");
 
+  const chipReihe = (werte, jetzt, fn) => werte.map(([k, lbl]) => {
+    const an = jetzt === k;
+    const style = an ? "background:#000; border-color:#000; color:#fff;" : "background:#fff; border-color:#000; color:#000;";
+    return `<div class="chip" style="${style}" onclick="${fn}('${k}')">${esc(lbl)}</div>`;
+  }).join("");
+
+  const ordnungChips = chipReihe(
+    [["vorname","Alphabetisch"],["nachname","Nach Nachname"],["eingabe","Wie eingegeben"]],
+    ordnungsArt(), "setOrdnung");
+
+  const jahresChips = chipReihe(
+    [["gleich","Beide gleich"],["zweites","2. Semester doppelt"]],
+    (state.settings.jahresGewicht === "zweites") ? "zweites" : "gleich", "setJahresGewicht");
+
+  const fotoChips = chipReihe(
+    [["klein","Klein"],["mittel","Mittel"],["genau","Genau"]],
+    fotoStufe(), "setFotoQualitaet");
+
   const kopie = sicherheitskopieLesen();
   const kopieText = kopie
     ? "Die App hat am " + esc(kopieZeitText(kopie)) + " selbst eine Kopie angelegt, Anlass: " + esc(kopie.grund) + ". Sie liegt in diesem Gerät und enthält alles außer den Porträtfotos. Zurückholen führt sie mit dem jetzigen Stand zusammen, es geht nichts verloren."
@@ -5452,6 +6570,18 @@ function renderSettingsList(){
     <div class="helptext">Schriftgröße für dieses Gerät. Am Handy meist klein oder normal, am iPad und am Rechner oft groß angenehmer.</div>
     <div class="chips">${schriftChips}</div>
 
+    <div class="label" style="border-top:2px solid #000;">REIHENFOLGE DER KLASSENLISTE</div>
+    <div class="helptext">Wird beim Anlegen und bei jedem weiteren Namen sofort angewendet. „Nach Nachname" geht vom letzten Wort im Namen aus, taugt also nur, wenn die Namen als „Sophie Maier" eingetragen sind.</div>
+    <div class="chips">${ordnungChips}</div>
+
+    <div class="label" style="border-top:2px solid #000;">JAHRESWERT NACH EINEM SEMESTERABSCHLUSS</div>
+    <div class="helptext">Gilt erst, sobald ein 1. Semester abgeschlossen ist. Danach wird das ganze Jahr aus der vergebenen Semesternote und dem 2. Semester gerechnet. Ohne Abschluss zählen weiterhin alle Leistungen beider Semester einzeln.</div>
+    <div class="chips">${jahresChips}</div>
+
+    <div class="label" style="border-top:2px solid #000;">FOTOS</div>
+    <div class="helptext">Wie genau Fotos gespeichert werden. „Klein" reicht für Zeichnungen und Hefteinträge, „Genau" für eng beschriebene Schularbeiten. Die Bilder liegen in einem eigenen Speicher und nehmen den Noten keinen Platz weg.</div>
+    <div class="chips">${fotoChips}</div>
+
     <div class="label" style="border-top:2px solid #000;">SICHERHEITSKOPIE IM GERÄT</div>
     <div class="helptext">${kopieText}</div>
     ${kopie ? '<div class="footer"><button onclick="sicherheitskopieZurueck()">Sicherheitskopie zurückholen</button></div>' : ""}
@@ -5472,11 +6602,16 @@ function renderSettingsList(){
           </div>
         </div>
         <div class="helptext">${sp.fotos
-          ? sp.fotos + (sp.fotos === 1 ? " Foto belegt " : " Fotos belegen ") + fmtPct(sp.fotoAnteil) + " % davon. "
-          : "Noch keine Fotos gespeichert. "}${
+          ? "<b>" + sp.fotos + (sp.fotos === 1 ? " Foto liegt" : " Fotos liegen") + " noch im Datenspeicher</b> und " +
+            (sp.fotos === 1 ? "belegt " : "belegen ") + fmtPct(sp.fotoAnteil) + " % davon. "
+          : ""}${
           eng
-            ? "<b>Es wird eng.</b> Sichere jetzt und lösche danach alte Fotos, sonst lässt sich irgendwann nichts mehr eintragen. Die Sicherung enthält die Fotos weiterhin."
-            : "Fotos brauchen mit Abstand den meisten Platz. Ein Foto belegt etwa 40 KB, es passen also einige hundert."}</div>`;
+            ? "<b>Es wird eng.</b> Sichere jetzt und lösche danach alte Einträge, sonst lässt sich irgendwann nichts mehr eintragen. Die Sicherung enthält alles weiterhin."
+            : "Hier stehen nur die Noten und Texte. Ein ganzes Schuljahr für mehrere Klassen bleibt weit unter dieser Grenze."}</div>
+        <div class="helptext" style="padding-top:0;">${sp.bilderAusgelagert
+          ? "<b>Bilder:</b> " + sp.bilderAnzahl + (sp.bilderAnzahl === 1 ? " Foto" : " Fotos") + " mit zusammen "
+            + Math.round(sp.bilderBytes / 1024) + " KB liegen in der Bilddatenbank des Browsers, getrennt von den Noten. Dort ist der Platz um ein Vielfaches größer."
+          : "Dieses Gerät bietet keine eigene Bilddatenbank. Fotos liegen deshalb im selben Speicher wie die Noten, und der ist eng."}</div>`;
     })()}
 
     <div class="label" style="border-top:2px solid #000;">FASSUNG</div>
@@ -5858,9 +6993,24 @@ function toggleCat(cat, on){
   render();
 }
 
+/* Auch die Schulstufe entscheidet über den Schlüssel: in der 1. Klasse
+   gilt ein eigener. Deshalb ebenfalls mit Nachfrage. */
 function setStufe(stufe){
   const cls = getClass(settingsView.classId);
-  cls.stufe = (stufe === 1) ? 1 : 2;
+  if(!cls) return;
+  const neu = (stufe === 1) ? 1 : 2;
+  if((cls.stufe || 2) === neu) return;
+
+  const folgen = schluesselFolgenKern(cls, cls.subjects,
+    (f, s) => schluesselKey(cls, s, f),
+    (f, s) => schluesselKey({ stufe: neu }, s, f));
+  if(!folgenBestaetigen(folgen,
+      "Klasse " + cls.name + " auf " + (neu === 1 ? "1. Klasse" : "2. bis 4. Klasse") + " stellen?")){
+    render();
+    return;
+  }
+  schluesselFolgenAnwenden(folgen);
+  cls.stufe = neu;
   save();
   render();
 }
@@ -6000,10 +7150,27 @@ function niveauNamenZuruecksetzen(){
   render();
 }
 
+/* Leistungsniveaus je Fach ein- oder ausschalten. Auch das ändert den
+   Schlüssel: ohne Niveaus rechnet die App für alle nach der oberen Spalte.
+   Deshalb derselbe Weg wie beim Umstufen einer Person, mit Nachfrage. */
 function setNiveaus(an){
-  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
-  if(!sub) return;
-  sub.niveaus = !!an;
+  const cls = getClass(settingsView.classId);
+  const sub = getSubject(cls, settingsView.subjectId);
+  if(!sub || !cls) return;
+  const neu = !!an;
+  if(hatNiveaus(sub) === neu){ sub.niveaus = neu; save(); render(); return; }
+
+  const folgen = schluesselFolgenKern(cls, [sub],
+    (f, s) => schluesselKey(cls, s, f),
+    (f, s) => (cls.stufe || 2) === 1 ? "stufe1"
+              : (neu ? (s.niveau === "standard" ? "standard" : "ahs") : "ahs"));
+  if(!folgenBestaetigen(folgen,
+      "Leistungsniveaus in " + sub.fach + " " + (neu ? "einschalten" : "ausschalten") + "?")){
+    render();
+    return;
+  }
+  schluesselFolgenAnwenden(folgen);
+  sub.niveaus = neu;
   save();
   render();
 }
@@ -6347,6 +7514,16 @@ function deleteClass(){
 fassungPruefen();
 schriftAnwenden();
 render();
+
+/* Bilddatenbank öffnen, Bilder in den Arbeitsspeicher holen und Fotos aus
+   früheren Fassungen dorthin auslagern. Danach neu zeichnen. Läuft im
+   Hintergrund: die App ist vorher schon bedienbar, nur die Bilder
+   erscheinen einen Augenblick später. */
+fotoDbStarten(function(){
+  fotosEinlagern(function(verschoben){
+    if(verschoben || fotoBereit) render();
+  });
+});
 
 /* Gemerkten Sicherungsordner nachladen, danach neu zeichnen, damit der
    Hinweis in den Einstellungen stimmt. */

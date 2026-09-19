@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.6
+# Klassenheft, Version 17.7
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -45,6 +45,8 @@ Der kürzeste Weg im Alltag führt über die Klassenliste, nicht über die einze
 
 Ein zweiter Tipp in derselben Zeile bessert aus, es entsteht kein doppelter Eintrag. Das Kreuz rechts entfernt den gerade gemachten Eintrag wieder. Unten steht mit, wie viele Einträge du in diesem Durchgang gesetzt hast.
 
+**Alle auf einmal.** War die Stunde gut oder die Schularbeit schlecht, tippst du oben bei *Alle auf einmal* eine Note oder Stufe an. Sie wird auf **alle Zeilen gesetzt, die noch leer sind**; was du schon eingetragen hast, bleibt. Danach tippst du nur noch die Ausnahmen einzeln. Ein Tipp daneben kann dabei nie etwas überschreiben.
+
 Die Gewichtung gilt für den ganzen Durchgang und steht oben, änderbar mit einem Tipp auf *ändern*. Die App merkt sich die zuletzt gewählte Beurteilungsart.
 
 **Punkte statt Noten.** Bei Schularbeiten und allen Beurteilungen mit Notenschlüssel gibt es oben das Feld **Punkte gesamt**. Trägst du dort zum Beispiel 40 ein, wechselt jede Zeile auf ein Punktefeld. Du tippst nur noch die erreichten Punkte ein, die App rechnet die Note aus dem Leistungsniveau der jeweiligen Person und merkt sich die Grundlage, also etwa "33 von 40 Punkten, 82,5 %". Lässt du das Feld leer, bleibt es bei den Notenfeldern zum Antippen.
@@ -61,13 +63,33 @@ Nach der Aufnahme fragt die App, wozu das Foto gehört. **Der Text ist frei** �
 
 Ohne Text speichert die App nicht. Ein Foto, von dem in zwei Monaten niemand mehr weiß, wozu es gehört, ist keine Dokumentation.
 
-Jedes Bild wird **vor dem Speichern verkleinert**: ein Eintragsfoto auf 480 Punkte Breite, ein Porträtfoto auf 200 mal 200 quadratisch aus der Mitte. Aus einem 10 MB großen Kamerabild werden dabei etwa 40 KB. Das Original bleibt in deiner Fotos-App unberührt, die App legt nur die verkleinerte Fassung ab.
+Jedes Bild wird **vor dem Speichern verkleinert**, und zwar auf eine Zielgröße statt auf eine feste Qualität: die App probiert so lange, bis die Datei klein genug ist. Unter *Einstellungen*, Abschnitt **FOTOS**, wählst du die Stufe.
+
+| Stufe | Kantenlänge | ungefähr | Wofür |
+|---|---|---|---|
+| Klein | 640 | 35 kB | Zeichnungen, Hefteinträge |
+| Mittel | 1000 | 75 kB | Vorgabe, passt für das meiste |
+| Genau | 1500 | 170 kB | eng beschriebene Schularbeiten |
+
+Ein Porträtfoto wird immer auf 200 mal 200 quadratisch aus der Mitte gebracht. Das Original bleibt in deiner Fotos-App unberührt, die App legt nur die verkleinerte Fassung ab.
+
+### Fotos im Ausdruck
+
+Fotos hängen am Ende des Ausdrucks an, auf einer eigenen Seite, zwei Bilder je Zeile mit Beschriftung und Datum:
+
+| Blatt | Welche Fotos |
+|---|---|
+| Elternsprechtag-Blatt | alle Fotos dieser Person, über alle Fächer |
+| Klassenblatt | alle Fotos der Klasse in diesem Fach |
+| Blatt zu einer Schularbeit | die Fotos vom Tag dieser Arbeit |
 
 ### Wie viel Platz ist da
 
-Unter *Einstellungen*, Abschnitt **Speicher dieses Geräts**, siehst du, wie voll es ist und wie viel davon die Fotos ausmachen. Der Browser gibt einer App etwa **5 MB**. Das reicht für rund **hundert Fotos** neben allen Noten.
+Seit Version 17.7 liegen die Bilder **in einem eigenen Speicher**, getrennt von den Noten. Das ist der wichtige Teil: Geht dort der Platz aus, kannst du trotzdem weiter Noten eintragen.
 
-Ab 70 % wird der Balken auffällig und die App sagt es dir. Dann: einmal *Jetzt sichern*, danach alte Fotos in den Schüleransichten löschen. **Die Sicherung enthält die Fotos weiterhin** — gelöscht werden sie also nur aus der App, nicht aus der Sicherung.
+Unter *Einstellungen*, Abschnitt **Speicher dieses Geräts**, stehen beide Zahlen getrennt. Der Speicher für Noten und Texte fasst etwa **5 MB**; ein ganzes Schuljahr für mehrere Klassen bleibt weit darunter. Der Bilderspeicher ist um ein Vielfaches größer.
+
+Fotos aus früheren Fassungen werden beim ersten Start von selbst umgelagert. Du musst nichts tun. **Die Sicherung enthält die Fotos weiterhin.**
 
 Wird es doch einmal zu eng, sagt die App beim Speichern klar, dass der Eintrag **nicht** übernommen wurde, und stellt den letzten gespeicherten Stand wieder her. Was du auf dem Bildschirm siehst, ist damit immer das, was wirklich gespeichert ist.
 
@@ -89,6 +111,24 @@ Die Schwellen sind bewusst so gesetzt, dass in einer üblichen Klasse eine Handv
 Warum mehrere Gründe: Ein schwacher Schnitt und fehlende Mitarbeit sind verschiedene Gespräche. Wer nur den Schnitt sieht, übersieht das Kind, das die Schularbeiten schafft, aber im Unterricht nicht mehr mitgeht.
 
 Die Schwellen stehen im Code ganz oben bei `AUFFALL_SCHNITT`, `AUFFALL_MITARBEIT` und `AUFFALL_MIN_STUFEN` und lassen sich ändern, siehe Bastelanleitung.
+
+### Und wer verlässlich mitarbeitet
+
+Seit 17.7 gibt es das Gegenstück. Wer bei mindestens vier Einstufungen zu 70 % in den obersten Stufen liegt, hat eine **leicht grüne** Zeile. Auffällige Zeilen sind **rötlich**. Der Grund steht in beiden Fällen als Text daneben, weil Rot und Grün nicht jeder auseinanderhält.
+
+Rot schlägt Grün: Wer Aufmerksamkeit braucht, wird nicht gleichzeitig gelobt.
+
+### Die Besten je Beurteilungsart
+
+Neben dem Namen steht eine **Krone**, wenn diese Person in einer Beurteilungsart die beste der Klasse ist. Unter der Liste steht, wer das je Art ist, mit dem Schnitt daneben. Die Bestenliste steht auch auf dem Klassenblatt im Ausdruck.
+
+Zwei Regeln halten das ehrlich: Es braucht **mindestens drei Eintragungen** in dieser Art, und sind alle gleich gut, wird niemand ausgezeichnet. Gleichstand an der Spitze ist erlaubt, dann tragen alle die Krone.
+
+## Die Klassenliste ist alphabetisch
+
+Beim Anlegen und bei jedem weiteren Namen wird sofort einsortiert. Unter *Einstellungen*, Abschnitt **REIHENFOLGE DER KLASSENLISTE**, wählst du zwischen *Alphabetisch* (nach dem Namen, wie er dasteht), *Nach Nachname* (nach dem letzten Wort) und *Wie eingegeben*.
+
+Die Noten hängen an der Person, nicht an der Position in der Liste. Umsortieren kostet also nichts.
 
 ## Welche Schularbeit ist das?
 
@@ -197,6 +237,14 @@ Unter dem Verlauf steht ein Bereich zum Herzeigen. Tipp eine Beurteilungsart an,
 
 **Es wird dabei nichts verändert und nichts gespeichert.** Der echte Notenschnitt bleibt, wie er ist. *Zurücksetzen* räumt die Vorschau wieder ab.
 
+### Was bringt die nächste Leistung
+
+Darunter, seit 17.7: je Beurteilungsart fünf Kacheln mit dem Schnitt, der sich ergäbe, wenn die nächste Leistung eine 1, 2, 3, 4 oder 5 wird. Dazu ein Satz:
+
+> Für eine 2 im Schnitt braucht es hier mindestens eine 1.
+
+Steht die bessere Note nicht mehr in Reichweite, steht dort stattdessen, was es braucht, um die jetzige zu halten. Auch hier wird nichts gespeichert.
+
 ### Thema einer Leistung
 
 In jeder Eingabemaske gibt es ein freiwilliges Feld **Thema**: Bruchrechnung, Gleichungen, Seite 42. Es steht danach beim Eintrag, auf dem Elternsprechtag-Blatt und in der Word-Sicherung. Leer lassen ist der Normalfall, dann steht dort wie bisher nur die Beurteilungsart.
@@ -218,6 +266,28 @@ Ist es ausgeschaltet:
 
 Das war vorher anders: Die App hat das Niveau in jedem Fach angesetzt. In Geografie bekamen damit zwei Kinder für dieselbe Prozentzahl zwei verschiedene Noten, je nachdem, was in Deutsch eingestellt war.
 
+## Jemanden umstufen
+
+Stellst du in der Schüleransicht das **Leistungsniveau** um, gilt ab dann ein anderer Notenschlüssel. Die App leitet deshalb jede Note, die aus Punkten oder Prozent entstanden ist, **neu ab**: 66 Prozent sind bei Standard eine 1 und bei Standard AHS eine 3.
+
+Vorher fragt sie und zeigt jede einzelne Änderung mit Grundlage, alter und neuer Note. Sagst du Nein, bleibt alles, wie es war. Das Umstufen gilt für die ganze Klasse, also für alle Fächer.
+
+**Unberührt bleibt, was dein Urteil ist:** Mitarbeit, Hausübung, Kompetenz-Check und jede Note, die du direkt angetippt hast. Die Mitarbeit hängt nicht am Leistungsniveau; wer jede Stunde mitarbeitet, arbeitet nicht schlechter mit, weil er umgestuft wurde.
+
+Dasselbe passiert, wenn du die Leistungsniveaus in einem Fach **abschaltest** oder eine Klasse von **1. Klasse auf 2. bis 4. Klasse** stellst.
+
+## Semester abschließen
+
+Am Ende eines Semesters trägst du die Note ein, die du vergibst. Ab dann steht dieses Semester fest, und das ganze Jahr wird aus dieser Note und dem zweiten Semester gerechnet statt aus allen einzelnen Leistungen.
+
+**Für die ganze Klasse:** in der Klassenliste unten der Knopf *1. Semester abschließen*. Dort steht je Kind der Rechenwert und fünf Kacheln; die vorgeschlagene ist dünn umrandet. *Alle Vorschläge übernehmen* setzt in einem Zug alles, was noch offen ist.
+
+**Einzeln:** in der Schüleransicht unter dem Notenschnitt.
+
+Ob beide Semester gleich zählen oder das zweite doppelt, stellst du unter *Einstellungen*, Abschnitt **JAHRESWERT NACH EINEM SEMESTERABSCHLUSS**, ein.
+
+Stellst du die Ansicht auf *Ganzes Jahr*, heißt der Knopf *Jahresnote festlegen*. **Aufheben geht jederzeit**, es wird nichts gelöscht.
+
 ## Eigener Notenschlüssel
 
 *Einstellungen*, Fach auswählen, Abschnitt **EIGENER NOTENSCHLÜSSEL**, Knopf **selbst festlegen**.
@@ -227,6 +297,8 @@ Dort stehen vier Zahlen: ab wie viel Prozent es eine 1, eine 2, eine 3 und eine 
 Jede Zahl muss kleiner sein als die darüber und zwischen 1 und 100 liegen. Solange das nicht stimmt, steht es in Rot darunter, und das Fach rechnet weiter mit dem bisherigen Schlüssel — es entsteht also nie ein halbfertiger Schlüssel, mit dem benotet wird.
 
 **Bereits eingetragene Noten ändern sich dadurch nicht.** Der neue Schlüssel gilt für alles, was du ab dann über Prozent oder Punkte eingibst. Eine alte Note, die nach dem neuen Schlüssel anders ausfallen soll, trägst du neu ein.
+
+Das ist der Unterschied zum **Wechsel des Leistungsniveaus**: Dort werden die Noten neu abgeleitet, weil dieselbe Leistung mit einem anderen Maßstab gemessen wird. Hier änderst du den Maßstab selbst, mitten im Jahr, und die Noten davor sind nach dem Maßstab vergeben worden, der damals galt.
 
 Mit **Wieder die Vorgabe verwenden** kommst du zum voreingestellten Schlüssel zurück.
 
