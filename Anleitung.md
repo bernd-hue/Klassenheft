@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.8
+# Klassenheft, Version 17.9
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -229,21 +229,38 @@ Ein Tippfehler im Namen fällt oft erst Wochen später auf. Tippe in der Schüle
 
 Der Tag der Schularbeit ist selten der Tag, an dem du sie korrigierst und einträgst. Klapp die Einträge auf, tipp auf das **unterstrichene Datum** und trag den richtigen Tag ein, im Format TT.MM. Die App prüft die Eingabe und lehnt einen 32. Jänner ab.
 
-### Was-wäre-wenn
+### Ausblick
 
-Unter dem Verlauf steht ein Bereich zum Herzeigen. Tipp eine Beurteilungsart an, um sie **probeweise** aus der Rechnung zu nehmen, und du siehst sofort, was das mit der Note macht. Darunter steht ausgerechnet, welcher Schnitt herauskäme, wenn die Mitarbeit ab jetzt durchgehend die beste Stufe wäre — genau der Satz, den man einem Kind sagen will:
+Das ist der Teil für das Gespräch mit dem Kind. Drei Zeilen, mehr nicht:
 
-> Bei durchgehend bester Mitarbeit: Ø 2,9 statt Ø 3,5 jetzt.
+```
+AUSBLICK BIS ZUM SEMESTERENDE
 
-**Es wird dabei nichts verändert und nichts gespeichert.** Der echte Notenschnitt bleibt, wie er ist. *Zurücksetzen* räumt die Vorschau wieder ab.
+So weiter wie bisher              Ø 3,0
+Befriedigend · bleibt wie jetzt
 
-### Was bringt die nächste Leistung
+Wenn die Mitarbeit besser wird    Ø 2,5
+zwischen Gut und Befriedigend · 0,45 besser als so weiter
 
-Darunter, seit 17.7: je Beurteilungsart fünf Kacheln mit dem Schnitt, der sich ergäbe, wenn die nächste Leistung eine 1, 2, 3, 4 oder 5 wird. Dazu ein Satz:
+Wenn die Mitarbeit nachlässt      Ø 3,5
+zwischen Befriedigend und Genügend · 0,45 schlechter als so weiter
 
-> Für eine 2 im Schnitt braucht es hier mindestens eine 1.
+Angenommen, es kommen bis dahin noch etwa 1× Schularbeit,
+3× Mitarbeit dazu.
+```
 
-Steht die bessere Note nicht mehr in Reichweite, steht dort stattdessen, was es braucht, um die jetzige zu halten. Auch hier wird nichts gespeichert.
+**Woher die Hochrechnung kommt.** Die App sieht auf den Kalender: Ist das Semester zur Hälfte um und liegen vier Mitarbeitseintragungen vor, kommen etwa vier dazu. Die künftigen Eintragungen bekommen in der ersten Zeile den bisherigen Schnitt dieser Person, in der zweiten die beste und in der dritten die schlechteste Stufe.
+
+**Hat jemand noch gar keine Mitarbeitseintragung**, nimmt die App als Anzahl das, was in dieser Klasse üblich ist. Genau der Fall, über den man mit einem Kind spricht, das sich bisher nie gemeldet hat. Steht auch in der Klasse noch nichts, entfallen die beiden unteren Zeilen und die App sagt, warum.
+
+**Darunter der Satz, um den es eigentlich geht:**
+
+> Die Mitarbeit kostet dich gerade 0,5 Notenstufen.
+> Ohne sie stünde jetzt Ø 2,5 da statt Ø 3,0.
+
+Steht die Mitarbeit gut, heißt es umgekehrt *bringt dir gerade*. Das ist die eine Zahl, die ein Kind versteht.
+
+**Es wird dabei nichts verändert und nichts gespeichert.** Ist der Zeitraum abgeschlossen, entfällt der Ausblick, denn dann ist die Note vergeben.
 
 ### Thema einer Leistung
 

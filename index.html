@@ -256,7 +256,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.8";
+const APP_FASSUNG = "17.9";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1646,6 +1646,7 @@ let letzterGuterStand = null;
    war er weg. Deshalb wird der Stand jetzt zurückgerollt: Was du siehst,
    ist das, was wirklich gespeichert ist. */
 function save(){
+  einstellungsStempel();
   const text = JSON.stringify({ version: 4, classes: state.classes, settings: state.settings });
   try{
     localStorage.setItem(STORAGE_KEY, text);
@@ -2062,96 +2063,217 @@ function tendenzFarbe(v){
   return { fg:"#A8241C", bg:"#FAEEEE" };
 }
 
-/* ---------- NOTENVORHERSAGE ----------
-   Zum Herzeigen: Kategorien probeweise weglassen und sehen, was das mit der
-   Note macht. Verändert nichts am Bestand, es wird nichts gespeichert. */
-let vorschauAus = [];
+/* ---------- AUSBLICK ----------
+   Die Frage, die im Gespräch mit einem Kind wirklich gestellt wird, lautet
+   nicht "was wäre, wenn die Hausübung nicht zählte", sondern:
 
-function vorschauSchnitt(sub, studentId, sem){
-  /* Bewusst der Rechenwert: die Vorschau zeigt, was die Rechnung ergäbe,
-     nicht eine bereits vergebene Note. */
-  if(!vorschauAus.length) return schnittBerechnet(sub, studentId, sem);
-  const kopie = JSON.parse(JSON.stringify(sub));
-  kopie.cats = (kopie.cats || []).filter(k => vorschauAus.indexOf(k) === -1);
-  kopie.stufenBonus = (kopie.stufenBonus || []).filter(k => vorschauAus.indexOf(k) === -1);
-  kopie.stufenZaehlt = (kopie.stufenZaehlt || []).filter(k => vorschauAus.indexOf(k) === -1);
-  kopie.entries = kopie.entries.filter(e => vorschauAus.indexOf(e.cat) === -1);
-  return schnittBerechnet(kopie, studentId, sem);
+     Wenn ich so weitermache, wo komme ich heraus?
+
+   Der Ausblick beantwortet genau das, in drei Zeilen: so weiter wie bisher,
+   mit besserer Mitarbeit, mit nachlassender Mitarbeit.
+
+   Dafür muss die App schätzen, wie viele Leistungen bis zum Ende des
+   Zeitraums noch kommen. Das tut sie aus dem Kalender, nicht aus einer
+   Einstellung: Ist das Semester zur Hälfte um und liegen sechs
+   Mitarbeitseinträge vor, kommen etwa sechs dazu. Die Annahme steht
+   darunter im Klartext, damit niemand eine Genauigkeit vermutet, die es
+   nicht gibt. */
+
+/* Anfang und Ende eines Zeitraums als Position im Schuljahr, gerechnet wie
+   schuljahrOrdnung: September ist der Anfang, August das Ende. */
+const ZEITRAUM_GRENZEN = {
+  1:     [schuljahrOrdnung("01.09."), schuljahrOrdnung("05.02.")],
+  2:     [schuljahrOrdnung("06.02."), schuljahrOrdnung("05.07.")],
+  alle:  [schuljahrOrdnung("01.09."), schuljahrOrdnung("05.07.")]
+};
+
+/* Wie weit ist der Zeitraum herum? 0 heißt gerade begonnen, 1 vorbei. */
+function zeitraumAnteil(sem){
+  const g = ZEITRAUM_GRENZEN[sem] || ZEITRAUM_GRENZEN.alle;
+  const jetzt = schuljahrOrdnung(today());
+  if(jetzt === 999999) return 1;
+  if(jetzt <= g[0]) return 0;
+  if(jetzt >= g[1]) return 1;
+  return (jetzt - g[0]) / (g[1] - g[0]);
 }
 
-/* Was käme heraus, wenn die Mitarbeit ab jetzt durchgehend die beste Stufe
-   wäre? Genau der Satz, den man dem Kind sagen will. */
-/* ---------- WAS-WÄRE-WENN: DIE NÄCHSTE LEISTUNG ----------
-   Die häufigste Frage im Gespräch mit Eltern und Kindern ist nicht
-   "was wäre, wenn die Hausübung nicht zählte", sondern "was brauche ich
-   in der nächsten Schularbeit". Genau das rechnet dieser Teil.
-
-   Gerechnet wird mit einer gedachten zusätzlichen Leistung. Es wird
-   nichts gespeichert und nichts verändert: die Kopie des Fachs bekommt den
-   Eintrag nur für die Dauer der Rechnung. */
-function probeSchnitt(sub, studentId, sem, cat, wert){
-  const gedacht = { id: "__probe", studentId: studentId, type: "note", cat: cat,
-    value: wert, w: startWeight(sub, cat), ts: Date.now(),
-    sem: (sem === undefined || sem === "alle") ? semesterFuerNeu() : sem, date: today() };
-  const kopie = Object.assign({}, sub, { entries: sub.entries.concat([gedacht]) });
-  return schnittBerechnet(kopie, studentId, sem);
+/* Wie viele Leistungen dieser Art noch zu erwarten sind. Ohne bisherige
+   Eintragung wird nichts geschätzt: aus nichts lässt sich nichts
+   hochrechnen. */
+function nochZuErwarten(anzahlBisher, anteil){
+  if(!anzahlBisher) return 0;
+  if(anteil >= 0.97) return 0;
+  const rest = anzahlBisher * (1 / Math.max(0.08, anteil) - 1);
+  /* Nach oben begrenzt: am Schulanfang wäre die Hochrechnung sonst wild. */
+  return Math.max(0, Math.min(anzahlBisher * 3, Math.round(rest)));
 }
 
-/* Für jede mitzählende Beurteilungsart: wohin der Schnitt geht, wenn die
-   nächste Leistung eine 1, 2, 3, 4 oder 5 wird. */
-function naechsteLeistung(sub, studentId, sem){
+/* Kategorien, die das Kind selbst in der Hand hat: alles, was eingestuft
+   statt benotet wird, also Mitarbeit und Hausübung. Wirkt keine davon,
+   tritt an ihre Stelle die Beurteilungsart mit dem größten Gewicht. */
+function ausblickCats(sub){
+  const stufig = activeCats(sub).filter(k => istStufenCat(sub, k)
+    && (stufeZaehlt(sub, k) || istBonusCat(sub, k)));
+  if(stufig.length) return { cats: stufig, stufig: true };
+  const noten = notenCats(sub);
+  return { cats: noten.length ? [noten[0]] : [], stufig: false };
+}
+
+/* Wie viele Eintragungen dieser Art in dieser Klasse üblich sind. Wird
+   gebraucht, wenn eine Person in einer Beurteilungsart noch gar nichts
+   stehen hat: aus dem eigenen Nichts lässt sich nichts hochrechnen, aus
+   dem, was bei den anderen schon dasteht, sehr wohl. Genommen wird der
+   mittlere Wert derer, die überhaupt etwas haben. */
+function typischeAnzahl(cls, sub, cat, sem, stufig){
+  if(!cls) return 0;
+  const zahlen = (cls.students || []).map(st =>
+    entriesOf(sub, st.id, sem).filter(e => stufig
+      ? (e.type === "stufe" && e.cat === cat)
+      : (e.type === "note" && e.cat === cat)).length).filter(n => n > 0);
+  if(!zahlen.length) return 0;
+  zahlen.sort((a, b) => a - b);
+  return zahlen[Math.floor(zahlen.length / 2)];
+}
+
+/* Der Kern: legt die erwarteten Leistungen dazu und rechnet neu.
+   `wahl` ist "weiter", "besser" oder "schlechter". */
+function ausblickSchnitt(cls, sub, studentId, sem, wahl){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  const anteil = zeitraumAnteil(z);
+  const drin = entriesOf(sub, studentId, z);
+  const beweglich = ausblickCats(sub).cats;
+  const zusatz = [];
+  let beweglichDrin = false;
+
+  activeCats(sub).forEach(cat => {
+    const stufig = istStufenCat(sub, cat);
+    const wirkt = stufig ? (stufeZaehlt(sub, cat) || istBonusCat(sub, cat)) : catZaehlt(sub, cat);
+    if(!wirkt) return;
+    const eigene = drin.filter(e => stufig
+      ? (e.type === "stufe" && e.cat === cat)
+      : (e.type === "note" && e.cat === cat));
+
+    const aenderbar = beweglich.indexOf(cat) !== -1 && wahl !== "weiter";
+    /* Steht hier noch gar nichts, bleibt "so weiter wie bisher" leer: es
+       gibt nichts, was weitergehen könnte. Für "besser" und "schlechter"
+       wird dagegen angenommen, dass ab jetzt so oft eingetragen wird wie
+       in dieser Klasse üblich. Genau der Fall, über den man mit einem Kind
+       spricht, das sich bisher nie gemeldet hat. */
+    const n = eigene.length
+      ? nochZuErwarten(eigene.length, anteil)
+      : (aenderbar ? nochZuErwarten(typischeAnzahl(cls, sub, cat, z, stufig), anteil) : 0);
+    if(!n) return;
+    if(beweglich.indexOf(cat) !== -1) beweglichDrin = true;
+    if(stufig){
+      const anzahlStufen = stufenListe(sub, cat).length;
+      const schnitt = eigene.length
+        ? eigene.reduce((a, e) => a + (e.stufe || 0), 0) / eigene.length
+        : anzahlStufen - 1;
+      const stufe = aenderbar
+        ? (wahl === "besser" ? 0 : anzahlStufen - 1)
+        : Math.round(schnitt);
+      for(let i = 0; i < n; i++){
+        zusatz.push({ id: "__aus" + cat + i, studentId: studentId, type: "stufe",
+          cat: cat, stufe: Math.max(0, Math.min(anzahlStufen - 1, stufe)),
+          ts: Date.now(), sem: (z === "alle") ? semesterFuerNeu() : z, date: today() });
+      }
+    } else {
+      const schnitt = eigene.length
+        ? eigene.reduce((a, e) => a + e.value, 0) / eigene.length
+        : 3;
+      const wert = aenderbar
+        ? Math.max(1, Math.min(5, schnitt + (wahl === "besser" ? -1 : 1)))
+        : schnitt;
+      for(let i = 0; i < n; i++){
+        zusatz.push({ id: "__aus" + cat + i, studentId: studentId, type: "note",
+          cat: cat, value: wert, w: startWeight(sub, cat),
+          ts: Date.now(), sem: (z === "alle") ? semesterFuerNeu() : z, date: today() });
+      }
+    }
+  });
+
+  if(!zusatz.length) return null;
+  const kopie = Object.assign({}, sub, { entries: sub.entries.concat(zusatz) });
+  return { wert: schnittBerechnet(kopie, studentId, z), anzahl: zusatz.length,
+           beweglichDrin: beweglichDrin,
+           gedeckelt: bonusSumme(kopie, studentId, z).gedeckelt };
+}
+
+/* Alles, was der Ausblick anzeigt, an einer Stelle gerechnet. */
+function ausblick(cls, sub, studentId, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  if(abschlussNote(sub, studentId, z) !== null) return null;
+  const jetzt = schnittBerechnet(sub, studentId, z);
+  if(jetzt === null) return null;
+
+  const weiter = ausblickSchnitt(cls, sub, studentId, z, "weiter");
+  const besser = ausblickSchnitt(cls, sub, studentId, z, "besser");
+  const schlechter = ausblickSchnitt(cls, sub, studentId, z, "schlechter");
+  /* Ohne jede Hochrechnung gibt es nichts zu zeigen. */
+  if(!weiter && !besser && !schlechter) return null;
+  const weiterWert = (weiter && weiter.wert !== null) ? weiter.wert : jetzt;
+  const bew = ausblickCats(sub);
+
+  /* Womit gerechnet wurde, in Worten. */
+  const anteil = zeitraumAnteil(z);
+  const drin = entriesOf(sub, studentId, z);
+  const teile = [];
+  activeCats(sub).forEach(cat => {
+    const stufig = istStufenCat(sub, cat);
+    const wirkt = stufig ? (stufeZaehlt(sub, cat) || istBonusCat(sub, cat)) : catZaehlt(sub, cat);
+    if(!wirkt) return;
+    const eigene = drin.filter(e => stufig
+      ? (e.type === "stufe" && e.cat === cat)
+      : (e.type === "note" && e.cat === cat));
+    if(eigene.length){
+      const n = nochZuErwarten(eigene.length, anteil);
+      if(n) teile.push(n + "× " + catLabel(sub, cat));
+    } else if(bew.cats.indexOf(cat) !== -1){
+      /* Dieselbe Regel wie in der Rechnung: ohne eigene Eintragung gilt,
+         was in dieser Klasse üblich ist. Das gehört dazugeschrieben. */
+      const n = nochZuErwarten(typischeAnzahl(cls, sub, cat, z, stufig), anteil);
+      if(n) teile.push(n + "× " + catLabel(sub, cat) + " (in dieser Klasse üblich)");
+    }
+  });
+
+  /* Lässt sich für das Bewegliche gar nichts hochrechnen, weil dort noch
+     nichts eingetragen ist, werden die beiden Zeilen weggelassen. Eine
+     Zeile "ändert nichts mehr" wäre hier eine Aussage über die Mitarbeit,
+     die die App gar nicht treffen kann. */
+  const ohneBasis = !(besser && besser.beweglichDrin);
+
+  return {
+    jetzt: jetzt,
+    weiter: weiterWert,
+    besser: (besser && !ohneBasis) ? besser.wert : null,
+    schlechter: (schlechter && !ohneBasis) ? schlechter.wert : null,
+    ohneBasis: ohneBasis,
+    beweglich: bew.cats.map(k => catLabel(sub, k)),
+    gedeckelt: !!(weiter && weiter.gedeckelt) || !!(schlechter && schlechter.gedeckelt),
+    stufig: bew.stufig,
+    annahme: teile,
+    zeitraum: z
+  };
+}
+
+/* Die eine Zeile, die vom alten Was-wäre-wenn übrig bleibt: was die
+   Mitarbeit ausmacht. */
+function ohneMitarbeit(sub, studentId, sem){
+  const bew = ausblickCats(sub);
+  if(!bew.stufig || !bew.cats.length) return null;
   const jetzt = schnittBerechnet(sub, studentId, sem);
-  if(jetzt === null) return [];
-  return notenCats(sub).map(cat => ({
-    cat: cat,
-    label: catLabel(sub, cat),
-    werte: [1,2,3,4,5].map(v => probeSchnitt(sub, studentId, sem, cat, v))
-  })).filter(z => z.werte.some(v => v !== null));
+  if(jetzt === null) return null;
+  const kopie = Object.assign({}, sub, {
+    cats: (sub.cats || []).filter(k => bew.cats.indexOf(k) === -1),
+    stufenBonus: (sub.stufenBonus || []).filter(k => bew.cats.indexOf(k) === -1),
+    stufenZaehlt: (sub.stufenZaehlt || []).filter(k => bew.cats.indexOf(k) === -1),
+    entries: sub.entries.filter(e => bew.cats.indexOf(e.cat) === -1)
+  });
+  const ohne = schnittBerechnet(kopie, studentId, sem);
+  if(ohne === null || Math.abs(ohne - jetzt) < 0.005) return null;
+  return { jetzt: jetzt, ohne: ohne, was: bew.cats.map(k => catLabel(sub, k)) };
 }
 
-/* Welche Note es in der nächsten Leistung dieser Art mindestens braucht,
-   damit der Schnitt noch auf die gewünschte Note gerundet wird. Gibt null
-   zurück, wenn das mit einer einzigen Leistung nicht mehr geht. */
-function nochNoetig(sub, studentId, sem, cat, ziel){
-  for(let v = 5; v >= 1; v--){
-    const s = probeSchnitt(sub, studentId, sem, cat, v);
-    if(s !== null && Math.round(s) <= ziel) return v;
-  }
-  return null;
-}
-
-/* Der Rahmen, in dem sich die Note mit einer weiteren Leistung noch
-   bewegen kann: bestenfalls eine 1, schlimmstenfalls eine 5. */
-function spielraum(sub, studentId, sem, cat){
-  const gut = probeSchnitt(sub, studentId, sem, cat, 1);
-  const schlecht = probeSchnitt(sub, studentId, sem, cat, 5);
-  if(gut === null || schlecht === null) return null;
-  return { gut: gut, schlecht: schlecht };
-}
-
-function bestenfalls(sub, studentId, sem){
-  const bonusCats = activeCats(sub).filter(k => istBonusCat(sub, k));
-  if(!bonusCats.length) return null;
-  const grund = schnittOhneBonus(sub, studentId, sem);
-  if(grund === null) return null;
-  const jetzt = schnittBerechnet(sub, studentId, sem);
-
-  const kopie = Object.assign({}, sub, { entries: sub.entries.map(e => {
-    if(e.type === "stufe" && bonusCats.indexOf(e.cat) !== -1) return Object.assign({}, e, { stufe: 0 });
-    return e;
-  }) });
-  const best = schnittBerechnet(kopie, studentId, sem);
-  if(best === null || Math.abs(best - jetzt) < 0.005) return null;
-  return { jetzt: jetzt, best: best, cats: bonusCats.map(k => catLabel(sub, k)) };
-}
-
-function vorschauSchalten(cat){
-  const i = vorschauAus.indexOf(cat);
-  if(i === -1) vorschauAus.push(cat); else vorschauAus.splice(i, 1);
-  render();
-}
-
-function vorschauZuruecksetzen(){ vorschauAus = []; render(); }
 
 /* ---------- SCHULARBEITEN VERGLEICHEN ----------
    Schularbeiten haben in der Praxis das größte Gewicht. Deshalb die Frage:
@@ -3217,67 +3339,60 @@ function renderStudent(){
       }).join("")}
     </div>`;
 
-  /* ---------- Notenvorhersage ---------- */
-  const vorschauCats = activeCats(sub).filter(k =>
-    notenCats(sub).indexOf(k) !== -1 || istBonusCat(sub, k));
-  const vorschauWert = vorschauSchnitt(sub, s.id);
-  const best = bestenfalls(sub, s.id);
-  /* ---------- Die nächste Leistung durchspielen ----------
-     Die Frage, die im Gespräch wirklich gestellt wird. */
-  const naechste = naechsteLeistung(sub, s.id);
-  const naechsteBlock = !naechste.length ? "" : `
-    <div class="label" style="border-top:2px solid #000;">WAS BRINGT DIE NÄCHSTE LEISTUNG</div>
-    <div class="helptext">Angenommen, es kommt noch eine Leistung dazu: Das wäre der Schnitt danach. Es wird nichts gespeichert.</div>
-    ${naechste.map(z => {
-      const c = catCol(sub, z.cat);
-      const kacheln = z.werte.map((w, i) => {
-        const g = gradeColor(i + 1);
-        return `<div style="flex:1; min-width:46px; text-align:center; border:1.5px solid ${g.fg}; background:${g.bg}; border-radius:6px; padding:4px 2px;">
-          <div style="font-size:11px; color:${g.fg}; font-weight:bold;">${i + 1}</div>
-          <div style="font-size:14px; font-weight:bold;">${fmtO(w)}</div>
-        </div>`;
-      }).join("");
-      /* Ein Satz dazu: was es für die nächstbessere Note noch braucht. */
-      const jetztNote = Math.round(schnitt);
-      const ziel = Math.max(1, jetztNote - 1);
-      const noetig = (jetztNote > 1) ? nochNoetig(sub, s.id, undefined, z.cat, ziel) : null;
-      const halten = nochNoetig(sub, s.id, undefined, z.cat, jetztNote);
-      const satz = (jetztNote > 1 && noetig !== null)
-        ? "Für eine " + ziel + " im Schnitt braucht es hier mindestens eine " + noetig + "."
-        : (halten !== null && halten < 5
-            ? "Um die " + jetztNote + " zu halten, darf es hier höchstens eine " + halten + " werden."
-            : (jetztNote === 1 ? "" : "Mit einer einzigen Leistung ist die " + ziel + " nicht mehr erreichbar."));
-      return `<div style="padding:4px 16px 10px;">
-        <div style="font-size:12px; font-weight:bold; color:${c.fg};">Nächste ${esc(z.label)}</div>
-        <div style="display:flex; gap:4px; margin-top:4px;">${kacheln}</div>
-        ${satz ? '<div style="font-size:12px; margin-top:4px;">' + esc(satz) + "</div>" : ""}
-      </div>`;
-    }).join("")}`;
+  /* ---------- AUSBLICK ----------
+     Drei Zeilen, mehr nicht. Was im Gespräch mit dem Kind gesagt wird,
+     steht dort wörtlich. */
+  const aus = ausblick(cls, sub, s.id);
+  const ohneMit = ohneMitarbeit(sub, s.id);
 
-  const vorschauBlock = (!vorschauCats.length || schnitt === null) ? "" : `
-    <div class="label" style="border-top:2px solid #000;">WAS-WÄRE-WENN</div>
-    <div class="helptext">Zum Herzeigen: Beurteilungsarten wegschalten und sehen, was das mit der Note macht. Es wird dabei nichts verändert und nichts gespeichert.</div>
-    <div class="chips">
-      ${vorschauCats.map(k => {
-        const c = catCol(sub, k);
-        const aus = vorschauAus.indexOf(k) !== -1;
-        const stil = aus
-          ? "background:#fff; border-color:#999; color:#999; text-decoration:line-through;"
-          : `background:${c.bg}; border-color:${c.fg}; color:${c.fg};`;
-        return `<div class="chip vorschau-chip" style="${stil}" onclick="vorschauSchalten('${k}')">${esc(catShort(sub, k))}</div>`;
-      }).join("")}
-      ${vorschauAus.length ? '<div class="chip vorschau-chip" style="background:#000; border-color:#000; color:#fff;" onclick="vorschauZuruecksetzen()">zurücksetzen</div>' : ""}
-    </div>
-    ${vorschauAus.length ? `
-      <div style="padding:0 16px 12px;">
-        <div style="font-size:15px; font-weight:bold;">Ohne ${esc(vorschauAus.map(k => catLabel(sub, k)).join(", "))}: ${fmtO(vorschauWert)}</div>
-        <div style="font-size:12px;">statt ${fmtO(schnitt)} mit allem.</div>
-      </div>` : ""}
-    ${best ? `
-      <div style="padding:0 16px 12px;">
-        <div style="font-size:15px; font-weight:bold;">Bei durchgehend bester ${esc(best.cats.join(" und "))}: ${fmtO(best.best)}</div>
-        <div style="font-size:12px;">statt ${fmtO(best.jetzt)} jetzt. Das ist der Unterschied, den die Mitarbeit noch machen kann.</div>
-      </div>` : ""}`;
+  /* Eine Zeile des Ausblicks. `bezug` ist der Wert, gegen den verglichen
+     wird: die erste Zeile gegen den heutigen Stand, die beiden anderen
+     gegen die erste. Ändert sich nichts, steht der Grund da statt einer
+     Null, sonst sähe die Zeile nach einem Fehler aus. */
+  const ausblickZeile = (titel, wert, bezug, bezugName, gleichText, fett) => {
+    if(wert === null) return "";
+    const g = gradeColor(Math.max(1, Math.min(5, Math.round(wert))));
+    const d = wert - bezug;
+    const zusatz = Math.abs(d) < 0.05
+      ? gleichText
+      : fmtB(Math.abs(d)) + (d < 0 ? " besser " : " schlechter ") + bezugName;
+    return `<div style="display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid #000;${
+        fett ? " background:" + g.bg + ";" : ""}">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:14px;${fett ? " font-weight:bold;" : ""}">${esc(titel)}</div>
+        <div class="sub">${esc(notenWort(wert))} &middot; ${esc(zusatz)}</div>
+      </div>
+      <span style="font-size:23px; font-weight:bold; color:${g.fg}; white-space:nowrap;">${fmtO(wert)}</span>
+    </div>`;
+  };
+
+  const was = aus ? (aus.beweglich.join(" und ") || "die Mitarbeit") : "";
+  const ausblickBlock = !aus ? "" : `
+    <div class="label" style="border-top:2px solid #000;">AUSBLICK BIS ${
+      aus.zeitraum === "alle" ? "ZUM SCHULJAHRESENDE" : "ZUM SEMESTERENDE"}</div>
+    ${ausblickZeile("So weiter wie bisher", aus.weiter, aus.jetzt, "als jetzt", "bleibt wie jetzt", true)}
+    ${aus.besser === null ? "" : ausblickZeile("Wenn die " + was + " besser wird",
+        aus.besser, aus.weiter, "als so weiter", "ändert nichts mehr")}
+    ${aus.schlechter === null ? "" : ausblickZeile("Wenn die " + was + " nachlässt",
+        aus.schlechter, aus.weiter, "als so weiter", "ändert nichts mehr")}
+    ${!aus.ohneBasis ? "" : '<div class="helptext">Für ' + esc(was)
+      + " gibt es in diesem Zeitraum noch keine Eintragungen. Sobald welche da sind, steht hier, was "
+      + esc(aus.beweglich.length === 1 ? "sie" : "sie") + " an der Note noch ausmachen "
+      + esc(aus.beweglich.length === 1 ? "würde" : "würden") + ".</div>"}
+    <div class="helptext">${aus.annahme.length
+      ? "Angenommen, es kommen bis dahin noch etwa " + esc(aus.annahme.join(", ")) + " dazu. Geschätzt aus dem, was bisher da ist, und der noch verbleibenden Zeit."
+      : "Der Zeitraum ist fast vorbei, es kommt kaum noch etwas dazu."}
+      Es wird dabei nichts verändert und nichts gespeichert.</div>
+    ${!ohneMit ? "" : `<div style="padding:9px 16px; border-bottom:1px solid #000; background:${
+        ohneMit.ohne < ohneMit.jetzt ? "#FBECEA" : "#EDF6EC"};">
+      <div style="font-size:13px; font-weight:bold; color:${
+        ohneMit.ohne < ohneMit.jetzt ? "#8E1C16" : "#215E24"};">Die ${esc(ohneMit.was.join(" und "))} ${
+        ohneMit.ohne < ohneMit.jetzt
+          ? "kostet dich gerade " + fmtB(ohneMit.jetzt - ohneMit.ohne) + " Notenstufen."
+          : "bringt dir gerade " + fmtB(ohneMit.ohne - ohneMit.jetzt) + " Notenstufen."}</div>
+      <div style="font-size:11px; margin-top:2px;">Ohne sie stünde jetzt ${fmtO(ohneMit.ohne)} da statt ${fmtO(ohneMit.jetzt)}.${
+        aus.gedeckelt ? " Mehr als " + fmtB(bonusMax(sub)) + " Notenstufen kann sie nie ausmachen, so ist die Obergrenze eingestellt." : ""}</div>
+    </div>`}`;
 
   const abschlussBlock = abschlussZeile(cls, sub, s);
 
@@ -3335,7 +3450,7 @@ function renderStudent(){
     </div>
     ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
     ${bilanzZeilen}
-    ${abschlussNote(sub, s.id, aktivesSemester()) === null ? vorschauBlock + naechsteBlock : ""}
+    ${ausblickBlock}
     <div style="padding:12px 16px; border-top:2px solid #000000; border-bottom:${homeView.zeigeEintraege ? "1px" : "2px"} solid #000000;">
       <button onclick="toggleEintraege()" style="width:100%;">${homeView.zeigeEintraege
         ? "Einzelne Einträge ausblenden"
@@ -5153,7 +5268,9 @@ function sicherheitskopieZurueck(){
     bericht.klassen + " Klasse(n)\n" +
     bericht.schueler + " Schüler:in(nen)\n" +
     bericht.faecher + " Fach/Fächer\n" +
-    bericht.eintraege + " Eintrag/Einträge");
+    bericht.eintraege + " Eintrag/Einträge" +
+    (bericht.einstellungen ? "\n\nBei " + bericht.einstellungen
+      + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen." : ""));
 }
 
 /* Beim Start prüfen, ob das Programm gegen eine neue Fassung getauscht wurde */
@@ -5314,6 +5431,7 @@ function starteImport(modus){
 /* Jedes Feld, das eine Einstellung des Fachs trägt. Wird beim Zusammenführen
    eines neuen Fachs vollständig übernommen. */
 const EINSTELLUNGSFELDER = [
+  "template", "weightMode", "cats", "weights", "competencies",
   "stufenCats", "stufenZaehlt", "stufenBonus", "stufenStand", "bonusMax",
   "stufenTexte", "stufenWerte", "bonusWerte",
   "niveaus", "niveauNamen", "schluessel", "catNamen"
@@ -5327,8 +5445,90 @@ function uebernehmen(ziel, quelle, feld){
   else ziel[feld] = v;
 }
 
+/* ---------- WANN WURDEN DIE EINSTELLUNGEN ZULETZT GEÄNDERT ----------
+   Beim Zusammenführen zweier Geräte muss entschieden werden, wessen
+   Einstellungen gelten. Bisher galt immer das Gerät, auf dem man gerade
+   sitzt. Das ist genau falsch herum, wenn man ein Fach am Rechner in Ruhe
+   einrichtet und die Noten danach am Handy einträgt: Die am Rechner
+   eingestellten Prozentanteile kamen nie am Handy an.
+
+   Jetzt gilt der neuere Stand. Dafür braucht jede Fachbestellung einen
+   Zeitstempel. Ihn in jeden einzelnen Einstellungsknopf einzubauen wäre
+   die Sorte Aufgabe, die man einmal vergisst; deshalb merkt sich die App
+   beim Speichern selbst, ob sich an den Einstellungen etwas geändert hat.
+
+   Ein Fach, das seit dem Umstieg auf diese Fassung nicht angefasst wurde,
+   bekommt bewusst KEINEN Zeitstempel. Sonst würde allein das Öffnen der
+   App auf einem Gerät dessen Einstellungen zu den neueren machen. */
+
+/* JSON mit sortierten Schlüsseln, damit derselbe Inhalt auf zwei Geräten
+   dieselbe Zeichenkette ergibt. Ohne das würde schon eine andere
+   Reihenfolge im Speicher als Änderung gelten. */
+function stabilJson(v){
+  if(v === null || typeof v !== "object") return JSON.stringify(v);
+  if(Array.isArray(v)) return "[" + v.map(stabilJson).join(",") + "]";
+  return "{" + Object.keys(v).sort().map(k =>
+    JSON.stringify(k) + ":" + stabilJson(v[k])).join(",") + "}";
+}
+
+/* Steht dieses Fach noch genau so da, wie die Vorlage es angelegt hat?
+
+   Gebraucht für Bestände aus früheren Fassungen: Dort gibt es noch keinen
+   Zeitstempel, und ohne ihn wüsste das Zusammenführen nicht, welche Seite
+   die gepflegte ist. Eine Einstellung, die von der Vorlage abweicht, ist
+   eine Entscheidung; eine, die der Vorlage entspricht, ist keine. Im
+   Zweifel gewinnt deshalb die Entscheidung. */
+function passtZu(sub, mode, cats, weights){
+  if(sub.weightMode !== mode) return false;
+  if(stabilJson((sub.cats || []).slice().sort()) !== stabilJson(cats.slice().sort())) return false;
+  const eigene = {}, soll = {};
+  Object.keys(sub.weights || {}).forEach(k => {
+    if((sub.cats || []).indexOf(k) !== -1) eigene[k] = sub.weights[k];
+  });
+  Object.keys(weights).forEach(k => { if(cats.indexOf(k) !== -1) soll[k] = weights[k]; });
+  return stabilJson(eigene) === stabilJson(soll);
+}
+
+function istVorlagenStand(sub){
+  const t = SUBJECT_TEMPLATES[sub.template] || SUBJECT_TEMPLATES.allgemein;
+  if(passtZu(sub, t.mode, t.cats, t.weights)) return true;
+  /* Ein Fach aus einem alten Bestand hat die Vorlage nie durchlaufen und
+     steht auf den allgemeinen Vorgaben. Auch das ist keine Entscheidung. */
+  return passtZu(sub, "multiplikator", DEFAULT_CATS, DEFAULT_WEIGHTS);
+}
+
+function einstellungsSignatur(sub){
+  const teil = {};
+  EINSTELLUNGSFELDER.forEach(f => { if(sub[f] !== undefined) teil[f] = sub[f]; });
+  /* Eigene Beurteilungsarten gehören dazu, aber ohne die Reihenfolge. */
+  teil.customCats = (sub.customCats || []).slice()
+    .sort((a, b) => String(a.key).localeCompare(String(b.key)));
+  return stabilJson(teil);
+}
+
+/* Läuft bei jedem Speichern. Stellt fest, ob sich an den Einstellungen
+   eines Fachs etwas geändert hat, und hält den Zeitpunkt fest. */
+function einstellungsStempel(){
+  let geaendert = 0;
+  state.classes.forEach(cls => (cls.subjects || []).forEach(sub => {
+    const sig = einstellungsSignatur(sub);
+    if(typeof sub.einstellungenSig !== "string"){
+      /* Erstes Mal gesehen: nur merken, nicht als Änderung werten. */
+      sub.einstellungenSig = sig;
+      if(typeof sub.einstellungenTs !== "number") sub.einstellungenTs = 0;
+      return;
+    }
+    if(sub.einstellungenSig !== sig){
+      sub.einstellungenSig = sig;
+      sub.einstellungenTs = Date.now();
+      geaendert++;
+    }
+  }));
+  return geaendert;
+}
+
 function mergeState(basis, fremd){
-  const bericht = { klassen:0, schueler:0, faecher:0, eintraege:0 };
+  const bericht = { klassen:0, schueler:0, faecher:0, eintraege:0, einstellungen:0 };
 
   fremd.classes.forEach(fc => {
     let bc = basis.classes.find(c => c.id === fc.id)
@@ -5377,9 +5577,15 @@ function mergeState(basis, fremd){
            hier fehlt, führt dazu, dass dasselbe Fach auf zwei Geräten
            verschieden rechnet, und das fällt niemandem auf. */
         EINSTELLUNGSFELDER.forEach(f => uebernehmen(bsub, fsub, f));
+        /* Der Zeitstempel kommt mit, sonst gälte das neue Fach sofort als
+           unverändert und das nächste Zusammenführen liefe wieder schief. */
+        if(typeof fsub.einstellungenTs === "number") bsub.einstellungenTs = fsub.einstellungenTs;
         bc.subjects.push(bsub);
         bericht.faecher++;
       } else {
+        /* Eigene Beurteilungsarten werden immer zusammengelegt, nie ersetzt:
+           legt ein Gerät eine an und das andere eine zweite, sollen danach
+           beide da sein. */
         (fsub.customCats || []).forEach(c => {
           if(!bsub.customCats.some(x => x.key === c.key)){
             bsub.customCats.push(Object.assign({}, c));
@@ -5387,17 +5593,46 @@ function mergeState(basis, fremd){
             if((bsub.cats || []).indexOf(c.key) === -1) bsub.cats.push(c.key);
           }
         });
-        /* Beim bestehenden Fach gilt die Einstellung dieses Geräts. Nur was
-           hier noch gar nicht gesetzt ist, wird vom anderen Gerät übernommen. */
-        /* Bei einem bereits vorhandenen Fach gilt die Einstellung dieses
-           Geräts. Vom anderen kommt nur, was hier noch gar nicht gesetzt ist.
-           Sonst überschriebe ein Zusammenführen stillschweigend Entscheidungen,
-           die jemand an diesem Gerät bewusst getroffen hat. */
-        if(fsub.stufenTexte){
-          if(!bsub.stufenTexte) bsub.stufenTexte = {};
-          Object.keys(fsub.stufenTexte).forEach(k => {
-            if(!Array.isArray(bsub.stufenTexte[k])) bsub.stufenTexte[k] = fsub.stufenTexte[k].slice();
+
+        /* Bei den übrigen Einstellungen gilt der NEUERE Stand, nicht der
+           des Geräts, auf dem man gerade sitzt. Wer ein Fach am Rechner
+           einrichtet und danach am Handy Noten einträgt, will genau das:
+           die am Rechner eingestellten Anteile sollen mitkommen.
+
+           Ohne Zeitstempel auf der anderen Seite wird nichts überschrieben;
+           dann bleibt es beim alten Verhalten und es kommt nur dazu, was
+           hier noch gar nicht gesetzt ist. */
+        const fts = typeof fsub.einstellungenTs === "number" ? fsub.einstellungenTs : 0;
+        const bts = typeof bsub.einstellungenTs === "number" ? bsub.einstellungenTs : 0;
+        /* Haben beide Seiten keinen Zeitstempel, weil der Bestand aus einer
+           früheren Fassung stammt, entscheidet die Vorlage: Ein Fach, das
+           noch genau so dasteht wie angelegt, hat niemand eingestellt, und
+           eine gepflegte Einstellung von der anderen Seite gewinnt. */
+        const vorlagenRegel = (fts === bts) && istVorlagenStand(bsub) && !istVorlagenStand(fsub);
+        if(fts > bts || vorlagenRegel){
+          const alteGewichte = Object.assign({}, bsub.weights);
+          EINSTELLUNGSFELDER.forEach(f => uebernehmen(bsub, fsub, f));
+          /* Gewichte schlüsselweise: eine Beurteilungsart, die es nur hier
+             gibt, verliert sonst ihren Anteil. */
+          bsub.weights = Object.assign(alteGewichte, fsub.weights || {});
+          /* Eigene Beurteilungsarten, die es nur hier gibt, bleiben in der
+             Liste der eingeschalteten. */
+          (bsub.customCats || []).forEach(c => {
+            if(!(fsub.customCats || []).some(x => x.key === c.key)
+               && (bsub.cats || []).indexOf(c.key) === -1) bsub.cats.push(c.key);
           });
+          bsub.einstellungenTs = Math.max(fts, bts);
+          delete bsub.einstellungenSig;
+          bericht.einstellungen++;
+        } else {
+          /* Der hiesige Stand ist der neuere oder gleich alt. Dann kommt nur
+             dazu, was hier noch gar nicht gesetzt ist. */
+          if(fsub.stufenTexte){
+            if(!bsub.stufenTexte) bsub.stufenTexte = {};
+            Object.keys(fsub.stufenTexte).forEach(k => {
+              if(!Array.isArray(bsub.stufenTexte[k])) bsub.stufenTexte[k] = fsub.stufenTexte[k].slice();
+            });
+          }
         }
       }
 
@@ -5515,7 +5750,9 @@ function ablageHolen(){
         bericht.klassen + " Klasse(n)\n" +
         bericht.schueler + " Schüler:in(nen)\n" +
         bericht.faecher + " Fach/Fächer\n" +
-        bericht.eintraege + " Eintrag/Einträge");
+        bericht.eintraege + " Eintrag/Einträge" +
+        (bericht.einstellungen ? "\n\nBei " + bericht.einstellungen
+          + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen." : ""));
     })
     .catch(ablageFehler);
 }
@@ -5553,7 +5790,6 @@ function uebertragungBereich(){
 }
 
 function ansichtenZuruecksetzen(){
-  vorschauAus = [];
   homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
@@ -5599,7 +5835,9 @@ document.getElementById("importInput").addEventListener("change", function(ev){
       bericht.klassen + " Klasse(n)\n" +
       bericht.schueler + " Schüler:in(nen)\n" +
       bericht.faecher + " Fach/Fächer\n" +
-      bericht.eintraege + " Eintrag/Einträge");
+      bericht.eintraege + " Eintrag/Einträge" +
+      (bericht.einstellungen ? "\n\nBei " + bericht.einstellungen
+        + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen." : ""));
   };
   reader.readAsText(file);
 });
