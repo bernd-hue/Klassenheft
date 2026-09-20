@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.7
+# Klassenheft, Version 17.8
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -271,6 +271,10 @@ Das war vorher anders: Die App hat das Niveau in jedem Fach angesetzt. In Geogra
 Stellst du in der Schüleransicht das **Leistungsniveau** um, gilt ab dann ein anderer Notenschlüssel. Die App leitet deshalb jede Note, die aus Punkten oder Prozent entstanden ist, **neu ab**: 66 Prozent sind bei Standard eine 1 und bei Standard AHS eine 3.
 
 Vorher fragt sie und zeigt jede einzelne Änderung mit Grundlage, alter und neuer Note. Sagst du Nein, bleibt alles, wie es war. Das Umstufen gilt für die ganze Klasse, also für alle Fächer.
+
+**Hast du eine Note direkt angetippt**, gibt es keine Prozentzahl, aus der sich etwas ableiten ließe. Dafür kommt eine zweite Frage: Die App nimmt dann an, die Leistung habe an der **unteren Grenze der Note** gelegen. Eine 1 bei Standard heißt „mindestens 64 %", und das ist bei Standard AHS eine 3. Die Annahme steht danach im Klartext beim Eintrag und lässt sich durch Zurückstufen wieder rückgängig machen.
+
+Der saubere Weg bleibt, Schularbeiten über **Punkte** einzutragen. Dann braucht es keine Annahme.
 
 **Unberührt bleibt, was dein Urteil ist:** Mitarbeit, Hausübung, Kompetenz-Check und jede Note, die du direkt angetippt hast. Die Mitarbeit hängt nicht am Leistungsniveau; wer jede Stunde mitarbeitet, arbeitet nicht schlechter mit, weil er umgestuft wurde.
 

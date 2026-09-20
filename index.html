@@ -256,7 +256,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.7";
+const APP_FASSUNG = "17.8";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -736,6 +736,143 @@ function folgenBestaetigen(treffer, titel){
 function schluesselFolgenAnwenden(treffer){
   treffer.forEach(t => { t.e.value = t.neu; });
   return treffer.length;
+}
+
+/* ---------- ANGETIPPTE NOTEN BEIM UMSTUFEN ----------
+   Eine Note, die direkt angetippt wurde, hat keine Rechengrundlage. Die
+   App kann deshalb nicht wissen, ob hinter der 1 nun 66 oder 98 Prozent
+   stehen, und rechnet sie beim Umstufen von sich aus auch nicht um.
+
+   Es gibt aber einen nachvollziehbaren Weg, und der ist genau der, den
+   man im Kopf auch geht: Man nimmt an, die Leistung lag an der UNTEREN
+   GRENZE der vergebenen Note. Eine 1 bei Standard heißt dann "mindestens
+   64 Prozent", und 64 Prozent sind bei Standard AHS eine 3.
+
+   Das ist eine Annahme, keine Messung, und sie fällt zu Ungunsten der
+   Schüler:in aus. Deshalb wird sie nie stillschweigend gemacht, sondern
+   eigens gefragt. Wird sie angenommen, bekommt der Eintrag die
+   angenommene Grundlage mitgespeichert; ab dann rechnet jedes weitere
+   Umstufen damit, und der Weg zurück führt wieder zur alten Note. */
+
+/* Die untere Grenze der Note in diesem Schlüssel, in Prozent. */
+function untereGrenze(sub, key, note){
+  const tbl = prozentTabelle(sub, key);
+  for(let i = 0; i < tbl.length; i++){ if(tbl[i][1] === note) return tbl[i][0]; }
+  return null;
+}
+
+/* Bei Diktaten die höchste Fehlerzahl, die diese Note noch ergibt. */
+function obereFehler(key, note){
+  const tbl = DIKTAT_KEYS[key] || DIKTAT_KEYS.ahs;
+  for(let i = 0; i < tbl.length; i++){
+    if(tbl[i][1] !== note) continue;
+    /* Die schlechteste Note hat keine Obergrenze. Ein Fehler mehr als die
+       Grenze davor ist die vorsichtigste Annahme, die noch stimmt. */
+    if(!isFinite(tbl[i][0])) return (i > 0 ? tbl[i-1][0] : 0) + 1;
+    return tbl[i][0];
+  }
+  return null;
+}
+
+/* Angetippte Noten, deren Note sich mit dem neuen Schlüssel ändern würde,
+   wenn man die untere Grenze annimmt. */
+function folgenOhneGrundlage(cls, faecher, altKeyFn, neuKeyFn, gilt){
+  const treffer = [];
+  (faecher || []).forEach(sub => {
+    (cls.students || []).forEach(s => {
+      if(gilt && !gilt(s)) return;
+      const altKey = altKeyFn(sub, s);
+      const neuKey = neuKeyFn(sub, s);
+      if(altKey === neuKey) return;
+      sub.entries.forEach(e => {
+        /* Nur die Einträge dieser Person. Ohne diese Zeile wurden beim
+           Umstufen einer einzigen Schülerin die angetippten Noten der
+           ganzen Klasse mit umgerechnet, und zwar nach ihrem Schlüssel. */
+        if(e.studentId !== s.id) return;
+        if(e.type !== "note") return;
+        if(!hasSchluessel(e.cat)) return;
+        if(istStufenCat(sub, e.cat)) return;
+        if(haengtAmSchluessel(sub, e)) return;   /* hat eine echte Grundlage */
+        if(typeof e.value !== "number" || e.value < 1 || e.value > 5) return;
+
+        if(e.cat === "diktat"){
+          const f = obereFehler(altKey, e.value);
+          if(f === null) return;
+          const neu = noteFromFehler(f, neuKey);
+          treffer.push({ sub: sub, s: s, e: e, alt: e.value, neu: neu, fz: f,
+            gleich: neu === e.value,
+            text: "höchstens " + fmtPct(f) + " Fehler" });
+        } else {
+          const p = untereGrenze(sub, altKey, e.value);
+          if(p === null) return;
+          const neu = noteFromProzent(p, neuKey, sub);
+          treffer.push({ sub: sub, s: s, e: e, alt: e.value, neu: neu, pct: p,
+            gleich: neu === e.value,
+            text: "mindestens " + fmtPct(p) + " %" });
+        }
+      });
+    });
+  });
+  return treffer;
+}
+
+/* Hält die angenommene Grundlage am Eintrag fest.
+
+   Ändert sich die Note dadurch, steht die Annahme auch im Klartext beim
+   Eintrag. Bleibt die Note gleich, wird nur der Zahlenwert hinterlegt und
+   sonst nichts angezeigt: sichtbar ändert sich nichts, aber ein späteres
+   Umstufen rechnet dann mit derselben Annahme weiter.
+
+   Dieser zweite Teil ist wichtiger, als er aussieht. Ohne ihn konnte ein
+   Umstufen hin und wieder zurück eine Note verschlechtern: Die 1 einer
+   Standard-AHS-Schülerin blieb beim Wechsel auf Standard eine 1, und beim
+   Zurückwechseln wurde aus ihr eine 3, weil dann die untere Grenze der
+   Standard-Eins angenommen wurde. Mit hinterlegter Grundlage kommt beim
+   Zurückwechseln wieder die 1 heraus. */
+function folgenOhneGrundlageAnwenden(treffer, altLabel){
+  let geaendert = 0;
+  treffer.forEach(t => {
+    const sichtbar = !t.gleich;
+    t.e.value = t.neu;
+    if(typeof t.pct === "number"){
+      t.e.pct = t.pct;
+      if(sichtbar) t.e.basis = "angenommen: " + fmtPct(t.pct) + " % (Note " + t.alt
+        + (altLabel ? " bei " + altLabel : "") + ")";
+    } else if(typeof t.fz === "number"){
+      t.e.fz = t.fz;
+      if(sichtbar) t.e.basis = "angenommen: " + fmtPct(t.fz) + " Fehler (Note " + t.alt
+        + (altLabel ? " bei " + altLabel : "") + ")";
+    }
+    if(sichtbar) geaendert++;
+  });
+  return geaendert;
+}
+
+/* Fragt getrennt nach, weil es eine Annahme ist und keine Rechnung.
+   Gefragt wird nur, wenn sich dadurch wirklich eine Note ändert. */
+function ohneGrundlageBestaetigen(treffer, altLabel, neuLabel){
+  const echte = treffer.filter(t => !t.gleich);
+  if(!echte.length) return false;
+  const zeilen = echte.slice(0, 12).map(t =>
+    "  " + (t.s ? t.s.name + " · " : "") + t.sub.fach + " · " + catLabel(t.sub, t.e.cat)
+    + ": " + t.alt + " wird " + t.neu + "   (angenommen " + t.text + ")");
+  return confirm(
+    echte.length + (echte.length === 1
+      ? " Note wurde direkt angetippt und hat keine Punkte- oder Prozentangabe."
+      : " Noten wurden direkt angetippt und haben keine Punkte- oder Prozentangabe.") + "\n\n"
+    + "Sollen sie mitgehen? Dabei wird angenommen, dass die Leistung genau an der "
+    + "unteren Grenze der Note lag"
+    + (altLabel ? ", gemessen an " + altLabel : "") + ":\n\n"
+    + zeilen.join("\n")
+    + (echte.length > 12 ? "\n  … und " + (echte.length - 12) + " weitere" : "")
+    + "\n\nDas ist eine Annahme, keine Messung, und sie fällt eher streng aus.\n"
+    + "Abbrechen lässt diese Noten unverändert; ändern kannst du sie jederzeit einzeln.");
+}
+
+/* Die unveränderten Fälle werden in jedem Fall festgehalten. Sie ändern
+   nichts, was man sieht, und machen jedes weitere Umstufen eindeutig. */
+function gleichbleibendeFesthalten(treffer){
+  return folgenOhneGrundlageAnwenden(treffer.filter(t => t.gleich), null);
 }
 
 /* ---------- EIGENER NOTENSCHLÜSSEL JE FACH ----------
@@ -2886,14 +3023,25 @@ function setNiveau(value){
   if(s.niveau === neu) return;
 
   const sub = getSubject(cls, homeView.subjectId);
+  const altLabel = niveauLabel(sub, s.niveau), neuLabel = niveauLabel(sub, neu);
   const folgen = schluesselFolgen(cls, s, cls.subjects, neu);
 
   if(!folgenBestaetigen(folgen,
-      s.name + " von " + niveauLabel(sub, s.niveau) + " auf " + niveauLabel(sub, neu) + " umstellen?")){
+      s.name + " von " + altLabel + " auf " + neuLabel + " umstellen?")){
     render();
     return;
   }
   schluesselFolgenAnwenden(folgen);
+
+  /* Angetippte Noten getrennt, weil dafür etwas angenommen werden muss. */
+  const ohne = folgenOhneGrundlage(cls, cls.subjects,
+    (f, x) => schluesselKey(cls, x, f),
+    (f, x) => schluesselKey(cls, { niveau: (x.id === s.id) ? neu : x.niveau }, f),
+    x => x.id === s.id);
+  gleichbleibendeFesthalten(ohne);
+  if(ohneGrundlageBestaetigen(ohne, altLabel, neuLabel)){
+    folgenOhneGrundlageAnwenden(ohne.filter(t => !t.gleich), altLabel);
+  }
 
   s.niveau = neu;
   s.updatedAt = Date.now();
@@ -7010,6 +7158,15 @@ function setStufe(stufe){
     return;
   }
   schluesselFolgenAnwenden(folgen);
+
+  const ohneS = folgenOhneGrundlage(cls, cls.subjects,
+    (f, x) => schluesselKey(cls, x, f),
+    (f, x) => schluesselKey({ stufe: neu }, x, f));
+  gleichbleibendeFesthalten(ohneS);
+  if(ohneGrundlageBestaetigen(ohneS, "dem bisherigen Schlüssel")){
+    folgenOhneGrundlageAnwenden(ohneS.filter(t => !t.gleich), "dem bisherigen Schlüssel");
+  }
+
   cls.stufe = neu;
   save();
   render();
@@ -7170,6 +7327,15 @@ function setNiveaus(an){
     return;
   }
   schluesselFolgenAnwenden(folgen);
+
+  const neuKeyFach = (f, x) => (cls.stufe || 2) === 1 ? "stufe1"
+    : (neu ? (x.niveau === "standard" ? "standard" : "ahs") : "ahs");
+  const ohneF = folgenOhneGrundlage(cls, [sub], (f, x) => schluesselKey(cls, x, f), neuKeyFach);
+  gleichbleibendeFesthalten(ohneF);
+  if(ohneGrundlageBestaetigen(ohneF, "dem bisherigen Schlüssel")){
+    folgenOhneGrundlageAnwenden(ohneF.filter(t => !t.gleich), "dem bisherigen Schlüssel");
+  }
+
   sub.niveaus = neu;
   save();
   render();
