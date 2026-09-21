@@ -220,7 +220,7 @@
   <div id="tabbar"></div>
 </div>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
-<input type="file" id="importInput" accept="application/json" style="display:none">
+<input type="file" id="importInput" accept=".json,application/json" style="display:none">
 <input type="file" id="avatarCamInput" accept="image/*" capture="user" style="display:none">
 <input type="file" id="avatarLibInput" accept="image/*" style="display:none">
 <div id="printArea"></div>
@@ -256,7 +256,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9";
+const APP_FASSUNG = "17.9.1";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -5156,6 +5156,48 @@ function idbOrdner(schreiben, wert){
 
 function kannOrdner(){ return typeof window.showDirectoryPicker === "function"; }
 
+/* ---------- WELCHES GERÄT ----------
+   Einen Ordner auswählen und sich merken können nur Chrome und Edge am
+   Computer. Safari kann es weder am Mac noch am iPhone, und am iPhone
+   verwendet jeder Browser Safari im Inneren. Das ist eine Vorgabe von Apple,
+   kein Fehler dieser App, und die Einstellungen müssen das so sagen, statt
+   einen Knopf zu versprechen, den es auf diesem Gerät nicht gibt. */
+function istIOS(){
+  const ua = navigator.userAgent || "";
+  if(/iPad|iPhone|iPod/.test(ua)) return true;
+  /* Das iPad meldet sich seit iPadOS 13 wie ein Mac, hat aber einen Touchscreen. */
+  return /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;
+}
+
+function istSafariAmMac(){
+  const ua = navigator.userAgent || "";
+  return !istIOS() && /Macintosh/.test(ua) && /Safari/.test(ua)
+    && !/Chrome|Chromium|CriOS|Edg|Firefox|OPR/.test(ua);
+}
+
+/* Am iPhone und iPad landet ein normaler Download in einer App am
+   Home-Bildschirm nicht zuverlässig in der Dateien-App. Das Teilen-Fenster
+   dagegen bietet "In Dateien sichern" an, man wählt einmal iCloud Drive und
+   einen Ordner, und iOS merkt sich den Ordner für das nächste Mal. Das ist
+   dort das Nächstbeste zu einem festen Sicherungsordner. */
+async function dateiAbgeben(blob, name){
+  if(istIOS() && typeof navigator.canShare === "function" && typeof navigator.share === "function"){
+    let datei = null;
+    try{ datei = new File([blob], name, { type: blob.type || "application/octet-stream" }); }catch(e){ datei = null; }
+    if(datei && navigator.canShare({ files: [datei] })){
+      try{
+        await navigator.share({ files: [datei], title: name });
+        return "geteilt";
+      }catch(e){
+        if(e && e.name === "AbortError") return "abgebrochen";
+        /* Anderer Fehler: auf den gewöhnlichen Download zurückfallen. */
+      }
+    }
+  }
+  download(blob, name);
+  return "geladen";
+}
+
 async function ordnerWaehlen(){
   if(!kannOrdner()){
     alert("Dieses Gerät kann keinen festen Sicherungsordner merken. Die Sicherung wird stattdessen ganz normal heruntergeladen und landet im Ordner Downloads oder in der Dateien-App.");
@@ -5348,12 +5390,16 @@ async function sicherungErstellen(){
 
 /* Eine der beiden Dateien abholen. Der Aufruf kommt aus einem echten Tipp,
    damit der Browser den Download nicht als ungefragt einstuft. */
-function sicherungHolen(welche){
+async function sicherungHolen(welche){
   if(!sicherungBereit) return;
-  if(welche === "json") download(sicherungBereit.jsonBlob, sicherungBereit.jsonName);
-  else download(sicherungBereit.wordBlob, sicherungBereit.wordName);
-  if(welche === "json") sicherungBereit.jsonGeholt = true;
-  else sicherungBereit.wordGeholt = true;
+  const b = sicherungBereit;
+  const ergebnis = (welche === "json")
+    ? await dateiAbgeben(b.jsonBlob, b.jsonName)
+    : await dateiAbgeben(b.wordBlob, b.wordName);
+  /* Abgebrochen heißt: nicht gesichert. Dann kein Häkchen. */
+  if(ergebnis !== "abgebrochen"){
+    if(welche === "json") b.jsonGeholt = true; else b.wordGeholt = true;
+  }
   render();
 }
 
@@ -5364,15 +5410,17 @@ function sicherungFertig(){ sicherungBereit = null; render(); }
 function nurDatenSichern(){
   const stempel = datumsStempel();
   const jsonBlob = new Blob([JSON.stringify(sicherungsDaten(), null, 2)], { type:"application/json" });
-  download(jsonBlob, "Klassenheft_Daten_" + stempel + ".json");
+  dateiAbgeben(jsonBlob, "Klassenheft_Daten_" + stempel + ".json");
 }
 
 function sicherungBereitBlock(){
   if(!sicherungBereit) return "";
   const g = (da) => da ? " &#10003;" : "";
   return `<div class="banner" id="sicherungBereitBlock" style="display:block;">
-    <div class="txt" style="margin-bottom:8px;"><b>Sicherung fertig.</b> Beide Dateien einzeln antippen, damit sie wirklich ankommen.
-      Manche Browser lassen nur einen Download auf einmal durch.</div>
+    <div class="txt" style="margin-bottom:8px;"><b>Sicherung fertig.</b> Beide Dateien einzeln antippen, damit sie wirklich ankommen.${
+      istIOS()
+        ? " Es öffnet sich jeweils das Teilen-Fenster: dort auf <b>In Dateien sichern</b> tippen und <b>iCloud Drive → Klassenheft</b> wählen. Beim nächsten Mal schlägt das iPhone den Ordner von selbst vor."
+        : " Manche Browser lassen nur einen Download auf einmal durch."}</div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <button class="green" onclick="sicherungHolen('json')">Datendatei (.json) sichern${g(sicherungBereit.jsonGeholt)}</button>
       <button onclick="sicherungHolen('word')">Word-Datei zum Nachlesen${g(sicherungBereit.wordGeholt)}</button>
@@ -6907,7 +6955,11 @@ function renderSettingsList(){
 
   const ordnerText = kannOrdner()
     ? (ordnerHandle ? "Sicherungsordner ist gemerkt. Die Sicherung landet automatisch dort." : "Noch kein fester Ordner gewählt. Bis dahin landet die Sicherung im Ordner für Downloads.")
-    : "Dieses Gerät kann keinen festen Ordner merken. Die Sicherung landet in den Downloads bzw. in der Dateien-App und lässt sich von dort ablegen, wo du möchtest.";
+    : (istIOS()
+        ? "<b>Am iPhone und iPad gibt es keinen Knopf für einen Sicherungsordner.</b> Apple erlaubt keiner App im Browser, einen Ordner auszuwählen. Stattdessen öffnet sich beim Sichern das Teilen-Fenster: dort <b>In Dateien sichern</b> tippen, <b>iCloud Drive</b> wählen und beim ersten Mal einen Ordner <b>Klassenheft</b> anlegen. Das iPhone merkt sich den Ordner."
+        : (istSafariAmMac()
+            ? "<b>In Safari gibt es keinen Knopf für einen Sicherungsordner.</b> Das kann nur Google Chrome oder Microsoft Edge. Öffne die App in Chrome, dann steht hier der Knopf <i>Sicherungsordner wählen</i>."
+            : "Dieser Browser kann keinen festen Ordner merken. Die Sicherung landet im Ordner für Downloads und lässt sich von dort ablegen, wo du möchtest."));
 
   return `
     <div class="header" style="${headerStyle("einstellungen")}">
@@ -6942,7 +6994,9 @@ function renderSettingsList(){
     ${uebertragungBereich()}
 
     <div class="label" style="border-top:2px solid #000;">HANDY UND RECHNER ÜBER EINE DATEI</div>
-    <div class="helptext">Am Gerät mit den neueren Einträgen auf Jetzt sichern tippen, die JSON-Datei über AirDrop, WLAN-Freigabe, Kabel oder Mail auf das andere Gerät bringen und dort auf Zusammenführen tippen. Es wird nichts überschrieben, fehlende Einträge kommen dazu. Nichts davon geht durch eine Cloud.${uebertragung.da ? "" : " Ohne Datei geht es mit dem Übertragungsprogramm im Ordner der App, siehe Anleitung."}</div>
+    <div class="helptext">Am Gerät mit den neueren Einträgen auf <i>Jetzt sichern</i> tippen und am anderen Gerät auf <i>Sicherung zusammenführen</i>. Es wird nichts überschrieben, fehlende Einträge kommen dazu.<br><br>
+      <b>Am einfachsten über iCloud Drive:</b> Liegt die JSON-Datei in <b>iCloud Drive → Klassenheft</b>, sehen sie iPhone und Mac gleichermaßen, ohne dass du sie verschickst. Beim Zusammenführen öffnet sich die Dateiauswahl, dort iCloud Drive antippen und die neueste Datei wählen. Die Datei liegt dann in deiner eigenen iCloud.<br><br>
+      Ohne iCloud geht es wie bisher über AirDrop, Kabel oder Mail.${uebertragung.da ? "" : " Oder mit dem Übertragungsprogramm im Ordner der App, siehe Anleitung."}</div>
     <div class="footer">
       <button onclick="starteImport('merge')">Sicherung zusammenführen</button>
       <button class="red" onclick="starteImport('ersetzen')">Alles ersetzen</button>
