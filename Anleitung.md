@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.9
+# Klassenheft, Version 17.9.2
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -548,6 +548,21 @@ Falls beim ersten Doppelklick am Mac eine Warnung kommt: einmal mit der rechten 
 1. Am Gerät mit den neueren Einträgen auf *Jetzt sichern* tippen.
 2. Die JSON-Datei auf das andere Gerät bringen, per AirDrop, Netzwerkfreigabe, Kabel oder Mail.
 3. Dort unter *Einstellungen* auf *Sicherung zusammenführen* tippen und die Datei wählen.
+
+### Einstellungen festschreiben
+
+Beim Zusammenführen galt bisher immer der neuere Stand der Einstellungen, also Gewichtung, Beurteilungsarten, Notenschlüssel und Leistungsniveaus. Wer die Bewertung fertig eingerichtet hat, will das nicht mehr: dann soll ein Zusammenführen nur noch Noten bringen.
+
+Dafür gibt es unter *Einstellungen* den Abschnitt **Einstellungen festschreiben** mit dem Knopf *Alle Einstellungen festschreiben*. Je Fach steht derselbe Knopf oben in den Fach-Einstellungen.
+
+Festgeschrieben heißt:
+
+- Beim Zusammenführen bleibt die Bewertung dieses Fachs unverändert, egal von welchem Gerät die Datei kommt und wie neu sie ist.
+- Noten, Einstufungen, Fotos und neue Namen kommen weiterhin dazu.
+- Nach dem Zusammenführen steht in der Meldung, bei wie vielen Fächern die Festschreibung gegriffen hat.
+- Du selbst kannst jede Einstellung jederzeit ändern. Die Festschreibung richtet sich gegen das Zusammenführen, nicht gegen dich.
+
+Ist ein Fach nur auf einem Gerät festgeschrieben, gilt dieser Stand auf beiden: Eine Festschreibung ist eine Entscheidung und gewinnt gegen jeden Zeitstempel.
 
 Bei beiden Wegen gilt: Es wird nichts gelöscht und nichts überschrieben. Fehlende Klassen, Namen, Fächer und Einträge kommen dazu, bei zwei Fassungen desselben Eintrags gewinnt die neuere. Der Vorgang lässt sich beliebig oft wiederholen, es entstehen keine Dubletten.
 

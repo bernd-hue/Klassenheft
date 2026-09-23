@@ -256,7 +256,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.1";
+const APP_FASSUNG = "17.9.2";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1099,11 +1099,16 @@ function catCol(sub, key){
 const ARBEITEN_MAX = 6;
 
 function arbeitWahl(sub, cat, gewaehlt, aufruf){
-  const hoechste = hoechsteArbeitNr(sub, cat);
+  /* Gezählt wird im Semester, in das ein neuer Eintrag ginge, nicht im
+     eingestellten Zeitraum. Sonst schlägt die App im Zeitraum "Ganzes Jahr"
+     für die erste Schularbeit des 2. Semesters die 4. vor und zeigt die
+     Eintragszahl der gleichnamigen Arbeit aus dem 1. Semester. */
+  const sem = semesterFuerNeu();
+  const hoechste = hoechsteArbeitNr(sub, cat, sem);
   const zeigen = Math.max(4, Math.min(ARBEITEN_MAX, hoechste + 1));
   const felder = [];
   for(let n = 1; n <= zeigen; n++){
-    const schon = arbeiten(sub, cat).find(a => a.nr === n);
+    const schon = arbeiten(sub, cat, sem).find(a => a.nr === n);
     const aktiv = gewaehlt === n;
     const stil = aktiv
       ? "background:#000; border-color:#000; color:#fff;"
@@ -1391,8 +1396,11 @@ function applyTemplate(sub, key){
   });
   /* Sagt die Vorlage etwas über die Leistungsniveaus, muss sie es auch tun.
      Der Text der Nebenfach-Vorlagen behauptet sonst, sie seien ausgeschaltet,
-     während zwei Spalten stehen bleiben. */
-  if(typeof t.niveaus === "boolean") sub.niveaus = t.niveaus;
+     während zwei Spalten stehen bleiben.
+     Sagt die Vorlage nichts, entscheidet der Fachname neu. Vorher blieb ein
+     einmal auf eine Nebenfach-Vorlage gestelltes Fach für immer ohne
+     Leistungsniveaus, auch wenn danach wieder Mathematik eingestellt wurde. */
+  sub.niveaus = (typeof t.niveaus === "boolean") ? t.niveaus : niveausVorschlag(sub.fach, key);
   return sub;
 }
 
@@ -1544,6 +1552,49 @@ function studentenOrdnen(cls){
   cls.students.sort(namenVergleich);
 }
 
+/* Bringt eine aus Einträgen aufgebaute Liste in die Reihenfolge der
+   Klassenliste. Überall, wo Namen untereinander stehen, ist es dieselbe
+   Reihenfolge: in der Klasse, in der Statistik, auf dem Papier. Gesucht wird
+   ein Name sonst dreimal an drei verschiedenen Stellen. */
+function nachKlassenliste(cls, liste){
+  const platz = {};
+  (cls && cls.students || []).forEach((s, i) => { platz[s.id] = i; });
+  return liste.slice().sort((a, b) => {
+    const x = platz[a.s && a.s.id], y = platz[b.s && b.s.id];
+    return (x === undefined ? 1e9 : x) - (y === undefined ? 1e9 : y);
+  });
+}
+
+/* Einstellungen eines Fachs festschreiben oder wieder freigeben. Eine
+   Festschreibung ist eine Aussage der Lehrkraft und steht deshalb über jedem
+   Zeitstempel: kein Zusammenführen ändert daran noch etwas. */
+function festschreiben(an){
+  const cls = getClass(settingsView.classId);
+  const sub = getSubject(cls, settingsView.subjectId);
+  if(!sub) return;
+  if(an){ sub.einstellungenFest = true; sub.festSeit = today(); }
+  else { delete sub.einstellungenFest; delete sub.festSeit; }
+  save();
+  render();
+}
+
+function alleFestschreiben(an){
+  const faecher = [];
+  state.classes.forEach(cls => (cls.subjects || []).forEach(sub => faecher.push(sub)));
+  const betroffen = faecher.filter(sub => !!sub.einstellungenFest !== !!an).length;
+  if(!an && betroffen && !confirm("Festschreibung bei " + betroffen + " Fach/Fächern aufheben?\n\n"
+      + "Danach gilt beim Zusammenführen wieder der neuere Stand.")) return;
+  faecher.forEach(sub => {
+    if(an){ sub.einstellungenFest = true; if(!sub.festSeit) sub.festSeit = today(); }
+    else { delete sub.einstellungenFest; delete sub.festSeit; }
+  });
+  save();
+  render();
+  alert(an
+    ? "Festgeschrieben.\n\nDie Einstellungen aller Fächer bleiben beim Zusammenführen jetzt unverändert."
+    : "Festschreibung aufgehoben.");
+}
+
 function setOrdnung(art){
   state.settings.ordnung = (art === "nachname") ? "nachname" : (art === "eingabe" ? "eingabe" : "vorname");
   state.classes.forEach(studentenOrdnen);
@@ -1561,17 +1612,44 @@ function normaliseSettings(s){
     intervallTage: typeof s.intervallTage === "number" && s.intervallTage > 0 ? s.intervallTage : 7,
     geraet: typeof s.geraet === "string" ? s.geraet : "",
     semester: (s.semester === 1 || s.semester === 2 || s.semester === "alle") ? s.semester : semesterHeute(),
-    schrift: (s.schrift === "klein" || s.schrift === "gross") ? s.schrift : "normal"
+    schrift: (s.schrift === "klein" || s.schrift === "gross") ? s.schrift : "normal",
+    /* Diese drei sind lange durchgefallen: sie standen in den Vorgaben und in
+       den Knöpfen, aber nicht in dieser Liste. Damit waren sie nach jedem
+       Neustart wieder auf der Vorgabe, und die Jahresnote rechnete plötzlich
+       anders. Jede Einstellung, die es gibt, gehört hierher. */
+    ordnung: (s.ordnung === "nachname" || s.ordnung === "eingabe") ? s.ordnung : "vorname",
+    jahresGewicht: (s.jahresGewicht === "zweites") ? "zweites" : "gleich",
+    fotoQualitaet: (s.fotoQualitaet === "klein" || s.fotoQualitaet === "genau") ? s.fotoQualitaet : "mittel"
   };
 }
 
 function migrate(data){
   const list = Array.isArray(data.classes) ? data.classes : [];
   const einst = normaliseSettings(data.settings);
-  const schonNeu = list.every(c => Array.isArray(c.subjects));
-  if(schonNeu){
+  /* Je Klasse entscheiden, nicht für die ganze Datei. Fehlte bei einer
+     einzigen Klasse die Fächerliste, etwa in einer abgeschnittenen
+     Sicherungsdatei, lief vorher der gesamte Bestand durch den Weg für das
+     alte Format, und dieser Weg sucht Felder, die es im neuen Format nicht
+     gibt: Am Ende stand eine Klasse namens "Klasse" ohne einen einzigen
+     Eintrag. Ohne Meldung. */
+  const alteForm = list.filter(c => !Array.isArray(c.subjects));
+  if(!alteForm.length){
     list.forEach(normaliseClass);
     return { classes: list, settings: einst };
+  }
+  if(alteForm.length < list.length){
+    /* Gemischt: die neuen Klassen bleiben, wie sie sind, nur die alten
+       werden umgebaut und danach dazugestellt. */
+    const neueTeile = list.filter(c => Array.isArray(c.subjects));
+    neueTeile.forEach(normaliseClass);
+    const umgebaut = migrate({ classes: alteForm, settings: data.settings });
+    umgebaut.classes.forEach(c => {
+      const da = neueTeile.find(x => String(x.name).trim().toLowerCase() === String(c.name).trim().toLowerCase());
+      if(da) c.subjects.forEach(sub => da.subjects.push(sub));
+      else neueTeile.push(c);
+    });
+    neueTeile.forEach(normaliseClass);
+    return { classes: neueTeile, settings: einst };
   }
 
   /* Alter Stand: je Fach eine eigene Klasse mit eigener Namensliste.
@@ -1616,6 +1694,7 @@ function migrate(data){
         sub.entries.push(kopie);
       });
     });
+    studentenOrdnen(cls);
     cls.subjects.push(sub);
   });
   const classes = Array.from(byName.values());
@@ -1623,15 +1702,37 @@ function migrate(data){
   return { classes: classes, settings: einst };
 }
 
+/* Steht auf true, wenn der Speicher zwar Text enthielt, dieser aber nicht
+   lesbar war. Dann darf nicht einfach weitergearbeitet werden: ein Speichern
+   würde den beschädigten, vielleicht noch rettbaren Stand endgültig
+   überschreiben. */
+let ladenGescheitert = false;
+
 function load(){
+  let raw = null;
+  try{ raw = localStorage.getItem(STORAGE_KEY); }
+  catch(e){ return { classes: [], settings: defaultSettings() }; }
+  if(!raw) return { classes: [], settings: defaultSettings() };
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){
-      const data = JSON.parse(raw);
-      if(data && Array.isArray(data.classes)) return migrate(data);
-    }
-  }catch(e){}
+    const data = JSON.parse(raw);
+    if(data && Array.isArray(data.classes)) return migrate(data);
+    ladenGescheitert = true;
+  }catch(e){ ladenGescheitert = true; }
   return { classes: [], settings: defaultSettings() };
+}
+
+/* Läuft einmal beim Start. Sagt es, wenn der Speicher unlesbar war, und
+   bietet die Sicherheitskopie an, statt so zu tun, als wäre nichts. */
+function ladefehlerMelden(){
+  if(!ladenGescheitert) return;
+  const k = sicherheitskopieLesen();
+  const text = "Der Speicher dieses Geräts ließ sich nicht lesen.\n\n"
+    + "Es wird nichts überschrieben, solange du nichts einträgst.\n\n"
+    + (k ? "Es gibt eine Sicherheitskopie vom " + kopieZeitText(k)
+           + ". Soll sie jetzt zurückgeholt werden?"
+         : "Eine Sicherheitskopie gibt es nicht. Spiel bitte deine letzte Sicherungsdatei zurück, bevor du weiterarbeitest.");
+  if(k && confirm(text)){ sicherheitskopieZurueck(); return; }
+  if(!k) alert(text);
 }
 
 /* Der zuletzt erfolgreich gespeicherte Stand, als Text. Wird gebraucht, um
@@ -1706,7 +1807,18 @@ function speicherStand(){
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
 let state = load();
-try{ letzterGuterStand = localStorage.getItem(STORAGE_KEY); }catch(e){}
+/* Beim Laden zieht die App alte Datenstände nach: neue Stufenvorgaben, die
+   Richtigstellung der Leistungsniveaus und Ähnliches. Das sind Änderungen des
+   Programms, nicht der Lehrkraft. Ohne diese Zeile würden sie beim nächsten
+   Speichern als "hier wurde etwas eingestellt" gewertet, das Fach bekäme einen
+   neuen Zeitstempel, und beim Zusammenführen hätte immer das zuletzt geöffnete
+   Gerät recht. Genau so sind Einstellungen hin und her gesprungen. */
+signaturenFesthalten();
+/* Der Stand, auf den bei vollem Speicher zurückgerollt wird, muss der
+   gelesene und nachgezogene sein, nicht der rohe Text aus dem Speicher.
+   Sonst landet beim Zurückrollen ein alter Datenstand im Programm, und die
+   Anzeige stirbt genau in dem Augenblick, in dem eine Sicherung nötig wäre. */
+try{ letzterGuterStand = JSON.stringify({ version: 4, classes: state.classes, settings: state.settings }); }catch(e){}
 let pendingPhoto = null;
 let pendingPhotoTag = null;
 
@@ -1899,13 +2011,33 @@ function jahresGewicht(){
    allen Leistungen beider Semester. */
 function jahresWertAusAbschluss(sub, studentId){
   const n1 = abschlussNote(sub, studentId, 1);
-  if(n1 === null) return null;
-  const w2 = (abschlussNote(sub, studentId, 2) !== null)
-    ? abschlussNote(sub, studentId, 2)
-    : schnittBerechnet(sub, studentId, 2);
-  if(w2 === null) return n1;
+  const n2 = abschlussNote(sub, studentId, 2);
+  if(n1 === null && n2 === null) return null;
+  /* Ein abgeschlossenes Semester zählt mit seiner vergebenen Note, ein
+     offenes mit seinem Rechenwert. Vorher galt das nur für das 1. Semester:
+     War allein das 2. abgeschlossen, fiel die dort vergebene Note aus dem
+     Jahreswert heraus, als hätte es sie nie gegeben. */
+  const w1 = (n1 !== null) ? n1 : schnittBerechnet(sub, studentId, 1);
+  const w2 = (n2 !== null) ? n2 : schnittBerechnet(sub, studentId, 2);
+  if(w1 === null && w2 === null) return null;
+  if(w1 === null) return w2;
+  if(w2 === null) return w1;
   const g = jahresGewicht();
-  return (n1 + w2 * g) / (1 + g);
+  return (w1 + w2 * g) / (1 + g);
+}
+
+/* Der Rechenwert eines Zeitraums: das, was die Rechnung sagt, bevor eine
+   Note vergeben wird. Für das ganze Jahr gehört ein bereits abgeschlossenes
+   Semester dazu, sonst steht auf dem Abschlussbildschirm eine andere Zahl
+   als in der Schüleransicht, und der Knopf "Alle Vorschläge übernehmen"
+   würde diese falsche Zahl für die ganze Klasse festschreiben. */
+function rechenwert(sub, studentId, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  if(z === "alle"){
+    const ausAbschluss = jahresWertAusAbschluss(sub, studentId);
+    if(ausAbschluss !== null) return ausAbschluss;
+  }
+  return schnittBerechnet(sub, studentId, z);
 }
 
 function computeSchnitt(sub, studentId, sem){
@@ -1929,11 +2061,15 @@ function schnittHerkunft(sub, studentId, sem){
       text: (z === "alle" ? "Jahresnote" : SEM_LABELS[z] + ": Note") + " " + fest + " vergeben"
         + (roh === null ? "" : ", Rechenwert " + fmtO(roh)) };
   }
-  if(z === "alle" && abschlussNote(sub, studentId, 1) !== null){
+  if(z === "alle" && (abschlussNote(sub, studentId, 1) !== null || abschlussNote(sub, studentId, 2) !== null)){
     const n1 = abschlussNote(sub, studentId, 1);
-    const w2 = schnittBerechnet(sub, studentId, 2);
+    const n2 = abschlussNote(sub, studentId, 2);
+    const teil = (n, roh, name) => n !== null
+      ? name + " " + n + " vergeben"
+      : name + " " + (roh === null ? "noch keine Leistungen" : fmtO(roh));
     return { fest: false, note: null, berechnet: computeSchnitt(sub, studentId, "alle"),
-      text: "aus Semesternote " + n1 + " und 2. Semester " + (w2 === null ? "noch keine Leistungen" : fmtO(w2))
+      text: "aus " + teil(n1, schnittBerechnet(sub, studentId, 1), "1. Semester")
+        + " und " + teil(n2, schnittBerechnet(sub, studentId, 2), "2. Semester")
         + (jahresGewicht() === 2 ? " (2. Semester zählt doppelt)" : "") };
   }
   return { fest: false, note: null, berechnet: schnittBerechnet(sub, studentId, z), text: "" };
@@ -1942,7 +2078,7 @@ function schnittHerkunft(sub, studentId, sem){
 /* Setzt oder ändert den Abschluss eines Zeitraums. */
 function abschlussSetzen(sub, studentId, zeitraum, note){
   const vorhanden = abschlussEintrag(sub, studentId, zeitraum);
-  const roh = schnittBerechnet(sub, studentId, zeitraum);
+  const roh = rechenwert(sub, studentId, zeitraum);
   if(vorhanden){
     vorhanden.value = note;
     vorhanden.berechnet = roh;
@@ -2194,7 +2330,7 @@ function ausblickSchnitt(cls, sub, studentId, sem, wahl){
 
   if(!zusatz.length) return null;
   const kopie = Object.assign({}, sub, { entries: sub.entries.concat(zusatz) });
-  return { wert: schnittBerechnet(kopie, studentId, z), anzahl: zusatz.length,
+  return { wert: rechenwert(kopie, studentId, z), anzahl: zusatz.length,
            beweglichDrin: beweglichDrin,
            gedeckelt: bonusSumme(kopie, studentId, z).gedeckelt };
 }
@@ -2203,7 +2339,7 @@ function ausblickSchnitt(cls, sub, studentId, sem, wahl){
 function ausblick(cls, sub, studentId, sem){
   const z = (sem === undefined) ? aktivesSemester() : sem;
   if(abschlussNote(sub, studentId, z) !== null) return null;
-  const jetzt = schnittBerechnet(sub, studentId, z);
+  const jetzt = rechenwert(sub, studentId, z);
   if(jetzt === null) return null;
 
   const weiter = ausblickSchnitt(cls, sub, studentId, z, "weiter");
@@ -2232,7 +2368,7 @@ function ausblick(cls, sub, studentId, sem){
       /* Dieselbe Regel wie in der Rechnung: ohne eigene Eintragung gilt,
          was in dieser Klasse üblich ist. Das gehört dazugeschrieben. */
       const n = nochZuErwarten(typischeAnzahl(cls, sub, cat, z, stufig), anteil);
-      if(n) teile.push(n + "× " + catLabel(sub, cat) + " (in dieser Klasse üblich)");
+      if(n) teile.push(n + "× " + catLabel(sub, cat) + " (in dieser Klasse üblich, angenommen für die beiden unteren Zeilen)");
     }
   });
 
@@ -2261,7 +2397,7 @@ function ausblick(cls, sub, studentId, sem){
 function ohneMitarbeit(sub, studentId, sem){
   const bew = ausblickCats(sub);
   if(!bew.stufig || !bew.cats.length) return null;
-  const jetzt = schnittBerechnet(sub, studentId, sem);
+  const jetzt = rechenwert(sub, studentId, sem);
   if(jetzt === null) return null;
   const kopie = Object.assign({}, sub, {
     cats: (sub.cats || []).filter(k => bew.cats.indexOf(k) === -1),
@@ -2269,7 +2405,7 @@ function ohneMitarbeit(sub, studentId, sem){
     stufenZaehlt: (sub.stufenZaehlt || []).filter(k => bew.cats.indexOf(k) === -1),
     entries: sub.entries.filter(e => bew.cats.indexOf(e.cat) === -1)
   });
-  const ohne = schnittBerechnet(kopie, studentId, sem);
+  const ohne = rechenwert(kopie, studentId, sem);
   if(ohne === null || Math.abs(ohne - jetzt) < 0.005) return null;
   return { jetzt: jetzt, ohne: ohne, was: bew.cats.map(k => catLabel(sub, k)) };
 }
@@ -2852,7 +2988,7 @@ function renderHomeList(){
     const bad = schnitt !== null && schnitt >= 4.0;
     return `<div class="row" onclick="goHome('roster','${cls.id}','${sub.id}')">
       <div>
-        <div class="name">${cls.name} &middot; ${sub.fach}</div>
+        <div class="name">${esc(cls.name)} &middot; ${esc(sub.fach)}</div>
         <div class="sub">${cls.students.length} Schüler:innen</div>
       </div>
       <div style="display:flex; align-items:center; gap:10px;">
@@ -3100,7 +3236,7 @@ function renderNewStudent(){
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('roster')">&lsaquo;</span>
       <span class="title" style="${titleStyle("home")}">Neue/r Schüler:in</span>
-      <div class="sub">Klasse ${cls.name}</div>
+      <div class="sub">Klasse ${esc(cls.name)}</div>
     </div>
     <form onsubmit="createStudent(event)">
       <span class="field-label">Name</span>
@@ -3108,7 +3244,7 @@ function renderNewStudent(){
       ${niveauFeld}
       <button type="submit">Anlegen</button>
     </form>
-    <div class="helptext">Der Name gilt für die ganze Klasse ${cls.name} und erscheint damit in allen Fächern dieser Klasse.</div>
+    <div class="helptext">Der Name gilt für die ganze Klasse ${esc(cls.name)} und erscheint damit in allen Fächern dieser Klasse.</div>
   `;
 }
 
@@ -3281,8 +3417,8 @@ function renderStudent(){
         <button class="green" onclick="assignPhoto()">Speichern</button>
       </div>
       <div class="chips" style="padding:8px 0 2px;">
-        ${fotoVorschlaege(sub).map(t =>
-          `<div class="chip" onclick="fotoTagSetzen('${t.replace(/'/g, "\\'")}')">${esc(t)}</div>`).join("")}
+        ${fotoVorschlaege(sub).map((t, i) =>
+          `<div class="chip" onclick="fotoTagSetzen(${i})">${esc(t)}</div>`).join("")}
       </div>
       <div style="display:flex; gap:8px; margin-top:2px; align-items:center;">
         <img src="${pendingPhoto}" alt="aufgenommenes Foto" style="height:52px; border:1.5px solid #000; border-radius:6px;">
@@ -3294,8 +3430,13 @@ function renderStudent(){
   const tend = tendenz(sub, s.id);
   const tf = tendenzFarbe(schnitt);
   const wort = notenWort(schnitt);
-  const bonusZusatz = (schnitt !== null && bonus.wert)
-    ? fmt(grundschnitt) + " " + (bonus.wert < 0 ? "\u2212" : "+") + " " + fmtB(Math.abs(bonus.wert)) + " Bonus"
+  /* Die Rechnung daneben muss aufgehen. Ist der Zeitraum abgeschlossen, ist
+     die große Zahl die vergebene Note, und Grundschnitt plus Bonus ergibt
+     sie nicht; dann steht der Rechenwert dabei. */
+  const rechenZahl = rechenwert(sub, s.id);
+  const bonusZusatz = (rechenZahl !== null && bonus.wert)
+    ? fmt(grundschnitt) + " " + (bonus.wert < 0 ? "\u2212" : "+") + " " + fmtB(Math.abs(bonus.wert))
+      + " Bonus" + ((schnitt !== null && Math.abs(schnitt - rechenZahl) > 0.005) ? " = " + fmt(rechenZahl) : "")
     : "";
 
   /* Noten, die gespeichert sind, aber laut Einstellung nicht mitzählen.
@@ -3394,6 +3535,21 @@ function renderStudent(){
         aus.gedeckelt ? " Mehr als " + fmtB(bonusMax(sub)) + " Notenstufen kann sie nie ausmachen, so ist die Obergrenze eingestellt." : ""}</div>
     </div>`}`;
 
+  /* Ist der Zeitraum abgeschlossen, entfällt der Ausblick, denn die Note ist
+     vergeben. Was die Mitarbeit ausgemacht hat, bleibt trotzdem die Zahl für
+     das Gespräch und steht dann für sich. */
+  const mitarbeitBlockAllein = (aus || !ohneMit) ? "" : `
+    <div class="label" style="border-top:2px solid #000;">WAS DIE MITARBEIT AUSGEMACHT HAT</div>
+    <div style="padding:9px 16px; border-bottom:1px solid #000; background:${
+        ohneMit.ohne < ohneMit.jetzt ? "#FBECEA" : "#EDF6EC"};">
+      <div style="font-size:13px; font-weight:bold; color:${
+        ohneMit.ohne < ohneMit.jetzt ? "#8E1C16" : "#215E24"};">Die ${esc(ohneMit.was.join(" und "))} ${
+        ohneMit.ohne < ohneMit.jetzt
+          ? "hat dich " + fmtB(ohneMit.jetzt - ohneMit.ohne) + " Notenstufen gekostet."
+          : "hat dir " + fmtB(ohneMit.ohne - ohneMit.jetzt) + " Notenstufen gebracht."}</div>
+      <div style="font-size:11px; margin-top:2px;">Ohne sie stünde als Rechenwert ${fmtO(ohneMit.ohne)} da statt ${fmtO(ohneMit.jetzt)}.</div>
+    </div>`;
+
   const abschlussBlock = abschlussZeile(cls, sub, s);
 
   /* Kronen dieser Person in diesem Fach. */
@@ -3451,6 +3607,7 @@ function renderStudent(){
     ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
     ${bilanzZeilen}
     ${ausblickBlock}
+    ${mitarbeitBlockAllein}
     <div style="padding:12px 16px; border-top:2px solid #000000; border-bottom:${homeView.zeigeEintraege ? "1px" : "2px"} solid #000000;">
       <button onclick="toggleEintraege()" style="width:100%;">${homeView.zeigeEintraege
         ? "Einzelne Einträge ausblenden"
@@ -3476,7 +3633,7 @@ function abschlussTitel(z){
 function abschlussZeile(cls, sub, s){
   const z = aktivesSemester();
   const eintrag = abschlussEintrag(sub, s.id, z);
-  const roh = schnittBerechnet(sub, s.id, z);
+  const roh = rechenwert(sub, s.id, z);
 
   if(eintrag){
     const jahrHinweis = (z === 1 && abschlussNote(sub, s.id, "alle") === null)
@@ -3508,7 +3665,7 @@ function abschlussFragen(studentId){
   const s = getStudent(cls, studentId);
   if(!cls || !sub || !s) return;
   const z = aktivesSemester();
-  const roh = schnittBerechnet(sub, s.id, z);
+  const roh = rechenwert(sub, s.id, z);
   const alt = abschlussNote(sub, s.id, z);
   const vorschlag = alt !== null ? alt : (roh === null ? "" : Math.round(roh));
   const eingabe = prompt(
@@ -3548,7 +3705,7 @@ function renderAbschluss(){
   const z = aktivesSemester();
 
   const zeilen = cls.students.map(s => {
-    const roh = schnittBerechnet(sub, s.id, z);
+    const roh = rechenwert(sub, s.id, z);
     const fest = abschlussNote(sub, s.id, z);
     const vorschlag = roh === null ? null : Math.round(roh);
     const kacheln = [1,2,3,4,5].map(v => {
@@ -3573,7 +3730,7 @@ function renderAbschluss(){
   }).join("");
 
   const offen = cls.students.filter(s => abschlussNote(sub, s.id, z) === null
-    && schnittBerechnet(sub, s.id, z) !== null).length;
+    && rechenwert(sub, s.id, z) !== null).length;
 
   return `
     <div class="header" style="${headerStyle("home")}">
@@ -3614,13 +3771,13 @@ function abschlussVorschlaegeUebernehmen(){
   if(!cls || !sub) return;
   const z = aktivesSemester();
   const offen = cls.students.filter(s => abschlussNote(sub, s.id, z) === null
-    && schnittBerechnet(sub, s.id, z) !== null);
+    && rechenwert(sub, s.id, z) !== null);
   if(!offen.length){ alert("Es ist nichts offen."); return; }
   if(!confirm("Für " + offen.length + " " + (offen.length === 1 ? "Schüler:in" : "Schüler:innen")
     + " die gerundete Note aus der Rechnung übernehmen?\n\n"
     + "Bereits vergebene Noten bleiben unverändert. Jede Note lässt sich danach einzeln ändern.")) return;
   offen.forEach(s => {
-    abschlussSetzen(sub, s.id, z, Math.round(schnittBerechnet(sub, s.id, z)));
+    abschlussSetzen(sub, s.id, z, Math.round(rechenwert(sub, s.id, z)));
   });
   save();
   render();
@@ -3644,6 +3801,10 @@ function nameAendern(){
   if(doppelt && !confirm("In dieser Klasse gibt es schon jemanden mit diesem Namen. Trotzdem so nennen?")) return;
   s.name = sauber;
   s.updatedAt = Date.now();
+  /* Nach dem Ausbessern gehört der Name an seine Stelle. Ohne das stand die
+     Klassenliste bis zum nächsten Öffnen nicht mehr alphabetisch, und
+     Statistik und Blätter übernehmen diese Reihenfolge. */
+  studentenOrdnen(cls);
   save();
   render();
 }
@@ -3877,6 +4038,21 @@ function updateNoteWeight(value){
   if(el) el.textContent = fmtW(homeView.noteWeight);
 }
 
+/* In der Schnelleingabe heißt der Regler "Gewichtung für alle". Sobald er
+   losgelassen wird, ziehen die bereits gesetzten Zeilen dieser Runde mit,
+   genau wie bei Thema, Arbeitsnummer und Höchstpunktezahl. */
+function gewichtFuerAlle(){
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  if(!sub || typeof homeView.noteWeight !== "number") return;
+  let geaendert = 0;
+  Object.keys(homeView.schnellIds || {}).forEach(sid => {
+    const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
+    if(!e || e.type !== "note") return;
+    if(e.w !== homeView.noteWeight){ e.w = homeView.noteWeight; geaendert++; }
+  });
+  if(geaendert) save();
+}
+
 function renderNewNote(){
   const cls = getClass(homeView.classId);
   const sub = getSubject(cls, homeView.subjectId);
@@ -3934,7 +4110,7 @@ function renderNewNote(){
       <div class="header" style="${headerStyle("home")}">
         <span class="back" style="${titleStyle("home")}" onclick="goHome('student')">&lsaquo;</span>
         <span class="title" style="${titleStyle("home")}">Note eintragen</span>
-        <div class="sub">${s.name} &middot; ${sub.fach}</div>
+        <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}</div>
       </div>
       <div class="chips">${chips}</div>
       ${themaFeld("themaInput", homeView.thema, themaVorschlag("kompetenz"))}
@@ -4032,7 +4208,7 @@ function goSchnell(){
   homeView.schnellMax = null;
   homeView.schnellThema = null;
   homeView.schnellArbeit = nummeriert(sub, homeView.newNoteCat)
-    ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, homeView.newNoteCat) + 1) : null;
+    ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, homeView.newNoteCat, semesterFuerNeu()) + 1) : null;
   homeView.screen = "schnell";
   render();
 }
@@ -4045,7 +4221,7 @@ function schnellCat(cat){
   homeView.schnellMax = null;
   homeView.schnellThema = null;
   homeView.schnellArbeit = nummeriert(sub, cat)
-    ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, cat) + 1) : null;
+    ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, cat, semesterFuerNeu()) + 1) : null;
   render();
 }
 
@@ -4073,7 +4249,11 @@ function punkteNeuRechnen(alteMax, neueMax){
   if(!sub || !neueMax) return;
   let geaendert = 0;
   const zuHoch = [];
-  Object.keys(homeView.schnellIds || {}).forEach(sid => {
+  /* In der Reihenfolge der Klassenliste, nicht in der des Antippens: die
+     Namen in der Meldung unten sucht man sonst einzeln zusammen. */
+  const reihe = cls.students.map(x => x.id).filter(id => homeView.schnellIds[id]);
+  Object.keys(homeView.schnellIds || {}).forEach(id => { if(reihe.indexOf(id) === -1) reihe.push(id); });
+  reihe.forEach(sid => {
     const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
     if(!e || e.type !== "note" || !e.basis) return;
     const treffer = String(e.basis).match(/^([\d.,]+) von /);
@@ -4147,6 +4327,11 @@ function schnellSpeichern(studentId, daten, leise){
     if(typeof daten.fz === "number"){ vorhanden.fz = daten.fz; } else { delete vorhanden.fz; }
     vorhanden.thema = thema;
     vorhanden.arbeit = homeView.schnellArbeit || null;
+    /* Die Gewichtung heißt "für alle" und gilt für alle: wer sie mitten in
+       der Runde nachstellt, meint auch die Zeilen, die schon stehen. Sonst
+       trügen zwei Noten derselben Erfassung stillschweigend verschiedene
+       Gewichte. */
+    if(typeof homeView.noteWeight === "number") vorhanden.w = homeView.noteWeight;
     vorhanden.ts = Date.now();
   } else {
     if(vorhanden) sub.entries = sub.entries.filter(e => e.id !== vorhanden.id);
@@ -4428,7 +4613,7 @@ function renderSchnell(){
         <span id="noteWeightVal" style="font-weight:bold;">${fmtW(homeView.noteWeight)}</span>
         <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
       </div>
-      ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">` : ""}
+      ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" onchange="gewichtFuerAlle()" style="margin-top:6px;">` : ""}
     </div>`;
 
   return `
@@ -4450,7 +4635,7 @@ function renderSchnell(){
     <div class="footer">
       <button onclick="goHome('roster')">Fertig${gesetzt ? " (" + gesetzt + " eingetragen)" : ""}</button>
       ${(gesetzt && nummeriert(sub, cat) && homeView.schnellArbeit)
-        ? `<button class="gross" onclick="goArbeit('${cls.id}','${sub.id}','${cat}','${homeView.schnellArbeit}')">Auswertung dieser ${esc(catLabel(sub, cat))} ansehen</button>`
+        ? `<button class="gross" onclick="goArbeit('${cls.id}','${sub.id}','${cat}','${semesterFuerNeu()}|${homeView.schnellArbeit}')">Auswertung dieser ${esc(catLabel(sub, cat))} ansehen</button>`
         : ""}
     </div>
   `;
@@ -4774,7 +4959,17 @@ function fotoVorschlaege(sub){
   return aus;
 }
 
-function fotoTagSetzen(text){
+/* Übergeben wird die Stelle in der Vorschlagsliste, nicht der Text selbst.
+   Ein Kategoriename ist frei wählbar; ein Anführungszeichen darin hat vorher
+   das Attribut beendet und den Knopf unbrauchbar gemacht. */
+function fotoTagSetzen(wahl){
+  let text = wahl;
+  if(typeof wahl === "number"){
+    const cls = getClass(homeView.classId);
+    const sub = getSubject(cls, homeView.subjectId);
+    const liste = sub ? fotoVorschlaege(sub) : [];
+    text = liste[wahl] || "";
+  }
   pendingPhotoTag = text;
   const el = document.getElementById("fotoTagInput");
   if(el) el.value = text;
@@ -5266,15 +5461,19 @@ function ohneFotos(klassen){
   }));
 }
 
+/* Meldet zurück, ob die Kopie wirklich liegt. Wer sie verspricht, muss
+   nachsehen: gerade auf dem vollen Gerät scheitert sie, und das ist das
+   Gerät, auf dem sie gebraucht wird. */
 function sicherheitskopieAnlegen(grund){
-  if(!state.classes.length) return;
+  if(!state.classes.length) return true;
   try{
     localStorage.setItem(KOPIE_KEY, JSON.stringify({
       grund: grund,
       zeit: new Date().toISOString(),
       daten: { version: 4, classes: ohneFotos(state.classes), settings: state.settings }
     }));
-  }catch(e){ /* kein Platz, dann eben nicht */ }
+    return true;
+  }catch(e){ return false; }
 }
 
 function sicherheitskopieLesen(){
@@ -5302,17 +5501,11 @@ function sicherheitskopieZurueck(){
               "Die Kopie wird mit dem jetzigen Stand zusammengeführt, es geht nichts verloren.\n" +
               "Porträtfotos sind in der Kopie nicht enthalten.")) return;
   const bericht = mergeState(state, migrate(JSON.parse(JSON.stringify(k.daten))));
-  save();
+  const gespeichert = save();
   fotosEinlagern(function(v){ if(v) render(); });
   ansichtenZuruecksetzen();
   switchTab("home");
-  alert("Zurückgeholt.\n\nNeu dazugekommen:\n" +
-    bericht.klassen + " Klasse(n)\n" +
-    bericht.schueler + " Schüler:in(nen)\n" +
-    bericht.faecher + " Fach/Fächer\n" +
-    bericht.eintraege + " Eintrag/Einträge" +
-    (bericht.einstellungen ? "\n\nBei " + bericht.einstellungen
-      + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen." : ""));
+  zusammenfuehrungMelden(gespeichert, bericht, "Zurückgeholt.");
 }
 
 /* Beim Start prüfen, ob das Programm gegen eine neue Fassung getauscht wurde */
@@ -5339,6 +5532,12 @@ function mitFotos(klassen){
   }));
 }
 
+/* Gibt es überhaupt Fotos, auf die gewartet werden müsste? */
+function fotoEintraegeDa(){
+  return state.classes.some(c => (c.subjects || []).some(sub =>
+    (sub.entries || []).some(e => e.type === "foto")));
+}
+
 function sicherungsDaten(){
   return { version: 4, ausgabe: AUSGABE, geraet: state.settings.geraet || "",
            classes: mitFotos(state.classes), settings: state.settings, exportedAt: new Date().toISOString() };
@@ -5348,6 +5547,14 @@ function sicherungsDaten(){
 let sicherungBereit = null;
 
 async function sicherungErstellen(){
+  /* Die Bilder liegen in der Bilddatenbank und werden beim Start in den
+     Arbeitsspeicher geholt. In der ersten Sekunde danach ist der Speicher
+     noch leer: eine Sicherung aus diesem Augenblick trüge Fotoeinträge ohne
+     Bild. Lieber einen Atemzug warten und es sagen. */
+  if(typeof fotoBereit !== "undefined" && !fotoBereit && fotoEintraegeDa()){
+    alert("Die Fotos sind noch nicht geladen.\n\nBitte gleich noch einmal auf Jetzt sichern tippen, damit die Bilder in der Sicherung sind.");
+    return;
+  }
   const stempel = datumsStempel();
   const wordBlob = new Blob([docxBytes()], { type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
   const jsonBlob = new Blob([JSON.stringify(sicherungsDaten(), null, 2)], { type:"application/json" });
@@ -5408,6 +5615,10 @@ function sicherungFertig(){ sicherungBereit = null; render(); }
 /* Nur die Datendatei, ohne Word. Für den häufigsten Fall: schnell den Stand
    sichern, um ihn auf dem anderen Gerät zusammenzuführen. */
 function nurDatenSichern(){
+  if(typeof fotoBereit !== "undefined" && !fotoBereit && fotoEintraegeDa()){
+    alert("Die Fotos sind noch nicht geladen.\n\nBitte gleich noch einmal tippen, damit die Bilder mitkommen.");
+    return;
+  }
   const stempel = datumsStempel();
   const jsonBlob = new Blob([JSON.stringify(sicherungsDaten(), null, 2)], { type:"application/json" });
   dateiAbgeben(jsonBlob, "Klassenheft_Daten_" + stempel + ".json");
@@ -5554,6 +5765,17 @@ function einstellungsSignatur(sub){
   return stabilJson(teil);
 }
 
+/* Hält den aktuellen Stand fest, ohne ihn als Änderung zu werten. Läuft
+   einmal direkt nach dem Laden. */
+function signaturenFesthalten(){
+  try{
+    state.classes.forEach(cls => (cls.subjects || []).forEach(sub => {
+      sub.einstellungenSig = einstellungsSignatur(sub);
+      if(typeof sub.einstellungenTs !== "number") sub.einstellungenTs = 0;
+    }));
+  }catch(e){}
+}
+
 /* Läuft bei jedem Speichern. Stellt fest, ob sich an den Einstellungen
    eines Fachs etwas geändert hat, und hält den Zeitpunkt fest. */
 function einstellungsStempel(){
@@ -5575,8 +5797,42 @@ function einstellungsStempel(){
   return geaendert;
 }
 
+/* Der Nachsatz unter jeder Zusammenführungsmeldung. Steht an einer Stelle,
+   damit alle drei Wege dasselbe sagen. */
+/* Nach einem Zusammenführen: nur melden, was wirklich im Speicher steht.
+   Schlägt das Speichern fehl, weil der Speicher voll ist, rollt save() den
+   Stand zurück. Eine Erfolgsmeldung wäre dann eine Unwahrheit, und die
+   Lehrkraft löscht im Vertrauen darauf ihre Sicherungsdatei. */
+function zusammenfuehrungMelden(gespeichert, bericht, kopf){
+  if(!gespeichert){
+    alert("Nicht übernommen.\n\nDer Speicher dieses Geräts ist voll, der Stand wurde deshalb zurückgesetzt.\n\n"
+      + "Bitte zuerst Platz schaffen, etwa durch Löschen alter Fotos, und danach noch einmal zusammenführen.\n\n"
+      + "Bewahre die Sicherungsdatei bis dahin auf.");
+    return;
+  }
+  alert(kopf + "\n\nNeu dazugekommen:\n" +
+    bericht.klassen + " Klasse(n)\n" +
+    bericht.schueler + " Schüler:in(nen)\n" +
+    bericht.faecher + " Fach/Fächer\n" +
+    bericht.eintraege + " Eintrag/Einträge" +
+    mergeNachsatz(bericht));
+}
+
+function mergeNachsatz(bericht){
+  let t = "";
+  if(bericht.einstellungen){
+    t += "\n\nBei " + bericht.einstellungen
+      + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen.";
+  }
+  if(bericht.fest){
+    t += "\n\nBei " + bericht.fest
+      + " Fach/Fächern sind die Einstellungen festgeschrieben. Dort wurde nichts geändert.";
+  }
+  return t;
+}
+
 function mergeState(basis, fremd){
-  const bericht = { klassen:0, schueler:0, faecher:0, eintraege:0, einstellungen:0 };
+  const bericht = { klassen:0, schueler:0, faecher:0, eintraege:0, einstellungen:0, fest:0 };
 
   fremd.classes.forEach(fc => {
     let bc = basis.classes.find(c => c.id === fc.id)
@@ -5597,6 +5853,12 @@ function mergeState(basis, fremd){
         bericht.schueler++;
       } else if((fs.updatedAt || 0) > (bs.updatedAt || 0)){
         bs.niveau = fs.niveau;
+        /* Der Name muss mitkommen. Sonst erreicht eine Richtigstellung das
+           andere Gerät nie, und beim übernächsten Zusammenführen findet
+           weder die Kennung noch der Name eine Entsprechung: Die Person
+           steht danach zweimal in der Liste, und die vorhandene Note wandert
+           zur Doppelgängerin. */
+        if(typeof fs.name === "string" && fs.name.trim()) bs.name = fs.name;
         if(fs.photo) bs.photo = fs.photo;
         bs.updatedAt = fs.updatedAt || 0;
       } else if(!bs.photo && fs.photo){
@@ -5604,6 +5866,9 @@ function mergeState(basis, fremd){
       }
       idMap[fs.id] = bs.id;
     });
+    /* Dazugekommene Namen stünden sonst bis zum nächsten Öffnen am Ende der
+       Liste. Die Einträge hängen an der Kennung, nicht an der Position. */
+    studentenOrdnen(bc);
 
     fc.subjects.forEach(fsub => {
       let bsub = bc.subjects.find(s => s.id === fsub.id)
@@ -5628,17 +5893,29 @@ function mergeState(basis, fremd){
         /* Der Zeitstempel kommt mit, sonst gälte das neue Fach sofort als
            unverändert und das nächste Zusammenführen liefe wieder schief. */
         if(typeof fsub.einstellungenTs === "number") bsub.einstellungenTs = fsub.einstellungenTs;
+        if(fsub.einstellungenFest){ bsub.einstellungenFest = true; bsub.festSeit = fsub.festSeit || today(); }
         bc.subjects.push(bsub);
         bericht.faecher++;
       } else {
         /* Eigene Beurteilungsarten werden immer zusammengelegt, nie ersetzt:
            legt ein Gerät eine an und das andere eine zweite, sollen danach
            beide da sein. */
+        const bFest = !!bsub.einstellungenFest, fFest = !!fsub.einstellungenFest;
         (fsub.customCats || []).forEach(c => {
           if(!bsub.customCats.some(x => x.key === c.key)){
             bsub.customCats.push(Object.assign({}, c));
-            if(typeof bsub.weights[c.key] !== "number") bsub.weights[c.key] = fsub.weights[c.key] ?? 10;
-            if((bsub.cats || []).indexOf(c.key) === -1) bsub.cats.push(c.key);
+            /* Die Vorgabe hängt an der Rechenart: 10 ist ein Prozentanteil,
+               im Faktormodus wäre es ein zehnfach zählender Eintrag. */
+            if(typeof bsub.weights[c.key] !== "number"){
+              bsub.weights[c.key] = (typeof (fsub.weights || {})[c.key] === "number")
+                ? fsub.weights[c.key] : (isProzentMode(bsub) ? 10 : 1);
+            }
+            /* Sind die Einstellungen hier festgeschrieben, wird die neue
+               Beurteilungsart nur bekannt gemacht, damit mitgebrachte Einträge
+               ihren Namen behalten. Eingeschaltet wird sie nicht: das würde die
+               Gewichtung verschieben, und genau das soll die Festschreibung
+               verhindern. Einschalten kannst du sie mit einem Tipp. */
+            if(!(bFest && !fFest) && (bsub.cats || []).indexOf(c.key) === -1) bsub.cats.push(c.key);
           }
         });
 
@@ -5657,7 +5934,16 @@ function mergeState(basis, fremd){
            noch genau so dasteht wie angelegt, hat niemand eingestellt, und
            eine gepflegte Einstellung von der anderen Seite gewinnt. */
         const vorlagenRegel = (fts === bts) && istVorlagenStand(bsub) && !istVorlagenStand(fsub);
-        if(fts > bts || vorlagenRegel){
+        /* Festgeschriebene Einstellungen stehen über jedem Zeitstempel.
+           Steht die Festschreibung hier, wird hier nichts geändert. Steht sie
+           nur auf der anderen Seite, ist dort die bewusste Entscheidung
+           gefallen, und sie kommt samt Festschreibung mit. */
+        const anders = einstellungsSignatur(bsub) !== einstellungsSignatur(fsub);
+        let uebernehmenJetzt;
+        if(bFest){ uebernehmenJetzt = false; if(anders) bericht.fest++; }
+        else if(fFest){ uebernehmenJetzt = true; }
+        else { uebernehmenJetzt = (fts > bts || vorlagenRegel); }
+        if(uebernehmenJetzt){
           const alteGewichte = Object.assign({}, bsub.weights);
           EINSTELLUNGSFELDER.forEach(f => uebernehmen(bsub, fsub, f));
           /* Gewichte schlüsselweise: eine Beurteilungsart, die es nur hier
@@ -5670,11 +5956,13 @@ function mergeState(basis, fremd){
                && (bsub.cats || []).indexOf(c.key) === -1) bsub.cats.push(c.key);
           });
           bsub.einstellungenTs = Math.max(fts, bts);
+          if(fFest){ bsub.einstellungenFest = true; bsub.festSeit = fsub.festSeit || today(); }
           delete bsub.einstellungenSig;
           bericht.einstellungen++;
-        } else {
+        } else if(!bFest){
           /* Der hiesige Stand ist der neuere oder gleich alt. Dann kommt nur
-             dazu, was hier noch gar nicht gesetzt ist. */
+             dazu, was hier noch gar nicht gesetzt ist. Festgeschrieben kommt
+             gar nichts dazu. */
           if(fsub.stufenTexte){
             if(!bsub.stufenTexte) bsub.stufenTexte = {};
             Object.keys(fsub.stufenTexte).forEach(k => {
@@ -5699,11 +5987,27 @@ function mergeState(basis, fremd){
   });
 
   basis.classes.forEach(normaliseClass);
+  /* Was das Zusammenführen an Einstellungen getan hat, hat es bewusst getan
+     und die Zeitstempel selbst gesetzt. Ohne diese Zeile hielte das nächste
+     Speichern jede dabei entstandene Kleinigkeit für eine Änderung der
+     Lehrkraft, stempelte sie mit dem jetzigen Zeitpunkt, und das zuletzt
+     empfangende Gerät gewänne künftig jeden Vergleich. */
+  basis.classes.forEach(cls => (cls.subjects || []).forEach(sub => {
+    sub.einstellungenSig = einstellungsSignatur(sub);
+  }));
   if(fremd.settings && fremd.settings.lastBackup){
     if(!basis.settings.lastBackup || fremd.settings.lastBackup > basis.settings.lastBackup){
       basis.settings.lastBackup = fremd.settings.lastBackup;
     }
   }
+  /* Lehrkraft und Schuljahr stehen im Kopf jedes Ausdrucks. Auf einem frisch
+     eingerichteten Zweitgerät sind sie leer; dann kommen sie mit. Ist hier
+     etwas eingetragen, bleibt es stehen. */
+  ["lehrkraft", "schuljahr"].forEach(f => {
+    if(!String(basis.settings[f] || "").trim() && fremd.settings && String(fremd.settings[f] || "").trim()){
+      basis.settings[f] = fremd.settings[f];
+    }
+  });
   return bericht;
 }
 
@@ -5757,6 +6061,10 @@ function ablageFehler(e){
 
 function ablageSenden(){
   if(typeof fetch !== "function") return;
+  if(typeof fotoBereit !== "undefined" && !fotoBereit && fotoEintraegeDa()){
+    alert("Die Fotos sind noch nicht geladen.\n\nBitte gleich noch einmal tippen, damit die Bilder mitkommen.");
+    return;
+  }
   const code = codeAusFeld();
   fetch("ablage", {
     method: "POST",
@@ -5790,17 +6098,11 @@ function ablageHolen(){
       const woher = daten.geraet ? " von " + daten.geraet : "";
       if(!confirm("Daten" + woher + " mit diesem Gerät zusammenführen? Es wird nichts gelöscht, fehlende Einträge kommen dazu.")) return;
       const bericht = mergeState(state, migrate(daten));
-      save();
+      const gespeichert = save();
       fotosEinlagern(function(v){ if(v) render(); });
       ansichtenZuruecksetzen();
       switchTab("home");
-      alert("Zusammengeführt.\n\nNeu dazugekommen:\n" +
-        bericht.klassen + " Klasse(n)\n" +
-        bericht.schueler + " Schüler:in(nen)\n" +
-        bericht.faecher + " Fach/Fächer\n" +
-        bericht.eintraege + " Eintrag/Einträge" +
-        (bericht.einstellungen ? "\n\nBei " + bericht.einstellungen
-          + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen." : ""));
+      zusammenfuehrungMelden(gespeichert, bericht, "Zusammengeführt.");
     })
     .catch(ablageFehler);
 }
@@ -5863,10 +6165,17 @@ document.getElementById("importInput").addEventListener("change", function(ev){
     const fremd = migrate(data);
     if(importModus === "ersetzen"){
       if(!confirm("Alles ersetzen? Der aktuelle Stand auf diesem Gerät wird dabei überschrieben.\n\nDie App legt vorher von selbst eine Sicherheitskopie an.")) return;
-      sicherheitskopieAnlegen("vor dem Ersetzen");
+      /* Die Kopie scheitert genau dort, wo sie gebraucht wird: auf dem vollen
+         Gerät. Dann wird gefragt, statt den Bestand ungebremst zu ersetzen. */
+      if(!sicherheitskopieAnlegen("vor dem Ersetzen")
+         && !confirm("Die Sicherheitskopie konnte nicht angelegt werden, der Speicher ist voll.\n\n"
+            + "Trotzdem ersetzen? Der jetzige Stand auf diesem Gerät ist danach weg.")) return;
       state = fremd;
       state.settings = normaliseSettings(state.settings);
-      save();
+      if(!save()){
+        alert("Nicht eingespielt.\n\nDer Speicher dieses Geräts ist voll. Bitte zuerst Platz schaffen.");
+        return;
+      }
       fotosEinlagern(function(v){ if(v) render(); });
       ansichtenZuruecksetzen();
       switchTab("home");
@@ -5875,17 +6184,11 @@ document.getElementById("importInput").addEventListener("change", function(ev){
     }
     if(!confirm("Daten aus der Datei mit diesem Gerät zusammenführen? Es wird nichts gelöscht, fehlende Einträge kommen dazu.")) return;
     const bericht = mergeState(state, fremd);
-    save();
+    const gespeichert = save();
     fotosEinlagern(function(v){ if(v) render(); });
     ansichtenZuruecksetzen();
     switchTab("home");
-    alert("Zusammengeführt.\n\nNeu dazugekommen:\n" +
-      bericht.klassen + " Klasse(n)\n" +
-      bericht.schueler + " Schüler:in(nen)\n" +
-      bericht.faecher + " Fach/Fächer\n" +
-      bericht.eintraege + " Eintrag/Einträge" +
-      (bericht.einstellungen ? "\n\nBei " + bericht.einstellungen
-        + " Fach/Fächern war die Einstellung auf dem anderen Gerät neuer und wurde übernommen." : ""));
+    zusammenfuehrungMelden(gespeichert, bericht, "Zusammengeführt.");
   };
   reader.readAsText(file);
 });
@@ -5942,10 +6245,13 @@ function verlaufSvg(sub, studentId, sem, breite, hoehe){
   const letzteBeschriftung = `<text x="${b - rechts}" y="${h - 6}" text-anchor="end" font-size="10" fill="#666666">${svgEsc(noten[noten.length - 1].date)}</text>`;
 
   /* Die strichlierte Linie liegt beim Schnitt der gezeichneten Punkte, sonst
-     würde sie außerhalb aller Punkte hängen. Kommt ein Bonus dazu, steht die
-     Endnote als zweite, feiner strichlierte Linie daneben. */
+     würde sie außerhalb aller Punkte hängen. Kommt ein Bonus dazu, steht der
+     Wert mit Bonus als zweite, feiner strichlierte Linie daneben.
+     Gezeichnet wird der Rechenwert, nicht die vergebene Note: sonst behauptet
+     die Grafik bei einem abgeschlossenen Zeitraum, der Bonus hätte die
+     vergebene Note bewirkt. */
   const grund = schnittOhneBonus(sub, studentId, sem);
-  const schnitt = computeSchnitt(sub, studentId, sem);
+  const schnitt = rechenwert(sub, studentId, sem);
   const bonus = bonusSumme(sub, studentId, sem);
   const zeigeBonus = grund !== null && schnitt !== null && Math.abs(schnitt - grund) > 0.005;
 
@@ -6213,7 +6519,7 @@ function noteTabelle(sub, studentId){
    hat. Nur wenn er tatsächlich etwas verändert, sonst wäre es nur Ballast. */
 function bonusSatz(sub, studentId, sem){
   const grund = schnittOhneBonus(sub, studentId, sem);
-  const schnitt = computeSchnitt(sub, studentId, sem);
+  const schnitt = rechenwert(sub, studentId, sem);
   if(grund === null || schnitt === null) return "";
   const bonus = bonusSumme(sub, studentId, sem);
   if(!bonus.teile.length) return "";
@@ -6354,9 +6660,8 @@ function blattArbeit(cls, sub, cat, kennung){
   const v = arbeitVergleich(liste, i);
   const label = catLabel(sub, cat);
   const alle = arbeitEintraege(cls, sub, cat, arbeitKennung(a));
-  const mitNote = alle.filter(x => x.e.type === "note")
-    .sort((x, y) => x.e.value - y.e.value || x.s.name.localeCompare(y.s.name));
-  const ohneNote = alle.filter(x => x.e.type === "fehlt");
+  const mitNote = nachKlassenliste(cls, alle.filter(x => x.e.type === "note"));
+  const ohneNote = nachKlassenliste(cls, alle.filter(x => x.e.type === "fehlt"));
 
   const zeilen = mitNote.map(x => `<tr>
       <td>${esc(x.s.name)}</td>
@@ -6518,7 +6823,13 @@ function blattKlasse(cls, sub){
   const proKat = notenCats(sub).map(k => {
     const noten = wertendeNotenAlle(sub).filter(e => e.cat === k);
     if(!noten.length) return "";
-    const mittel = noten.reduce((a,n) => a + n.value, 0) / noten.length;
+    /* Gewichtet, genau wie in der Schüleransicht. Trägt eine Note ein
+       anderes Gewicht, stünden sonst für dieselbe Beurteilungsart zwei
+       verschiedene Zahlen auf zwei Bildschirmen. */
+    let summe = 0, gewicht = 0;
+    noten.forEach(n => { const q = noteWeight(sub, n); summe += n.value * q; gewicht += q; });
+    if(gewicht <= 0) return "";
+    const mittel = summe / gewicht;
     return `<tr><td>${esc(catLabel(sub,k))}</td><td style="text-align:center;">${noten.length}</td><td style="text-align:center; font-weight:bold;">${fmt(mittel)}</td></tr>`;
   }).join("");
 
@@ -6585,7 +6896,11 @@ function printKlasse(classId, subjectId){
    Praktisch am Abend vor dem Elternsprechtag. */
 function printAlleSchueler(classId){
   const cls = getClass(classId);
-  if(!cls || !cls.students.length) return;
+  if(!cls) return;
+  if(!cls.students.length){
+    alert("In dieser Klasse ist noch niemand eingetragen, es gibt also nichts zu drucken.");
+    return;
+  }
   drucken(cls.students.map(s => blattSchueler(cls, s)).join(""));
 }
 
@@ -6624,9 +6939,8 @@ function renderStatArbeit(){
   const v = arbeitVergleich(liste, i);
   const label = catLabel(sub, statView.arbeitCat);
   const alle = arbeitEintraege(cls, sub, statView.arbeitCat, arbeitKennung(a));
-  const mitNote = alle.filter(x => x.e.type === "note")
-    .sort((x, y) => x.e.value - y.e.value || x.s.name.localeCompare(y.s.name));
-  const ohneNote = alle.filter(x => x.e.type === "fehlt");
+  const mitNote = nachKlassenliste(cls, alle.filter(x => x.e.type === "note"));
+  const ohneNote = nachKlassenliste(cls, alle.filter(x => x.e.type === "fehlt"));
 
   const schnitteAlle = liste.map(x => x.schnitt).filter(x => x !== null);
   const mittelAller = schnitteAlle.length
@@ -6680,7 +6994,7 @@ function renderStatArbeit(){
     <div style="padding:0 16px 12px; overflow-x:auto;">${spiegelTabelle(a.verteilung)}</div>
     <div class="label" style="border-top:2px solid #000;">BESTE UND SCHWÄCHSTE NOTE</div>
     <div class="helptext">Beste Note ${a.beste}, schwächste Note ${a.schlechteste}.${
-      a.anzahl > 1 ? " Die Liste unten ist nach der Note sortiert." : ""}</div>
+      a.anzahl > 1 ? " Die Liste unten steht in der Reihenfolge der Klassenliste." : ""}</div>
     <div class="label" style="border-top:2px solid #000;">ALLE NOTEN</div>
     ${zeilen || '<div class="helptext">Keine Noten.</div>'}
     ${fehlZeilen}
@@ -6695,7 +7009,7 @@ function renderStatList(){
   const rows = allSubjectRows().map(({cls, sub}) => `
     <div class="row" onclick="goStat('detail','${cls.id}','${sub.id}')">
       <div>
-        <div class="name">${cls.name} &middot; ${sub.fach}</div>
+        <div class="name">${esc(cls.name)} &middot; ${esc(sub.fach)}</div>
         <div class="sub">${cls.students.length} Schüler:innen</div>
       </div>
       <div class="chev" style="${titleStyle("statistik")}">&rsaquo;</div>
@@ -6722,14 +7036,17 @@ function renderStatDetail(){
   const klassenschnitt = avgs.length ? avgs.reduce((a,b) => a+b, 0) / avgs.length : null;
   const totalPos = je.reduce((a,p) => a + p.pos, 0);
   const totalNeg = je.reduce((a,p) => a + p.neg, 0);
-  const sortiert = je.slice().sort((a,b) => (b.schnitt ?? 0) - (a.schnitt ?? 0));
+  /* Die Liste steht in der Reihenfolge der Klassenliste, also alphabetisch,
+     wenn nicht ausdrücklich die Eingabereihenfolge eingestellt ist. Vorher
+     stand sie nach Notenschnitt, und damit an jeder Stelle der App anders. */
+  const sortiert = je;
 
   const rows = sortiert.map(p => {
     const bad = p.schnitt !== null && p.schnitt >= 4.0;
     return `<div class="row" style="cursor:default;">
       <div style="display:flex; align-items:center; gap:10px;">
         ${avatarHtml(p.s, true)}
-        <div class="name" style="font-size:14px;">${p.s.name}</div>
+        <div class="name" style="font-size:14px;">${esc(p.s.name)}</div>
       </div>
       <div style="text-align:right; display:flex; gap:10px; align-items:center; flex-shrink:0;">
         ${(p.pos + p.neg) > 0
@@ -6747,7 +7064,10 @@ function renderStatDetail(){
   const negGesamt = verteilungZahlen[4];
   const notenGesamt = verteilungZahlen.reduce((x, y) => x + y, 0);
 
-  /* Stufen zählen nicht in den Schnitt, gehören aber in die Auswertung */
+  /* Einstufungen ohne eigene Note gehören in die Auswertung. Ob sie als
+     Bonus wirken oder gar nichts bewirken, steht am Abzeichen: die Mitarbeit
+     ist in fast jedem Fach ein Bonus, und "zählt nicht" wäre dort das
+     Gegenteil dessen, was die Schüleransicht sagt. */
   const stufenUebersicht = activeCats(sub).filter(k => istStufenCat(sub, k) && !stufeZaehlt(sub, k)).map(k => {
     const c = catCol(sub, k);
     const liste = sub.entries.filter(e => e.type === "stufe" && e.cat === k &&
@@ -6759,7 +7079,8 @@ function renderStatDetail(){
     return `<div class="entry">
       <span class="catdot" style="background:${c.fg};"></span>
       <div class="txt">${esc(catLabel(sub, k))} &middot; ${esc(teile.join(", "))}</div>
-      <span class="badge" style="border-color:${c.fg}; color:${c.fg}; background:${c.bg};">zählt nicht</span>
+      <span class="badge" style="border-color:${c.fg}; color:${c.fg}; background:${c.bg};">${
+        istBonusCat(sub, k) ? "wirkt als Bonus" : "zählt nicht"}</span>
     </div>`;
   }).join("");
 
@@ -6847,11 +7168,17 @@ function renderStatDetail(){
   const perCat = notenCats(sub).map(k => {
     const noten = wertendeNotenAlle(sub).filter(e => e.cat === k);
     if(!noten.length) return "";
-    const mittel = noten.reduce((a,n) => a + n.value, 0) / noten.length;
+    /* Gewichtet, genau wie in der Schüleransicht. Trägt eine Note ein
+       anderes Gewicht, stünden sonst für dieselbe Beurteilungsart zwei
+       verschiedene Zahlen auf zwei Bildschirmen. */
+    let summe = 0, gewicht = 0;
+    noten.forEach(n => { const q = noteWeight(sub, n); summe += n.value * q; gewicht += q; });
+    if(gewicht <= 0) return "";
+    const mittel = summe / gewicht;
     const c = catCol(sub, k);
     return `<div class="entry">
       <span class="catdot" style="background:${c.fg};"></span>
-      <div class="txt">${catLabel(sub,k)}</div>
+      <div class="txt">${esc(catLabel(sub,k))}</div>
       <span class="badge" style="border-color:${c.fg}; color:${c.fg}; background:${c.bg};">${noten.length} Noten</span>
       <span class="grade">${fmtO(mittel)}</span>
     </div>`;
@@ -6860,7 +7187,7 @@ function renderStatDetail(){
   return `
     <div class="header" style="${headerStyle("statistik")}">
       <span class="back" style="${titleStyle("statistik")}" onclick="goStat('list')">&lsaquo;</span>
-      <span class="title" style="${titleStyle("statistik")}">${cls.name} &middot; ${sub.fach}</span>
+      <span class="title" style="${titleStyle("statistik")}">${esc(cls.name)} &middot; ${esc(sub.fach)}</span>
       <div class="sub">${SEM_LABELS[aktivesSemester()]}</div>
     </div>
     ${semesterLeiste("statistik")}
@@ -6914,11 +7241,14 @@ function renderSettingsList(){
   const rows = allSubjectRows().map(({cls, sub}) => `
     <div class="row" onclick="goSettings('detail','${cls.id}','${sub.id}')">
       <div>
-        <div class="name">${cls.name} &middot; ${sub.fach}</div>
-        <div class="sub">${SUBJECT_TEMPLATES[sub.template] ? SUBJECT_TEMPLATES[sub.template].label : "eigene Einstellung"}</div>
+        <div class="name">${esc(cls.name)} &middot; ${esc(sub.fach)}</div>
+        <div class="sub">${SUBJECT_TEMPLATES[sub.template] ? SUBJECT_TEMPLATES[sub.template].label : "eigene Einstellung"}${
+          sub.einstellungenFest ? " &middot; festgeschrieben" : ""}</div>
       </div>
       <div class="chev" style="${titleStyle("einstellungen")}">&rsaquo;</div>
     </div>`).join("");
+  const alleFaecher = allSubjectRows();
+  const festAnzahl = alleFaecher.filter(({sub}) => sub.einstellungenFest).length;
   const tage = tageSeitSicherung();
   const standText = !state.settings.lastBackup
     ? "Noch keine Sicherung erstellt."
@@ -6970,6 +7300,19 @@ function renderSettingsList(){
     ${sicherungBereitBlock()}
     <div class="label">FÄCHER</div>
     ${rows || '<div class="helptext">Noch nichts angelegt.</div>'}
+
+    <div class="label" style="border-top:2px solid #000;">EINSTELLUNGEN FESTSCHREIBEN</div>
+    <div class="helptext">${alleFaecher.length === 0
+      ? "Sobald ein Fach angelegt ist, kannst du seine Einstellungen hier festschreiben."
+      : (festAnzahl === alleFaecher.length
+        ? "<b>Alle " + alleFaecher.length + " Fächer sind festgeschrieben.</b> Beim Zusammenführen bleiben Gewichtung, Beurteilungsarten, Notenschlüssel und Leistungsniveaus unverändert. Einträge kommen weiterhin dazu. Ändern kannst du jede Einstellung jederzeit selbst, das hebt die Festschreibung nicht auf."
+        : (festAnzahl
+          ? "<b>" + festAnzahl + " von " + alleFaecher.length + " Fächern sind festgeschrieben.</b> Nur dort bleiben die Einstellungen beim Zusammenführen unverändert."
+          : "Solange nichts festgeschrieben ist, gilt beim Zusammenführen der neuere Stand. Wer die Bewertung fertig eingerichtet hat, schreibt sie besser fest: dann ändert kein Zusammenführen mehr etwas daran."))}</div>
+    ${alleFaecher.length ? `<div class="footer">
+      <button onclick="alleFestschreiben(true)">Alle Einstellungen festschreiben</button>
+      ${festAnzahl ? '<button class="ghost" onclick="alleFestschreiben(false)">Festschreibung überall aufheben</button>' : ""}
+    </div>` : ""}
 
     <div class="label" style="border-top:2px solid #000;">ANGABEN FÜR DEN AUSDRUCK</div>
     <div style="padding:0 16px;">
@@ -7155,6 +7498,11 @@ function renderSettingsDetail(){
   /* Stufen-Kategorien haben kein Gewicht, sie zählen nicht in den Schnitt */
   const zaehlendeListe = notenCats(sub).map(k => catLabel(sub, k)).join(", ");
   const bonusListe = cats.filter(k => istBonusCat(sub, k)).map(k => catLabel(sub, k)).join(", ");
+  /* Eine benotete Beurteilungsart mit Gewicht 0 fällt aus notenCats heraus,
+     ist kein Bonus und keine Einstufung: Sie stand in keiner der drei Zeilen,
+     obwohl sie weiter Noten sammelt. */
+  const nullListe = cats.filter(k => !istStufenCat(sub, k) && !istBonusCat(sub, k)
+    && notenCats(sub).indexOf(k) === -1).map(k => catLabel(sub, k)).join(", ");
   const nurVermerktListe = cats.filter(k => istStufenCat(sub, k) && !stufeZaehlt(sub, k) && !istBonusCat(sub, k))
     .map(k => catLabel(sub, k)).join(", ");
 
@@ -7271,14 +7619,25 @@ function renderSettingsDetail(){
   return `
     <div class="header" style="${headerStyle("einstellungen")}">
       <span class="back" style="${titleStyle("einstellungen")}" onclick="goSettings('list')">&lsaquo;</span>
-      <span class="title" style="${titleStyle("einstellungen")}">${cls.name} &middot; ${sub.fach}</span>
+      <span class="title" style="${titleStyle("einstellungen")}">${esc(cls.name)} &middot; ${esc(sub.fach)}</span>
       <div class="sub">${stufeLabel(cls)}</div>
     </div>
 
-    <div class="label">WAS IN DIE NOTE EINFLIESST</div>
+    <div class="label">EINSTELLUNGEN DIESES FACHS</div>
+    <div class="helptext">${sub.einstellungenFest
+      ? "<b>Festgeschrieben" + (sub.festSeit ? " am " + esc(sub.festSeit) : "") + ".</b> Beim Zusammenführen mit einem anderen Gerät bleibt hier alles, wie es ist: Gewichtung, Beurteilungsarten, Notenschlüssel, Leistungsniveaus, Stufentexte. Noten und Einträge kommen weiterhin dazu. Du selbst kannst jede Einstellung weiterhin ändern."
+      : "<b>Nicht festgeschrieben.</b> Beim Zusammenführen gilt der neuere Stand, auch wenn er vom anderen Gerät kommt. Sobald du die Bewertung dieses Fachs fertig eingerichtet hast, schreibe sie fest."}</div>
+    <div class="footer">
+      ${sub.einstellungenFest
+        ? '<button class="ghost" onclick="festschreiben(false)">Festschreibung aufheben</button>'
+        : '<button onclick="festschreiben(true)">Einstellungen festschreiben</button>'}
+    </div>
+
+    <div class="label" style="border-top:2px solid #000;">WAS IN DIE NOTE EINFLIESST</div>
     <div class="helptext">
       ${zaehlendeListe ? "<b>Zählt in den Notenschnitt:</b> " + esc(zaehlendeListe) + "<br>" : ""}
       ${bonusListe ? "<b>Wirkt als Bonus, höchstens " + fmtB(bonusMax(sub)) + " Notenstufen:</b> " + esc(bonusListe) + "<br>" : ""}
+      ${nullListe ? "<b>Steht auf Gewicht 0 und zählt deshalb nicht:</b> " + esc(nullListe) + "<br>" : ""}
       ${nurVermerktListe ? "<b>Nur vermerkt, ohne Wirkung:</b> " + esc(nurVermerktListe) : ""}
       <br>Ändern kannst du das weiter unten unter <b>Benotet oder nur vermerkt</b>. Die Entscheidung liegt bei dir, in jedem Fach getrennt.
     </div>
@@ -7316,6 +7675,9 @@ function renderSettingsDetail(){
           ? '<button class="ghost" style="margin-top:6px;" onclick="niveauNamenZuruecksetzen()">Wieder die Vorgabe verwenden</button>'
           : ""}
       </div>` : ""}
+      ${(!IST_FREI && !hatNiveaus(sub) && niveausVorschlag(sub.fach, sub.template))
+        ? '<div class="helptext" style="padding:4px 0 0; color:#8E1C16;"><b>In ' + esc(sub.fach) + ' werden üblicherweise Leistungsniveaus geführt, hier sind sie ausgeschaltet.</b> Dann gilt für alle derselbe Notenschlüssel, und in der Klassenliste steht bei niemandem Standard AHS oder Standard. Mit dem Häkchen oben schaltest du sie ein.</div>'
+        : ""}
       <div class="helptext" style="padding:4px 0 0;">${IST_FREI
         ? "Zwei Niveaus nebeneinander, jedes mit eigenem Notenschlüssel. Das braucht nur, wer in diesem Fach nach Niveaus differenziert. Die Namen können Sie frei wählen, zum Beispiel Grundkurs und Leistungskurs."
         : "Die beiden Niveaus gibt es nur in den Hauptgegenständen, also in Deutsch, Mathematik und Englisch. In den theoretischen und praktischen Nebengegenständen gibt es sie nicht; dort gilt <b>ein</b> Schlüssel für alle. An einer höheren Schule können Sie sie umbenennen."}
@@ -7972,6 +8334,7 @@ function deleteClass(){
 fassungPruefen();
 schriftAnwenden();
 render();
+ladefehlerMelden();
 
 /* Bilddatenbank öffnen, Bilder in den Arbeitsspeicher holen und Fotos aus
    früheren Fassungen dorthin auslagern. Danach neu zeichnen. Läuft im
