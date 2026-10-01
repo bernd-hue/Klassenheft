@@ -186,6 +186,7 @@
   .pr-h1{font-size:16pt; font-weight:bold; margin:0;}
   .pr-meta{font-size:9pt; text-align:right;}
   .pr-h2{font-size:11pt; font-weight:bold; margin:6mm 0 2mm; border-bottom:1px solid #000000; padding-bottom:1mm;}
+  .pr-h3{font-size:10pt; font-weight:bold; margin:4mm 0 1mm;}
   .pr-tbl{width:100%; border-collapse:collapse; font-size:10pt;}
   .pr-tbl th, .pr-tbl td{border:1px solid #000000; padding:2mm 2.5mm; text-align:left; vertical-align:top;}
   .pr-tbl th{background:#eeeeee; font-size:9pt;}
@@ -256,7 +257,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.2";
+const APP_FASSUNG = "17.9.3";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -3335,6 +3336,7 @@ function renderStudent(){
   const grundschnitt = schnittOhneBonus(sub, s.id);
   const anzahlFehlt = eigene.filter(e => e.type === "fehlt").length;
   const verlauf2 = verlaufSvg(sub, s.id);
+  const verlaufKats = verlaufJeKategorie(sub, s.id);
   const bilanz = stufenBilanz(sub, s.id);
   const bilanzZeilen = bilanz.length ? bilanz.map(b => {
     const c = catCol(sub, b.cat);
@@ -3602,9 +3604,12 @@ function renderStudent(){
       <button class="gross" onclick="goHome('newNote')">Leistung eintragen</button>
       <button onclick="goNewEntry('notiz')">Notiz</button>
       <button onclick="document.getElementById('cameraInput').click()">Foto aufnehmen</button>
-      <button onclick="printSchueler('${cls.id}','${s.id}')">Elternsprechtag-Blatt</button>
+      <button onclick="printSchueler('${cls.id}','${s.id}','${sub.id}')">Elternsprechtag-Blatt</button>
     </div>
-    ${verlauf2 ? '<div class="label">NOTENVERLAUF</div><div class="chart">' + verlauf2 + "</div>" : ""}
+    ${verlauf2 ? '<div class="label">NOTENVERLAUF, ALLES ZUSAMMEN</div><div class="chart">' + verlauf2 + "</div>" : ""}
+    ${verlaufKats ? '<div class="label" style="border-top:2px solid #000;">VERLAUF JE BEURTEILUNGSART</div>'
+      + '<div class="helptext">Jede Beurteilungsart für sich, in zeitlicher Folge. Oben ist das Gute. Bei Einstufungen stehen die Stufen an der Achse, sie werden nicht in Noten umgerechnet.</div>'
+      + verlaufKats : ""}
     ${bilanzZeilen}
     ${ausblickBlock}
     ${mitarbeitBlockAllein}
@@ -5260,7 +5265,9 @@ function wordDokument(){
             const zeilen = noten.map(n => [
               n.date,
               eintragTitel(sub, n),
-              n.cat === "kompetenz" ? ((n.achieved||[]).length + " von " + n.total + " Kompetenzen") : (n.basis || ""),
+              n.cat === "kompetenz" ? (typeof n.total === "number"
+                ? ((n.achieved||[]).length + " von " + n.total + " Kompetenzen")
+                : (n.basis || "")) : (n.basis || ""),
               fmtW(noteWeight(sub, n)),
               String(n.value)
             ]);
@@ -6278,6 +6285,177 @@ function verlaufSvg(sub, studentId, sem, breite, hoehe){
   </svg>${hinweis}`;
 }
 
+/* ---------- VERLAUF JE BEURTEILUNGSART ----------
+   Eine Linie für alles ist für eine Lehrkraft lesbar, für Eltern nicht: In
+   einer einzigen Linie liegen Schularbeiten, Mitarbeit und Hausübungen
+   durcheinander, und man sieht nicht, woran es liegt. Deshalb bekommt jede
+   Beurteilungsart ihre eigene, kleine Linie, untereinander und in derselben
+   Reihenfolge wie überall in der App.
+
+   Zwei Skalen, nicht eine: Noten laufen von 1 bis 5, Einstufungen laufen von
+   der besten zur schwächsten Stufe und tragen deshalb die Stufentexte an der
+   Achse. Beides in eine Skala zu zwingen hieße, eine Hausübung in eine Note
+   umzurechnen, die niemand vergeben hat. Oben ist immer das Gute. */
+
+function verlaufDatenJeKategorie(sub, studentId, sem){
+  const bloecke = [];
+  activeCats(sub).forEach(cat => {
+    const stufig = istStufenCat(sub, cat);
+    const eigene = nachDatum(entriesOf(sub, studentId, sem).filter(e => stufig
+      ? (e.type === "stufe" && e.cat === cat)
+      : (e.type === "note" && e.cat === cat)));
+    if(!eigene.length) return;
+    const anzahlStufen = stufig ? stufenListe(sub, cat).length : 0;
+    const punkte = eigene.map(e => ({
+      e: e,
+      /* Für die Höhe im Bild: 1 ist oben, 5 ist unten. Eine Einstufung
+         bekommt ihre Position aus dem Stufenrang, nicht aus einer Note. */
+      hoehe: stufig
+        ? (anzahlStufen > 1 ? 1 + (4 * (e.stufe || 0)) / (anzahlStufen - 1) : 3)
+        : e.value,
+      text: stufig ? stufenText(sub, e) : "Note " + e.value
+    }));
+    bloecke.push({ cat: cat, label: catLabel(sub, cat), stufig: stufig,
+      anzahlStufen: anzahlStufen, texte: stufig ? stufenListe(sub, cat) : [], punkte: punkte,
+      rolle: stufig
+        ? (stufeZaehlt(sub, cat) ? "zählt mit" : (istBonusCat(sub, cat) ? "wirkt als Bonus" : "nur vermerkt"))
+        : (catZaehlt(sub, cat) ? "zählt in die Note" : "zählt nicht"),
+      schnitt: stufig ? null : punkte.reduce((a, x) => a + x.hoehe, 0) / punkte.length });
+  });
+  return bloecke;
+}
+
+/* Welche Stufe entspricht einer Höhe im Bild? Gebraucht, um für eine Klasse
+   nicht "Schnitt 2,2" über Hausübungen zu schreiben: Eine Einstufung ist
+   keine Note, und eine Zahl dafür liest sich wie eine. */
+function stufeZurHoehe(block, hoehe){
+  const texte = block.texte || [];
+  if(!texte.length || typeof hoehe !== "number") return "";
+  const i = texte.length > 1 ? Math.round(((hoehe - 1) / 4) * (texte.length - 1)) : 0;
+  return texte[Math.max(0, Math.min(texte.length - 1, i))];
+}
+
+/* Eine einzelne kleine Linie. */
+function kleinerVerlaufSvg(block, farbe, breite, hoehe){
+  const b = breite || 380, h = hoehe || 84;
+  const links = block.stufig ? 74 : 24, rechts = 8, oben = 10, unten = 16;
+  const iB = b - links - rechts, iH = h - oben - unten;
+  const n = block.punkte.length;
+  const x = i => links + (n === 1 ? iB / 2 : (iB * i) / (n - 1));
+  const y = wert => oben + (iH * (wert - 1)) / 4;
+
+  let gitter = "";
+  if(block.stufig){
+    const texte = block.texte || [];
+    texte.forEach((t, i) => {
+      const wert = texte.length > 1 ? 1 + (4 * i) / (texte.length - 1) : 3;
+      gitter += `<line x1="${links}" y1="${y(wert).toFixed(1)}" x2="${b - rechts}" y2="${y(wert).toFixed(1)}" stroke="#DDDDDD" stroke-width="1"/>`
+        + `<text x="${links - 6}" y="${(y(wert) + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="#555555">${svgEsc(stufenKurz(t))}</text>`;
+    });
+  } else {
+    for(let g = 1; g <= 5; g++){
+      gitter += `<line x1="${links}" y1="${y(g).toFixed(1)}" x2="${b - rechts}" y2="${y(g).toFixed(1)}" stroke="#DDDDDD" stroke-width="1"/>`
+        + `<text x="${links - 6}" y="${(y(g) + 3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#555555">${g}</text>`;
+    }
+  }
+
+  const linie = n < 2 ? "" :
+    `<polyline points="${block.punkte.map((pt, i) => x(i).toFixed(1) + "," + y(pt.hoehe).toFixed(1)).join(" ")}"
+      fill="none" stroke="${farbe}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+  const marken = block.punkte.map((pt, i) => {
+    const titel = svgEsc(block.label + " " + (pt.e.date || "") + ": " + pt.text);
+    return `<circle cx="${x(i).toFixed(1)}" cy="${y(pt.hoehe).toFixed(1)}" r="4" fill="${farbe}" stroke="#FFFFFF" stroke-width="1.5"><title>${titel}</title></circle>`;
+  }).join("");
+
+  const erste = `<text x="${links}" y="${h - 4}" font-size="8" fill="#666666">${svgEsc(block.punkte[0].e.date || "")}</text>`;
+  const letzte = n < 2 ? "" :
+    `<text x="${b - rechts}" y="${h - 4}" text-anchor="end" font-size="8" fill="#666666">${svgEsc(block.punkte[n - 1].e.date || "")}</text>`;
+  const mittel = (block.schnitt === null) ? "" :
+    `<line x1="${links}" y1="${y(block.schnitt).toFixed(1)}" x2="${b - rechts}" y2="${y(block.schnitt).toFixed(1)}"
+      stroke="${farbe}" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"><title>Schnitt ${svgEsc(fmt(block.schnitt))}</title></line>`;
+
+  return `<svg viewBox="0 0 ${b} ${h}" width="100%" height="${h}" role="img" preserveAspectRatio="xMidYMid meet"
+      aria-label="${svgEsc(block.label + ", " + n + " Eintrag/Einträge")}">
+    ${gitter}${mittel}${linie}${marken}${erste}${letzte}
+  </svg>`;
+}
+
+/* Der ganze Bereich: eine Linie je Beurteilungsart, untereinander.
+   `druck` schaltet auf die Maße des Papiers um. */
+function verlaufJeKategorie(sub, studentId, sem, druck){
+  const bloecke = verlaufDatenJeKategorie(sub, studentId, sem);
+  if(!bloecke.length) return "";
+  const breite = druck ? 520 : 380;
+  return bloecke.map(block => {
+    const c = catCol(sub, block.cat);
+    const kopf = `<div style="display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; font-size:${druck ? "9pt" : "12px"};">
+        <span class="catdot" style="background:${c.fg};"></span>
+        <b>${esc(block.label)}</b>
+        <span>${block.punkte.length}${block.punkte.length === 1 ? " Eintrag" : " Einträge"}</span>
+        <span>&middot; ${esc(block.rolle)}</span>
+        ${block.schnitt === null ? "" : "<span>&middot; Schnitt " + fmt(block.schnitt) + "</span>"}
+      </div>`;
+    return `<div style="${druck ? "margin:2mm 0 3mm; page-break-inside:avoid;" : "padding:8px 16px 10px; border-bottom:1px solid #000000;"}">
+      ${kopf}
+      ${kleinerVerlaufSvg(block, c.fg, breite, block.stufig ? 88 : 92)}
+    </div>`;
+  }).join("");
+}
+
+/* Dasselbe für die ganze Klasse: je Beurteilungsart der Klassenschnitt über
+   die Zeit. Zusammengefasst wird je Termin, bei nummerierten Arbeiten also je
+   Schularbeit, sonst je Tag. */
+function verlaufKlasseJeKategorie(cls, sub, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  const bloecke = [];
+  activeCats(sub).forEach(cat => {
+    const stufig = istStufenCat(sub, cat);
+    const anzahlStufen = stufig ? stufenListe(sub, cat).length : 0;
+    const roh = (sub.entries || []).filter(e => e.cat === cat
+      && (stufig ? e.type === "stufe" : e.type === "note")
+      && (z === "alle" || eintragSemester(e) === z)
+      && (cls.students || []).some(x => x.id === e.studentId));
+    if(!roh.length) return;
+    const gruppen = {};
+    nachDatum(roh).forEach(e => {
+      const nr = stufig ? null : arbeitNr(e);
+      const schluessel = nr ? ("A" + eintragSemester(e) + "-" + nr) : ("D" + (e.date || ""));
+      if(!gruppen[schluessel]) gruppen[schluessel] = { date: e.date, nr: nr, werte: [] };
+      gruppen[schluessel].werte.push(stufig
+        ? (anzahlStufen > 1 ? 1 + (4 * (e.stufe || 0)) / (anzahlStufen - 1) : 3)
+        : e.value);
+    });
+    const reihen = Object.keys(gruppen).map(k => gruppen[k])
+      .sort((a, b) => schuljahrOrdnung(a.date || "") - schuljahrOrdnung(b.date || ""));
+    if(!reihen.length) return;
+    const punkte = reihen.map(g => {
+      const mittel = g.werte.reduce((a, v) => a + v, 0) / g.werte.length;
+      return { e: { date: g.date }, hoehe: mittel,
+        text: (g.nr ? g.nr + ". Termin, " : "") + g.werte.length + "× eingetragen, Schnitt " + fmt(mittel) };
+    });
+    bloecke.push({ cat: cat, label: catLabel(sub, cat), stufig: stufig,
+      anzahlStufen: anzahlStufen, texte: stufig ? stufenListe(sub, cat) : [],
+      punkte: punkte, rolle: punkte.length + (punkte.length === 1 ? " Termin" : " Termine"),
+      schnitt: punkte.reduce((a, x) => a + x.hoehe, 0) / punkte.length });
+  });
+  if(!bloecke.length) return "";
+  return bloecke.map(block => {
+    const c = catCol(sub, block.cat);
+    return `<div style="padding:8px 16px 10px; border-bottom:1px solid #000000;">
+      <div style="display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; font-size:12px;">
+        <span class="catdot" style="background:${c.fg};"></span>
+        <b>${esc(block.label)}</b>
+        <span>${esc(block.rolle)}</span>
+        <span>&middot; ${block.stufig
+          ? "meist " + esc(stufeZurHoehe(block, block.schnitt))
+          : "Klassenschnitt " + fmt(block.schnitt)}</span>
+      </div>
+      ${kleinerVerlaufSvg(block, c.fg, 380, block.stufig ? 88 : 92)}
+    </div>`;
+  }).join("");
+}
+
 /* ---------- VERGLEICH MEHRERER ARBEITEN ----------
    Eine Reihe, eine Farbe. Die Höhe zeigt den Schnitt, jede Säule trägt ihre
    Zahl. Die Säule zusätzlich nach dem Notenwert einzufärben, würde nur die
@@ -6497,7 +6675,9 @@ function noteTabelle(sub, studentId){
   if(!noten.length) return '<div class="pr-note">Noch keine Noten eingetragen.</div>';
   const zeilen = noten.map(n => {
     const grundlage = n.cat === "kompetenz"
-      ? (n.achieved || []).length + " von " + n.total + " Kompetenzen"
+      ? (typeof n.total === "number"
+          ? (n.achieved || []).length + " von " + n.total + " Kompetenzen"
+          : (n.basis || ""))
       : (n.basis || "");
     return `<tr>
       <td>${esc(n.date)}</td>
@@ -6591,13 +6771,23 @@ function fotoAnhang(paare, titel){
 
 /* Ein Blatt je Schüler:in, über alle Fächer dieser Klasse. Genau das,
    was am Elternsprechtag auf dem Tisch liegen und mitgegeben werden soll. */
-function blattSchueler(cls, s){
-  const teile = cls.subjects.map(sub => {
+/* Das Elternsprechtag-Blatt. Wird ein Fach übergeben, steht genau dieses
+   Fach darauf. Ohne Fach stehen alle Fächer der Klasse darauf.
+
+   Gemeldet: Aus der Statistik in 2a Mathematik gedruckt, und auf dem Blatt
+   stand auch das Bewertungsschema von Bewegung und Sport. Das Blatt hat
+   immer über alle Fächer der Klasse gerechnet, auch wenn man aus einem
+   einzelnen Fach heraus gedruckt hat. Für das Gespräch über Mathematik ist
+   das falsch, und es verwirrt die Eltern. */
+function blattSchueler(cls, s, nurSub){
+  const faecher = nurSub ? [nurSub] : (cls.subjects || []);
+  const teile = faecher.map(sub => {
     const schnitt = computeSchnitt(sub, s.id);
     const pn = countPosNeg(sub, s.id);
     const hatWas = entriesOf(sub, s.id).length > 0;
     if(!hatWas) return "";
     const grafik = verlaufSvg(sub, s.id, undefined, 520, 150);
+    const katGrafik = verlaufJeKategorie(sub, s.id, undefined, true);
     return `
       <div class="pr-h2">${esc(sub.fach)}</div>
       <div class="pr-kpi">
@@ -6615,6 +6805,9 @@ function blattSchueler(cls, s){
       </div>
       ${grafik ? '<div class="pr-chart">' + grafik + "</div>" : ""}
       ${grafik ? "" : bonusZeile(sub, s.id)}
+      ${katGrafik ? '<div class="pr-h3">Verlauf je Beurteilungsart</div>'
+        + '<div class="pr-note" style="margin-bottom:1mm;">Jede Beurteilungsart für sich, in zeitlicher Folge. Oben ist das Gute. Hausübung und Mitarbeit tragen ihre eigenen Stufen an der Achse, sie werden nicht in Noten umgerechnet.</div>'
+        + katGrafik : ""}
       ${noteTabelle(sub, s.id)}
       ${stufenTabelle(sub, s.id)}
       ${verlaufTabelle(sub, s.id)}
@@ -6624,15 +6817,15 @@ function blattSchueler(cls, s){
   /* Das Niveau steht im Kopf des Blattes nur, wenn wenigstens ein Fach
      dieser Klasse Niveaus führt. In einer Klasse aus lauter Nebenfächern
      wäre die Angabe sinnlos. */
-  const niveauRelevant = (cls.subjects || []).some(f => hatNiveaus(f));
+  const niveauRelevant = faecher.some(f => hatNiveaus(f));
   /* Auf dem Blatt über alle Fächer gilt der Name des ersten Fachs, das
      Niveaus führt. Mehrere Namen nebeneinander wären im Kopf nicht lesbar. */
-  const niveauFach = (cls.subjects || []).find(f => hatNiveaus(f));
+  const niveauFach = faecher.find(f => hatNiveaus(f));
   const niveau = (cls.stufe === 1 || !niveauRelevant) ? "" : " &middot; " + esc(niveauLabel(niveauFach, s.niveau));
   return `<div class="pr-page">
     <div class="pr-head">
       <div>
-        <div class="pr-h1">Leistungsübersicht</div>
+        <div class="pr-h1">Leistungsübersicht${nurSub ? " " + esc(nurSub.fach) : ""}</div>
         <div style="font-size:11pt; margin-top:1mm;">${esc(s.name)} &middot; Klasse ${esc(cls.name)}${niveau}</div>
         <div style="font-size:10pt; margin-top:1mm;">Zeitraum: ${esc(SEM_LABELS[aktivesSemester()])}</div>
       </div>
@@ -6645,7 +6838,7 @@ function blattSchueler(cls, s){
       <div>Unterschrift Erziehungsberechtigte</div>
     </div>
   </div>` + fotoAnhang(
-    cls.subjects.reduce((liste, sub) => liste.concat(
+    faecher.reduce((liste, sub) => liste.concat(
       fotosVon(sub, s.id).map(e => ({ e: e, wo: sub.fach }))), []),
     "Fotos zu " + s.name);
 }
@@ -6878,11 +7071,12 @@ function drucken(html){
   window.print();
 }
 
-function printSchueler(classId, studentId){
+function printSchueler(classId, studentId, subjectId){
   const cls = getClass(classId);
   const s = getStudent(cls, studentId);
   if(!cls || !s) return;
-  drucken(blattSchueler(cls, s));
+  const sub = subjectId ? getSubject(cls, subjectId) : null;
+  drucken(blattSchueler(cls, s, sub));
 }
 
 function printKlasse(classId, subjectId){
@@ -6894,14 +7088,15 @@ function printKlasse(classId, subjectId){
 
 /* Alle Blätter einer Klasse auf einmal, ein Blatt je Schüler:in.
    Praktisch am Abend vor dem Elternsprechtag. */
-function printAlleSchueler(classId){
+function printAlleSchueler(classId, subjectId){
   const cls = getClass(classId);
   if(!cls) return;
   if(!cls.students.length){
     alert("In dieser Klasse ist noch niemand eingetragen, es gibt also nichts zu drucken.");
     return;
   }
-  drucken(cls.students.map(s => blattSchueler(cls, s)).join(""));
+  const sub = subjectId ? getSubject(cls, subjectId) : null;
+  drucken(cls.students.map(s => blattSchueler(cls, s, sub)).join(""));
 }
 
 /* ---------- STATISTIK ---------- */
@@ -7053,12 +7248,13 @@ function renderStatDetail(){
           ? '<span style="font-size:12px;"><span class="green">' + p.pos + '</span>/<span class="' + (p.neg > p.pos ? "red" : "") + '">' + p.neg + "</span></span>"
           : (p.fuenfer ? '<span style="font-size:11px; color:#A8241C;">' + p.fuenfer + "\u00d7 5</span>" : "")}
         <span class="val ${bad ? "red" : ""}" style="font-size:14px; white-space:nowrap;">${fmtO(p.schnitt)}</span>
-        <button class="ghost" onclick="printSchueler('${cls.id}','${p.s.id}')">Blatt</button>
+        <button class="ghost" onclick="printSchueler('${cls.id}','${p.s.id}','${sub.id}')">Blatt</button>
       </div>
     </div>`;
   }).join("");
 
   const verteilung = verteilungSvg(sub);
+  const klassenVerlauf = verlaufKlasseJeKategorie(cls, sub);
   const verteilungZahlen = spiegelVerteilung(sub);
   const spiegelGesamt = spiegelTabelle(verteilungZahlen);
   const negGesamt = verteilungZahlen[4];
@@ -7198,6 +7394,9 @@ function renderStatDetail(){
         : '<div class="stat"><div class="val ' + (negGesamt ? "red" : "") + '">' + negGesamt + '</div><div class="lbl">Nicht genügend' + (notenGesamt ? " &middot; " + fmtPct((negGesamt * 100) / notenGesamt) + " % aller Noten" : "") + '</div></div>'}
     </div>
     ${arbeitKacheln}
+    ${klassenVerlauf ? '<div class="label" style="border-top:2px solid #000;">VERLAUF JE BEURTEILUNGSART</div>'
+      + '<div class="helptext">Der Klassenschnitt je Beurteilungsart über die Zeit, jede für sich. Oben ist das Gute. Einstufungen tragen ihre eigenen Stufen an der Achse.</div>'
+      + klassenVerlauf : ""}
     ${verteilung ? '<div class="label" style="border-top:2px solid #000;">VERTEILUNG ALLER NOTEN</div><div class="chart">' + verteilung + "</div>" : ""}
     ${spiegelGesamt ? '<div class="label">NOTENSPIEGEL</div><div style="padding:0 16px 12px; overflow-x:auto;">' + spiegelGesamt + "</div>" : ""}
     ${vergleichBloecke}
@@ -7211,7 +7410,10 @@ function renderStatDetail(){
     <div class="helptext">Blatt mit Notenübersicht, Verlauf und Unterschriftenzeile. Im Druckdialog lässt es sich auch als PDF sichern und den Eltern mitgeben.</div>
     <div class="footer">
       <button onclick="printKlasse('${cls.id}','${sub.id}')">Klassenübersicht drucken</button>
-      <button onclick="printAlleSchueler('${cls.id}')">Alle Einzelblätter drucken</button>
+      <button onclick="printAlleSchueler('${cls.id}','${sub.id}')">Alle Einzelblätter drucken</button>
+      ${(cls.subjects || []).length > 1
+        ? `<button class="ghost" onclick="printAlleSchueler('${cls.id}')">Einzelblätter über alle Fächer der Klasse</button>`
+        : ""}
       ${notenCats(sub).filter(k => arbeiten(sub, k).length).map(k =>
         `<button onclick="printAlleArbeiten('${cls.id}','${sub.id}','${k}')">${esc(catShort(sub, k))}: alle auf einem Blatt</button>`).join("")}
     </div>

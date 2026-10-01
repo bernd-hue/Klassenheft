@@ -1,4 +1,4 @@
-# Klassenheft, Version 17.9.2
+# Klassenheft, Version 17.9.3
 
 Kurzanleitung zum Installieren, Übertragen und Verteilen. Stand 28.08.2026.
 
@@ -566,9 +566,25 @@ Ist ein Fach nur auf einem Gerät festgeschrieben, gilt dieser Stand auf beiden:
 
 Bei beiden Wegen gilt: Es wird nichts gelöscht und nichts überschrieben. Fehlende Klassen, Namen, Fächer und Einträge kommen dazu, bei zwei Fassungen desselben Eintrags gewinnt die neuere. Der Vorgang lässt sich beliebig oft wiederholen, es entstehen keine Dubletten.
 
+## Verlauf je Beurteilungsart
+
+Eine einzige Linie für alles ist für dich lesbar, für Eltern nicht: Schularbeiten, Mitarbeit und Hausübungen liegen dort durcheinander, und man sieht nicht, woran es liegt.
+
+Deshalb gibt es jetzt zusätzlich **eine Linie je Beurteilungsart**, untereinander:
+
+- in der **Schüleransicht** unter *Verlauf je Beurteilungsart*
+- auf dem **Elternsprechtag-Blatt** gleich unter der Gesamtgrafik
+- in der **Statistik** als Klassenschnitt je Beurteilungsart über die Zeit
+
+Zwei Skalen, nicht eine. Noten laufen von 1 bis 5. Einstufungen wie Mitarbeit und Hausübung tragen ihre eigenen Stufen an der Achse, von der besten oben bis zur schwächsten unten. Sie werden **nicht** in Noten umgerechnet, denn eine Hausübung ist keine Note. Oben ist immer das Gute, in beiden Skalen.
+
+Die gestrichelte Linie in einer Notenlinie ist der Schnitt dieser Beurteilungsart. Bei den Einstufungen steht daneben, welche Stufe im Mittel herauskommt, zum Beispiel *meist gute Mitarbeit*.
+
 ## Elternsprechtag
 
-Unter *Statistik* ein Fach wählen. Dort gibt es *Klassenübersicht drucken* und *Alle Einzelblätter drucken*. Ein einzelnes Blatt gibt es auch direkt bei der Schüler:in über *Elternsprechtag-Blatt*. Im Druckdialog lässt sich das Blatt als PDF sichern und den Eltern mitgeben.
+Unter *Statistik* ein Fach wählen. Dort gibt es *Klassenübersicht drucken* und *Alle Einzelblätter drucken*.
+
+**Das Blatt zeigt das Fach, aus dem du druckst.** Druckst du in 2a Mathematik, steht Mathematik darauf und sonst nichts. Bis Version 17.9.2 standen immer alle Fächer der Klasse darauf, auch Bewegung und Sport mit seinem eigenen Bewertungsschema. Brauchst du doch ein Blatt über alle Fächer einer Klasse, etwa weil du dieselbe Klasse in zwei Fächern hast, gibt es dafür in der Statistik den Knopf *Einzelblätter über alle Fächer der Klasse*. Ein einzelnes Blatt gibt es auch direkt bei der Schüler:in über *Elternsprechtag-Blatt*. Im Druckdialog lässt sich das Blatt als PDF sichern und den Eltern mitgeben.
 
 Damit im Kopf des Blattes der richtige Name steht, unter *Einstellungen* einmal *Lehrkraft* und *Schuljahr* eintragen.
 
