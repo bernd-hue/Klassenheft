@@ -257,7 +257,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.3";
+const APP_FASSUNG = "17.9.4";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1442,6 +1442,13 @@ function normaliseClass(cls){
     });
     if(!Array.isArray(sub.competencies)) sub.competencies = defaultCompetencies(sub.fach);
     if(!Array.isArray(sub.entries)) sub.entries = [];
+    /* Ein festes Gewicht aus früheren Fassungen, das genau dem Regler
+       entspricht, war die Vorbelegung. Es wird zu "folgt dem Regler"; am
+       angezeigten Schnitt ändert das nichts. Was abweicht, bleibt stehen und
+       wird der Lehrkraft zur Entscheidung vorgelegt. */
+    sub.entries.forEach(e => {
+      if(gewichtUnklar(e) && gewichtGleich(e.w, startWeight(sub, e.cat))) delete e.w;
+    });
     /* Stufen-Kategorien festlegen. Vorgabe ist die Hausübung, weil sie nicht
        benotet werden darf. Liegen in einem Fach schon Hausübungsnoten aus
        einer früheren Fassung, bleibt es dort bei Noten, damit sich kein
@@ -1888,12 +1895,37 @@ function wertendeNotenAlle(sub, sem){
     }).filter(Boolean);
 }
 
-/* Gewichtung einer einzelnen Note. Ältere Noten ohne eigenes Gewicht verhalten
-   sich genau wie vorher, damit sich bestehende Notenschnitte nicht ändern. */
+/* Gewichtung einer einzelnen Note.
+   Seit 17.9.4 gilt: Eine Note ohne eigenes Gewicht folgt dem Regler ihrer
+   Kategorie, auch wenn er nachträglich verstellt wird. Ein eigenes Gewicht
+   wird nur gespeichert, wenn es beim Eintragen ausdrücklich vom Regler
+   abweicht, und trägt dann das Kennzeichen wEigen.
+   Bis 17.9.3 hat jede Note das Gewicht vom Zeitpunkt des Eintragens fest
+   mitgespeichert. Ein später verstellter Regler wirkte dadurch nur auf neue
+   Noten, und nach einem Wechsel vom Prozent- ins Faktormodell zählten alle
+   bisherigen Noten weiter ×1, egal was eingestellt war. */
 function noteWeight(sub, n){
   if(typeof n.w === "number") return n.w;
   return isProzentMode(sub) ? 1 : (sub.weights[n.cat] ?? 1);
 }
+
+function gewichtGleich(a, b){ return Math.abs(a - b) < 1e-9; }
+
+/* Setzt das Gewicht einer Note so, wie es eingegeben wurde: gleich dem
+   Regler heißt "folgt dem Regler", alles andere ist ein eigenes Gewicht. */
+function gewichtSetzen(sub, e, w){
+  if(typeof w !== "number" || isNaN(w) || gewichtGleich(w, startWeight(sub, e.cat))){
+    delete e.w; delete e.wEigen;
+  } else {
+    e.w = w; e.wEigen = true;
+  }
+}
+
+/* Noten mit festem Gewicht aus einer Fassung vor 17.9.4. Ob es damals
+   bewusst gesetzt wurde oder nur die Vorbelegung war, lässt sich nicht mehr
+   sagen. Deshalb entscheidet die Lehrkraft, die App nicht. */
+function gewichtUnklar(e){ return e.type === "note" && typeof e.w === "number" && !e.wEigen; }
+function gewichtEigen(e){ return e.type === "note" && typeof e.w === "number" && !!e.wEigen; }
 
 /* Zählt diese Kategorie in den Notenschnitt? Maßgeblich ist ausschließlich
    die Einstellung, nicht der Eintragstyp. Eine Kategorie, die abgeschaltet
@@ -2323,7 +2355,7 @@ function ausblickSchnitt(cls, sub, studentId, sem, wahl){
         : schnitt;
       for(let i = 0; i < n; i++){
         zusatz.push({ id: "__aus" + cat + i, studentId: studentId, type: "note",
-          cat: cat, value: wert, w: startWeight(sub, cat),
+          cat: cat, value: wert,
           ts: Date.now(), sem: (z === "alle") ? semesterFuerNeu() : z, date: today() });
       }
     }
@@ -3005,6 +3037,7 @@ function renderHomeList(){
       <div class="sub">Klassen und Fächer</div>
     </div>
     ${backupBanner()}
+    ${gewichtHinweisBanner()}
     ${sicherungBereitBlock()}
     ${semesterLeiste("home")}
     ${rows || '<div class="helptext">Noch nichts angelegt. Leg unten eine Klasse mit einem Fach an.</div>'}
@@ -4053,7 +4086,9 @@ function gewichtFuerAlle(){
   Object.keys(homeView.schnellIds || {}).forEach(sid => {
     const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
     if(!e || e.type !== "note") return;
-    if(e.w !== homeView.noteWeight){ e.w = homeView.noteWeight; geaendert++; }
+    const vorher = noteWeight(sub, e) + "|" + !!e.wEigen;
+    gewichtSetzen(sub, e, homeView.noteWeight);
+    if(noteWeight(sub, e) + "|" + !!e.wEigen !== vorher){ e.ts = Date.now(); geaendert++; }
   });
   if(geaendert) save();
 }
@@ -4130,7 +4165,7 @@ function renderNewNote(){
           <span id="noteWeightVal" style="font-weight:bold;">${fmtW(homeView.noteWeight)}</span>
           <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
         </div>
-        ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">` : ""}
+        ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.1" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">` : ""}
       </div>
     `;
   }
@@ -4172,7 +4207,7 @@ function renderNewNote(){
           <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
         </div>
         ${homeView.zeigeGewicht ? `
-        <input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">
+        <input type="range" min="0" max="3" step="0.1" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" style="margin-top:6px;">
         <div class="helptext" style="padding:2px 0 0;">${isProzentMode(sub)
           ? "Wie stark diese Note innerhalb von " + catLabel(sub,cat) + " zählt. Die Kategorie selbst hat " + fmtPct(sub.weights[cat] ?? 0) + " % Anteil."
           : "Wie stark diese Note im Notenschnitt zählt."}</div>` : ""}
@@ -4336,15 +4371,16 @@ function schnellSpeichern(studentId, daten, leise){
        der Runde nachstellt, meint auch die Zeilen, die schon stehen. Sonst
        trügen zwei Noten derselben Erfassung stillschweigend verschiedene
        Gewichte. */
-    if(typeof homeView.noteWeight === "number") vorhanden.w = homeView.noteWeight;
+    if(typeof homeView.noteWeight === "number") gewichtSetzen(sub, vorhanden, homeView.noteWeight);
     vorhanden.ts = Date.now();
   } else {
     if(vorhanden) sub.entries = sub.entries.filter(e => e.id !== vorhanden.id);
     const eintrag = { id: uid(), studentId: studentId, type: "note", cat: cat,
-      value: daten.value, w: typeof homeView.noteWeight === "number" ? homeView.noteWeight : 1,
+      value: daten.value,
       basis: daten.basis || null, thema: thema, arbeit: homeView.schnellArbeit || null,
       ts: Date.now(), sem: semesterFuerNeu(), date: today(),
       label: catLabel(sub, cat) };
+    gewichtSetzen(sub, eintrag, homeView.noteWeight);
     if(typeof daten.pct === "number") eintrag.pct = daten.pct;
     if(typeof daten.fz === "number") eintrag.fz = daten.fz;
     sub.entries.push(eintrag);
@@ -4618,7 +4654,7 @@ function renderSchnell(){
         <span id="noteWeightVal" style="font-weight:bold;">${fmtW(homeView.noteWeight)}</span>
         <button class="ghost" onclick="toggleGewicht()">${homeView.zeigeGewicht ? "zuklappen" : "ändern"}</button>
       </div>
-      ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.5" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" onchange="gewichtFuerAlle()" style="margin-top:6px;">` : ""}
+      ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.1" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" onchange="gewichtFuerAlle()" style="margin-top:6px;">` : ""}
     </div>`;
 
   return `
@@ -4649,6 +4685,7 @@ function renderSchnell(){
 function toggleGewicht(){ homeView.zeigeGewicht = !homeView.zeigeGewicht; render(); }
 /* Direkt zu den Bewertungseinstellungen des gerade offenen Fachs */
 function zurBewertung(){
+  settingsView.wirkung = null;
   settingsView.classId = homeView.classId;
   settingsView.subjectId = homeView.subjectId;
   settingsView.screen = "detail";
@@ -4699,18 +4736,21 @@ function createNote(ev){
   if(cat === "kompetenz" && !istStufenCat(sub, cat)){
     const angehakt = Array.from(document.querySelectorAll(".compCheck:checked")).map(el => el.value);
     const gesamt = sub.competencies.length;
-    sub.entries.push({ id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
+    const kc = { id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       achieved: angehakt, total: gesamt, value: gradeFromRatio(gesamt > 0 ? angehakt.length / gesamt : 0),
-      w: w, thema: thema, arbeit: homeView.arbeitNr || null,
-      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) });
+      thema: thema, arbeit: homeView.arbeitNr || null,
+      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) };
+    gewichtSetzen(sub, kc, w);
+    sub.entries.push(kc);
   } else {
     if(homeView.newNoteGrade === null) return;
     const eintrag = { id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
-      value: homeView.newNoteGrade, w: w, basis: homeView.noteBasis || null, thema: thema,
+      value: homeView.newNoteGrade, basis: homeView.noteBasis || null, thema: thema,
       arbeit: homeView.arbeitNr || null,
       ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) };
     if(typeof homeView.notePct === "number") eintrag.pct = homeView.notePct;
     if(typeof homeView.noteFz === "number") eintrag.fz = homeView.noteFz;
+    gewichtSetzen(sub, eintrag, w);
     sub.entries.push(eintrag);
   }
   homeView.newNoteGrade = null;
@@ -7429,9 +7469,169 @@ function goSettings(screen, classId, subjectId){
   if(screen !== settingsView.screen || (subjectId !== undefined && subjectId !== settingsView.subjectId)){
     settingsView.stufenOffen = null;
   }
+  if(screen !== settingsView.screen || (subjectId !== undefined && subjectId !== settingsView.subjectId)){
+    settingsView.wirkung = null;
+  }
   settingsView.screen = screen;
   if(classId !== undefined && classId !== null) settingsView.classId = classId;
   if(subjectId !== undefined && subjectId !== null) settingsView.subjectId = subjectId;
+  render();
+}
+
+
+/* ---------- GEWICHTE PRÜFEN (17.9.4) ----------
+   Zeigt in den Einstellungen eines Fachs, welche Noten ein eigenes Gewicht
+   tragen und deshalb dem Regler nicht folgen, und rechnet live vor, was
+   ein Regler an den Schnitten der Klasse verändert. */
+
+function schnittStand(cls, sub, sem){
+  const m = {};
+  cls.students.forEach(s => { m[s.id] = computeSchnitt(sub, s.id, sem); });
+  return m;
+}
+
+function standVergleich(cls, vorher, nachher){
+  const liste = [];
+  cls.students.forEach(s => {
+    const a = vorher[s.id], b = nachher[s.id];
+    if(a === null && b === null) return;
+    if(a !== null && b !== null && Math.abs(a - b) < 0.005) return;
+    liste.push({ name: s.name, a: a, b: b,
+      kippt: a !== null && b !== null && Math.round(a) !== Math.round(b),
+      diff: (a === null || b === null) ? 9 : Math.abs(a - b) });
+  });
+  return liste.sort((x, y) => y.diff - x.diff);
+}
+
+function wirkungHtml(cls, sub){
+  if(!cls || !sub || !cls.students.length) return "";
+  const sem = aktivesSemester();
+  const key = cls.id + "|" + sub.id + "|" + sem;
+  if(!settingsView.wirkung || settingsView.wirkung.key !== key){
+    settingsView.wirkung = { key: key, stand: schnittStand(cls, sub, sem) };
+  }
+  const jetzt = schnittStand(cls, sub, sem);
+  const alt = settingsView.wirkung.stand;
+  const mittel = m => {
+    const v = Object.values(m).filter(x => x !== null && !isNaN(x));
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const geaendert = standVergleich(cls, alt, jetzt);
+  const zeig = v => v === null ? "keine Note" : fmtO(v);
+  const kipp = geaendert.filter(x => x.kippt).length;
+  const zeilen = geaendert.slice(0, 6).map(x =>
+    `<div style="display:flex; justify-content:space-between; gap:8px;"><span>${esc(x.name)}</span><span${x.kippt ? ' style="font-weight:bold;"' : ""}>${zeig(x.a)} &rarr; ${zeig(x.b)}</span></div>`).join("");
+  return `<div class="helptext" style="border-top:1px solid #000;">
+    <b>Wirkung in ${esc(SEM_LABELS[sem])}.</b> Klassenschnitt beim Öffnen ${zeig(mittel(alt))}, jetzt <b>${zeig(mittel(jetzt))}</b>.
+    ${geaendert.length
+      ? geaendert.length + " Person" + (geaendert.length === 1 ? "" : "en") + " mit verändertem Schnitt"
+        + (kipp ? ", davon " + kipp + " mit anderer gerundeter Note" : "") + ":"
+        + `<div style="margin-top:4px;">${zeilen}</div>`
+        + (geaendert.length > 6 ? `<div>und ${geaendert.length - 6} weitere</div>` : "")
+      : "Noch keine Veränderung gegenüber dem Stand beim Öffnen."}
+    <div style="margin-top:6px;"><button class="ghost" onclick="wirkungNeuStarten()">Jetzigen Stand als Ausgang nehmen</button></div>
+  </div>`;
+}
+
+function wirkungNeuStarten(){ settingsView.wirkung = null; render(); }
+
+/* Eine Note weicht ab, wenn sie gerade mit einem anderen Gewicht zählt, als
+   ihre Kategorie ihr geben würde. */
+function gewichtWeichtAb(sub, e){
+  return e.type === "note" && typeof e.w === "number" && !gewichtGleich(e.w, startWeight(sub, e.cat));
+}
+
+function eigeneGewichteBlock(sub){
+  const prozent = isProzentMode(sub);
+  const teile = [];
+  activeCats(sub).forEach(cat => {
+    const noten = sub.entries.filter(e => e.cat === cat && gewichtWeichtAb(sub, e));
+    if(!noten.length) return;
+    const gewichte = Array.from(new Set(noten.map(e => e.w))).sort((a, b) => a - b).map(fmtW).join(", ");
+    const unklar = noten.filter(gewichtUnklar).length;
+    const eigen = noten.length - unklar;
+    let text = "<b>" + esc(catLabel(sub, cat)) + ":</b> ";
+    if(unklar) text += unklar + (unklar === 1 ? " Note trägt" : " Noten tragen") + " ein festes Gewicht aus einer früheren Fassung";
+    if(unklar && eigen) text += ", ";
+    if(eigen) text += eigen + (eigen === 1 ? " Note hat" : " Noten haben") + " beim Eintragen ein eigenes Gewicht bekommen";
+    text += prozent
+      ? ". " + (noten.length === 1 ? "Sie zählt" : "Sie zählen") + " innerhalb der Kategorie " + gewichte + " statt ×1,0 wie die übrigen."
+      : ". " + (noten.length === 1 ? "Sie zählt" : "Sie zählen") + " " + gewichte + " statt " + fmtW(startWeight(sub, cat)) + " und " + (noten.length === 1 ? "folgt" : "folgen") + " dem Regler nicht.";
+    teile.push(`<div style="padding:6px 0; border-bottom:1px solid #000;">${text}
+      <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="gewichteFolgen('${cat}')">${prozent ? "Gleich zählen wie die übrigen" : "Dem Regler folgen lassen"}</button>
+        ${unklar ? `<button class="ghost" onclick="gewichteBehalten('${cat}')">So lassen</button>` : ""}
+      </div></div>`);
+  });
+  if(!teile.length) return "";
+  return `<div class="helptext" style="border-top:2px solid #B3241C;">
+    <b style="color:#B3241C;">Noten mit eigenem Gewicht</b><br>
+    Diese Noten zählen anders, als der Regler ihrer Kategorie es vorgibt.
+    ${teile.join("")}
+  </div>`;
+}
+
+function gewichteFolgen(cat){
+  const cls = getClass(settingsView.classId);
+  const sub = getSubject(cls, settingsView.subjectId);
+  if(!cls || !sub) return;
+  const betroffen = sub.entries.filter(e => e.cat === cat && gewichtWeichtAb(sub, e));
+  if(!betroffen.length) return;
+  const sem = aktivesSemester();
+  const vorher = schnittStand(cls, sub, sem);
+  const probe = Object.assign({}, sub, { entries: sub.entries.map(e => {
+    if(betroffen.indexOf(e) === -1) return e;
+    const k = Object.assign({}, e); delete k.w; delete k.wEigen; return k;
+  }) });
+  const liste = standVergleich(cls, vorher, schnittStand(cls, probe, sem));
+  const zeig = v => v === null ? "keine Note" : fmtO(v);
+  let frage = betroffen.length + (betroffen.length === 1 ? " Note" : " Noten") + " in " + catLabel(sub, cat)
+    + " folgen danach dem Regler.\n\n";
+  frage += liste.length
+    ? "Der Schnitt in " + SEM_LABELS[sem] + " ändert sich bei " + liste.length + (liste.length === 1 ? " Person" : " Personen") + ":\n"
+      + liste.slice(0, 15).map(x => x.name + ": " + zeig(x.a) + " → " + zeig(x.b) + (x.kippt ? "  (andere gerundete Note)" : "")).join("\n")
+      + (liste.length > 15 ? "\nund " + (liste.length - 15) + " weitere" : "")
+    : "In " + SEM_LABELS[sem] + " ändert sich dadurch kein Schnitt.";
+  frage += "\n\nUmstellen?";
+  if(!confirm(frage)) return;
+  const jetzt = Date.now();
+  betroffen.forEach(e => { delete e.w; delete e.wEigen; e.ts = jetzt; });
+  save();
+  render();
+}
+
+function gewichteBehalten(cat){
+  const sub = getSubject(getClass(settingsView.classId), settingsView.subjectId);
+  if(!sub) return;
+  const jetzt = Date.now();
+  sub.entries.filter(e => e.cat === cat && gewichtUnklar(e) && gewichtWeichtAb(sub, e)).forEach(e => { e.wEigen = true; e.ts = jetzt; });
+  save();
+  render();
+}
+
+/* Hinweis auf dem Startbildschirm, solange irgendwo noch unklare feste
+   Gewichte liegen. Er verschwindet von selbst, sobald entschieden ist. */
+function gewichtHinweisBanner(){
+  const faelle = [];
+  allSubjectRows().forEach(({cls, sub}) => {
+    const n = sub.entries.filter(e => gewichtUnklar(e) && gewichtWeichtAb(sub, e) && activeCats(sub).indexOf(e.cat) !== -1).length;
+    if(n) faelle.push({ cls: cls, sub: sub, n: n });
+  });
+  if(!faelle.length) return "";
+  return faelle.map(f => `<div class="banner">
+    <div class="txt">${esc(f.cls.name)} &middot; ${esc(f.sub.fach)}: ${f.n} ${f.n === 1 ? "Note trägt" : "Noten tragen"} ein festes Gewicht aus einer früheren Fassung und ${f.n === 1 ? "zählt" : "zählen"} deshalb anders, als der Regler es vorgibt. Bitte kurz entscheiden.</div>
+    <button onclick="gewichtAnsehen('${f.cls.id}','${f.sub.id}')">Ansehen</button>
+  </div>`).join("");
+}
+
+function gewichtAnsehen(classId, subjectId){
+  settingsView.wirkung = null;
+  settingsView.classId = classId;
+  settingsView.subjectId = subjectId;
+  settingsView.screen = "detail";
+  /* Nicht über switchTab: steht man schon im Reiter Einstellungen, würde der
+     zurück auf die Liste springen statt ins Fach. */
+  tab = "einstellungen";
   render();
 }
 
@@ -7779,7 +7979,7 @@ function renderSettingsDetail(){
     return `
     <div class="slider-row">
       <div class="top"><span style="color:${c.fg};">&#9679; ${catLabel(sub,k)}</span><span id="val_${k}" style="color:${c.fg};">${prozent ? fmtPct(w) + " %" : fmtW(w)}</span></div>
-      <input type="range" min="0" max="${prozent ? 100 : 3}" step="${prozent ? 2.5 : 0.5}" value="${w}" oninput="updateWeight('${k}', this.value)">
+      <input type="range" min="0" max="${prozent ? 100 : 3}" step="${prozent ? 2.5 : 0.1}" value="${w}" oninput="updateWeight('${k}', this.value)">
     </div>`;
   }).join("");
 
@@ -7925,9 +8125,11 @@ function renderSettingsDetail(){
     <div class="chips">${modeChips}</div>
     <div class="helptext">${prozent
       ? "Jede Kategorie hat einen Anteil an der Gesamtnote. Kategorien ohne Note fallen heraus, ihr Anteil verteilt sich auf die übrigen."
-      : "Jede Note zählt mit ihrem Faktor. Der Wert hier ist die Vorbelegung, beim Eintragen kannst du jede Note einzeln anders gewichten."}</div>
+      : "Jede Note zählt mit dem Faktor ihrer Kategorie. Verstellst du einen Regler, gilt das sofort für alle Noten dieser Kategorie, auch für die schon eingetragenen. Nur wenn du beim Eintragen einer Note die Gewichtung ausdrücklich anders setzt, behält diese Note ihr eigenes Gewicht."}</div>
     ${weightRows}
     ${summeBox}
+    ${eigeneGewichteBlock(sub)}
+    <div id="gewichtWirkung">${wirkungHtml(cls, sub)}</div>
 
     <div class="label" style="border-top:2px solid #000;">KOMPETENZEN</div>
     <div class="helptext">Diese Liste erscheint beim Kompetenz-Check als Checkliste.</div>
@@ -7951,6 +8153,8 @@ function updateWeight(cat, value){
   sub.template = "eigen";
   const el = document.getElementById("val_" + cat);
   if(el) el.textContent = isProzentMode(sub) ? fmtPct(v) + " %" : fmtW(v);
+  const wirk = document.getElementById("gewichtWirkung");
+  if(wirk) wirk.innerHTML = wirkungHtml(getClass(settingsView.classId), sub);
   const box = document.getElementById("pctSumBox");
   if(box && isProzentMode(sub)){
     const summe = activeCats(sub).reduce((a,k) => a + (typeof sub.weights[k] === "number" ? sub.weights[k] : 0), 0);
