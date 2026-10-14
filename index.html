@@ -48,7 +48,12 @@
       min-height:calc(100dvh - 48px);
       border:2px solid #000000;
       border-radius:14px;
+      /* clip statt hidden: hidden macht den Rahmen zum eigenen Scrollbereich,
+         dann kleben Reiterleiste und Dock nicht mehr am Bildschirmrand und
+         wandern mit dem Inhalt weg (behoben in 17.9.7). Ältere Browser ohne
+         clip behalten hidden. */
       overflow:hidden;
+      overflow:clip;
       box-shadow:0 4px 18px rgba(0,0,0,0.15);
     }
   }
@@ -281,12 +286,15 @@
   body.stil-tafel{ background:#F2F3EF; }
   body.stil-tafel #frame{
     max-width:none; width:100%; margin:0; border:none; border-radius:0; box-shadow:none;
-    flex-direction:row; min-height:100vh; min-height:100dvh;
+    flex-direction:row; min-height:100vh; min-height:100dvh; overflow:visible;
+    padding-left:calc(216px + env(safe-area-inset-left, 0px));
   }
   body.stil-tafel #content{ flex:1; min-width:0; max-width:920px; margin:0 auto; padding:8px 24px 40px; }
   body.stil-tafel #tabbar{
-    order:-1; flex-direction:column; width:216px; flex-shrink:0; align-self:flex-start;
-    position:sticky; top:0; bottom:auto; height:100vh; height:100dvh; margin:0; border-radius:0; box-shadow:none; border:none;
+    /* Fest am linken Rand: bleibt beim Scrollen immer an derselben Stelle. */
+    flex-direction:column; width:calc(216px + env(safe-area-inset-left, 0px)); box-sizing:border-box;
+    position:fixed; top:0; bottom:0; left:0; height:auto; margin:0; border-radius:0; box-shadow:none; border:none;
+    overflow-y:auto; z-index:20;
     background:#1E3832; gap:14px;
     padding:calc(24px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   }
@@ -380,7 +388,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.6";
+const APP_FASSUNG = "17.9.7";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
