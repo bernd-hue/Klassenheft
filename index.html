@@ -275,6 +275,31 @@
   body.stil-freundlich .tabbtn{ border-top:none; border-radius:20px; color:#1C1F22; background:transparent; min-height:72px; }
   body.stil-freundlich .tabbtn.active{ color:#FFFFFF; }
 
+  /* ---------- ERSCHEINUNGSBILD „TAFEL-LEISTE“ (seit 17.9.6) ----------
+     Baut auf Freundlich auf (der body trägt beide Klassen) und legt die drei
+     Reiter als breite Leiste an den linken Rand. Für iPad quer und Rechner. */
+  body.stil-tafel{ background:#F2F3EF; }
+  body.stil-tafel #frame{
+    max-width:none; width:100%; margin:0; border:none; border-radius:0; box-shadow:none;
+    flex-direction:row; min-height:100vh; min-height:100dvh;
+  }
+  body.stil-tafel #content{ flex:1; min-width:0; max-width:920px; margin:0 auto; padding:8px 24px 40px; }
+  body.stil-tafel #tabbar{
+    order:-1; flex-direction:column; width:216px; flex-shrink:0; align-self:flex-start;
+    position:sticky; top:0; bottom:auto; height:100vh; height:100dvh; margin:0; border-radius:0; box-shadow:none; border:none;
+    background:#1E3832; gap:14px;
+    padding:calc(24px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  }
+  body.stil-tafel #frame button.tabbtn{
+    flex:0 0 auto; min-height:118px; border-radius:14px; border:2px solid rgba(244,241,232,0.35);
+    color:#F4F1E8; background:transparent; font-size:19px; gap:8px;
+  }
+  body.stil-tafel #frame button.tabbtn.active{ border-color:#F4F1E8; }
+  body.stil-tafel .tabbtn svg{ width:40px; height:40px; }
+  .rail-marke{ color:#F4F1E8; font-size:20px; font-weight:800; padding:0 6px 14px; border-bottom:1px solid rgba(244,241,232,0.3); }
+  .rail-fuss{ margin-top:auto; color:rgba(244,241,232,0.8); font-size:13px; padding:0 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  body.stil-tafel .kachel-raster{ grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); }
+
   /* ---------- AUSDRUCK ELTERNSPRECHTAG ----------
      Am Bildschirm unsichtbar, beim Drucken wird nur dieser Bereich ausgegeben. */
   #printArea{display:none;}
@@ -355,7 +380,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.5";
+const APP_FASSUNG = "17.9.6";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1619,7 +1644,7 @@ function normaliseClass(cls){
 /* Grundeinstellungen der App, unabhängig von den Klassen */
 function defaultSettings(){
   return { lehrkraft: "", schuljahr: "", lastBackup: null, intervallTage: 7, geraet: "", semester: semesterHeute(),
-           schrift: "normal", stil: "freundlich", ordnung: "vorname", jahresGewicht: "gleich" };
+           schrift: "normal", stil: "auto", ordnung: "vorname", jahresGewicht: "gleich" };
 }
 
 /* ---------- REIHENFOLGE DER KLASSENLISTE ----------
@@ -1719,7 +1744,7 @@ function normaliseSettings(s){
     geraet: typeof s.geraet === "string" ? s.geraet : "",
     semester: (s.semester === 1 || s.semester === 2 || s.semester === "alle") ? s.semester : semesterHeute(),
     schrift: (s.schrift === "klein" || s.schrift === "gross") ? s.schrift : "normal",
-    stil: (s.stil === "amtlich") ? "amtlich" : "freundlich",
+    stil: (s.stil === "freundlich" || s.stil === "tafel" || s.stil === "amtlich") ? s.stil : "auto",
     /* Diese drei sind lange durchgefallen: sie standen in den Vorgaben und in
        den Knöpfen, aber nicht in dieser Liste. Damit waren sie nach jedem
        Neustart wieder auf der Vorgabe, und die Jahresnote rechnete plötzlich
@@ -3091,15 +3116,20 @@ function renderTabBar(){
   bar.setAttribute("role", "navigation");
   bar.setAttribute("aria-label", "Hauptnavigation");
   const freundlich = istFreundlich();
-  bar.innerHTML = Object.keys(TAB_COLORS).map(k => {
+  const tafel = istTafel();
+  const knoepfe = Object.keys(TAB_COLORS).map(k => {
     const c = TAB_COLORS[k];
     const active = tab === k;
     const style = active
-      ? (freundlich ? `background:${c.fg}; color:#fff;` : `border-top-color:${c.fg}; background:${c.bg}; color:${c.fg};`)
+      ? (tafel ? "background:#F4F1E8; color:#1E3832;"
+        : (freundlich ? `background:${c.fg}; color:#fff;` : `border-top-color:${c.fg}; background:${c.bg}; color:${c.fg};`))
       : "";
     const symbol = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_SYMBOLE[k] || ""}</svg>`;
     return `<button type="button" class="tabbtn ${active ? "active" : ""}" style="${style}" ${active ? 'aria-current="page"' : ""} onclick="switchTab('${k}')">${symbol}<span>${c.label}</span></button>`;
   }).join("");
+  bar.innerHTML = tafel
+    ? `<div class="rail-marke">${esc(APP_NAME)}</div>${knoepfe}<div class="rail-fuss">${esc(state.settings.geraet || "")}</div>`
+    : knoepfe;
 }
 
 function headerStyle(t){ return `background:${TAB_COLORS[t].bg};`; }
@@ -6423,6 +6453,7 @@ document.getElementById("importInput").addEventListener("change", function(ev){
             + "Trotzdem ersetzen? Der jetzige Stand auf diesem Gerät ist danach weg.")) return;
       state = fremd;
       state.settings = normaliseSettings(state.settings);
+      geraetAnwenden();
       if(!save()){
         alert("Nicht eingespielt.\n\nDer Speicher dieses Geräts ist voll. Bitte zuerst Platz schaffen.");
         return;
@@ -7958,8 +7989,9 @@ function renderSettingsList(){
     <div class="label" style="border-top:2px solid #000;">DARSTELLUNG</div>
     <div class="helptext">Schriftgröße für dieses Gerät. Am Handy meist klein oder normal, am iPad und am Rechner oft groß angenehmer.</div>
     <div class="chips">${schriftChips}</div>
-    <div class="helptext">Erscheinungsbild. <b>Freundlich</b> mit Kacheln und hellem Grund, <b>Amtlich-klar</b> schwarz-weiß und dicht, bei direkter Sonne am besten lesbar. Ändert nur das Aussehen, keine Note.</div>
-    <div class="chips">${chipReihe([["freundlich","Freundlich"],["amtlich","Amtlich-klar"]], istFreundlich() ? "freundlich" : "amtlich", "setStil")}</div>
+    <div class="helptext">Erscheinungsbild. <b>Automatisch</b> nimmt am Handy und am iPad im Hochformat <i>Freundlich</i>, am Rechner und am iPad im Querformat die <i>Tafel-Leiste</i> mit der Seitenleiste links. <b>Amtlich-klar</b> ist schwarz-weiß und dicht, bei direkter Sonne am besten lesbar. Ändert nur das Aussehen, keine Note.</div>
+    <div class="chips">${chipReihe([["auto","Automatisch"],["freundlich","Freundlich"],["tafel","Tafel-Leiste"],["amtlich","Amtlich-klar"]], stilWahl(), "setStil")}</div>
+    <div class="helptext">Schriftgröße, Erscheinungsbild und Gerätename gelten nur für dieses Gerät. Sie bleiben auch beim Übertragen und beim Einspielen einer Sicherung erhalten.</div>
 
     <div class="label" style="border-top:2px solid #000;">REIHENFOLGE DER KLASSENLISTE</div>
     <div class="helptext">Wird beim Anlegen und bei jedem weiteren Namen sofort angewendet. „Nach Nachname" geht vom letzten Wort im Namen aus, taugt also nur, wenn die Namen als „Sophie Maier" eingetragen sind.</div>
@@ -8025,7 +8057,47 @@ function renderSettingsList(){
 
 function setSetting(feld, wert){
   state.settings[feld] = String(wert || "").trim();
+  if(GERAET_FELDER.indexOf(feld) !== -1) geraetMerken();
   save();
+}
+
+/* ---------- EINSTELLUNGEN DIESES GERÄTS (seit 17.9.6) ----------
+   Erscheinungsbild, Schriftgröße und Gerätename gehören zum Gerät, nicht zum
+   Datenbestand. Sie liegen zusätzlich unter einem eigenen Schlüssel und werden
+   nach jedem Laden und nach „Alles ersetzen" wieder darübergelegt. Sonst sähe
+   das iPad nach dem Einspielen eines Stands vom iPhone aus wie das iPhone und
+   hieße auch so. Beim Zusammenführen bleiben die eigenen Einstellungen ohnehin
+   stehen. */
+const GERAET_KEY = "klassenheft" + SCHLUESSEL_ZUSATZ + "_geraet_v1";
+const GERAET_FELDER = ["stil", "schrift", "geraet"];
+
+function geraetLesen(){
+  try{
+    const o = JSON.parse(localStorage.getItem(GERAET_KEY) || "null");
+    return (o && typeof o === "object") ? o : null;
+  }catch(e){ return null; }
+}
+
+function geraetMerken(){
+  try{
+    const o = {};
+    GERAET_FELDER.forEach(f => { o[f] = state.settings[f]; });
+    localStorage.setItem(GERAET_KEY, JSON.stringify(o));
+  }catch(e){}
+}
+
+function geraetAnwenden(){
+  const o = geraetLesen();
+  if(!o){
+    /* Erster Start mit 17.9.6. In 17.9.5 war „Freundlich" die Vorgabe und
+       nicht von einer bewussten Wahl zu unterscheiden; ab jetzt gilt
+       „Automatisch". Eine bewusste Wahl von Amtlich-klar bleibt stehen. */
+    if(state.settings.stil === "freundlich") state.settings.stil = "auto";
+    geraetMerken();
+    return;
+  }
+  GERAET_FELDER.forEach(f => { if(Object.prototype.hasOwnProperty.call(o, f)) state.settings[f] = o[f]; });
+  state.settings = normaliseSettings(state.settings);
 }
 
 const SCHRIFT_SKALA = { klein: 0.9, normal: 1, gross: 1.2 };
@@ -8038,24 +8110,60 @@ function schriftAnwenden(){
 /* Erscheinungsbild. Ändert nur das Aussehen, nie eine Note oder Rechnung. */
 const STIL_THEME_FARBE = { freundlich:"#F2F3EF", amtlich:"#ffffff" };
 
-function stilAnwenden(){
-  const stil = (state.settings.stil === "amtlich") ? "amtlich" : "freundlich";
-  document.body.classList.toggle("stil-freundlich", stil === "freundlich");
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if(meta) meta.setAttribute("content", STIL_THEME_FARBE[stil]);
+/* „Automatisch": schmale Bildschirme bekommen Freundlich, breite die
+   Tafel-Leiste. Die Tafel-Leiste braucht Platz; auf einem Handy wird sie
+   deshalb auch bei ausdrücklicher Wahl zu Freundlich. */
+const BREIT = window.matchMedia ? window.matchMedia("(min-width: 900px)") : null;
+const SCHMAL = window.matchMedia ? window.matchMedia("(max-width: 699px)") : null;
+
+function stilWahl(){
+  const w = state.settings.stil;
+  return (w === "freundlich" || w === "tafel" || w === "amtlich") ? w : "auto";
 }
 
-function istFreundlich(){ return state.settings.stil !== "amtlich"; }
+function stilWirksam(){
+  const w = stilWahl();
+  if(w === "amtlich" || w === "freundlich") return w;
+  if(w === "tafel") return (SCHMAL && SCHMAL.matches) ? "freundlich" : "tafel";
+  return (BREIT && BREIT.matches) ? "tafel" : "freundlich";
+}
+
+function stilAnwenden(){
+  const stil = stilWirksam();
+  document.body.classList.toggle("stil-freundlich", stil !== "amtlich");
+  document.body.classList.toggle("stil-tafel", stil === "tafel");
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", stil === "amtlich" ? STIL_THEME_FARBE.amtlich : STIL_THEME_FARBE.freundlich);
+}
+
+function istFreundlich(){ return stilWirksam() !== "amtlich"; }
+function istTafel(){ return stilWirksam() === "tafel"; }
 
 function setStil(wert){
-  state.settings.stil = (wert === "amtlich") ? "amtlich" : "freundlich";
+  state.settings.stil = (wert === "freundlich" || wert === "tafel" || wert === "amtlich") ? wert : "auto";
+  geraetMerken();
   save();
   stilAnwenden();
   render();
 }
 
+/* Dreht man das iPad oder zieht das Fenster schmäler, wechselt nur der Rahmen.
+   Der Inhalt wird nicht neu aufgebaut, damit ein halb ausgefülltes Feld
+   stehen bleibt. */
+function stilBeiGroesse(){
+  const vorher = document.body.classList.contains("stil-tafel");
+  stilAnwenden();
+  if(document.body.classList.contains("stil-tafel") !== vorher) renderTabBar();
+}
+[BREIT, SCHMAL].forEach(mq => {
+  if(!mq) return;
+  if(mq.addEventListener) mq.addEventListener("change", stilBeiGroesse);
+  else if(mq.addListener) mq.addListener(stilBeiGroesse);
+});
+
 function setSchrift(wert){
   state.settings.schrift = (wert === "klein" || wert === "gross") ? wert : "normal";
+  geraetMerken();
   save();
   schriftAnwenden();
   render();
@@ -8962,6 +9070,9 @@ function deleteClass(){
 
 /* ---------- START ---------- */
 
+/* Die Einstellungen dieses Geräts zuerst darüberlegen. Erst hier, weil
+   ihr Schlüssel weiter oben noch nicht bekannt ist. */
+geraetAnwenden();
 fassungPruefen();
 schriftAnwenden();
 stilAnwenden();
