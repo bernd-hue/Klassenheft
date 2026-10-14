@@ -116,9 +116,15 @@
   .grade-tile{flex:1; min-width:0; aspect-ratio:1/1; border-radius:8px; border:1.5px solid #000000; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:bold; cursor:pointer;}
   .comp-item{display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid #000000; font-size:13px;}
   .comp-check{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px;}
-  #tabbar{display:flex; border-top:2px solid #000000; flex-shrink:0; position:sticky; bottom:0; background:#fff;}
-  .tabbtn{flex:1; text-align:center; padding:10px 4px 8px; font-size:11px; font-weight:bold; cursor:pointer; border-top:3px solid transparent; color:#000000; background:#fff;}
-  .tabbtn.active{border-top-width:3px;}
+  /* Seit 17.9.5 sind die drei Reiter große Knöpfe mit Symbol und Beschriftung.
+     Sie werden oft im Gehen oder im Stehen am Pult getroffen. */
+  #tabbar{display:flex; border-top:2px solid #000000; flex-shrink:0; position:sticky; bottom:0; background:#fff;
+    padding-bottom:env(safe-area-inset-bottom, 0px);}
+  .tabbtn{flex:1; min-height:76px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+    text-align:center; padding:8px 4px; font-size:15px; font-weight:bold; cursor:pointer; border:none; border-top:4px solid transparent;
+    border-radius:0; color:#000000; background:#fff; font-family:inherit;}
+  .tabbtn svg{width:30px; height:30px; display:block;}
+  .tabbtn.active{border-top-width:4px;}
 
   /* Notenvergabe: Hauptweg groß, Feinheiten klein darunter */
   button.gross{width:100%; font-size:16px; padding:14px;}
@@ -176,6 +182,98 @@
   .swatches{display:flex; gap:8px; flex-wrap:wrap; padding:4px 0 10px;}
   .swatch{width:26px; height:26px; border-radius:50%; border:2px solid #000000; cursor:pointer;}
   .swatch.off{border-color:#bbbbbb;}
+
+  /* ---------- ERSCHEINUNGSBILD „RUHIG UND FREUNDLICH“ (seit 17.9.5) ----------
+     Wird über die Klasse stil-freundlich am body eingeschaltet. Amtlich-klar
+     bleibt als zweites Erscheinungsbild in den Einstellungen wählbar, weil es
+     bei direkter Sonne im Klassenzimmer am besten lesbar ist.
+     Alles hier gilt nur innerhalb von #frame. Der Ausdruck (#printArea) bleibt
+     unverändert schwarz-weiß. Keine Webschrift: die App lädt nichts aus dem
+     Internet nach, deshalb die Systemschrift des Geräts. */
+  body.stil-freundlich{ background:#F2F3EF; }
+  body.stil-freundlich #frame{
+    background:#F2F3EF; color:#1C1F22;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "Source Sans 3", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  @media (min-width:560px){
+    body.stil-freundlich{ background:#E4E6E1; }
+    body.stil-freundlich #frame{ border:none; border-radius:28px; box-shadow:0 10px 40px rgba(28,31,34,0.14); }
+  }
+  body.stil-freundlich #frame .header{ background:transparent !important; border-bottom:none; padding:22px 18px 10px; }
+  body.stil-freundlich #frame .header .title{ font-size:24px; font-weight:800; letter-spacing:-0.01em; color:#1C1F22 !important; }
+  body.stil-freundlich #frame .header .sub{ font-size:14px; color:#565C63; margin-top:4px; }
+  body.stil-freundlich #frame .back{ font-size:30px; line-height:1; padding:0 6px 0 0; }
+  body.stil-freundlich #frame .label{ border-top-color:transparent !important; color:#565C63; font-size:12px; padding:18px 18px 6px; }
+  body.stil-freundlich #frame .helptext{ color:#3F454B; font-size:13px; line-height:1.4; padding:6px 18px; }
+  body.stil-freundlich #frame .row{
+    background:#FFFFFF; margin:0 14px 8px; border:none; border-radius:16px; padding:14px 16px;
+    box-shadow:0 1px 2px rgba(28,31,34,0.06); min-height:56px;
+  }
+  body.stil-freundlich #frame .row:last-child{ border-bottom:none; }
+  body.stil-freundlich #frame .row .name{ font-size:16px; }
+  body.stil-freundlich #frame .row .sub{ font-size:13px; color:#565C63; }
+  body.stil-freundlich #frame .footer{ border-top:none; padding:14px 16px; }
+  body.stil-freundlich #frame button{
+    border-radius:12px; border:1.5px solid #C4C9CE; background:#FFFFFF; min-height:44px; padding:10px 16px; font-size:15px; color:#1C1F22;
+  }
+  body.stil-freundlich #frame button.green{ background:var(--green-bg); border-color:var(--green); color:var(--green); }
+  body.stil-freundlich #frame button.red{ background:var(--red-bg); border-color:var(--red); color:var(--red); }
+  body.stil-freundlich #frame button.ghost{ border:none; background:none; min-height:0; }
+  body.stil-freundlich #frame button.gross{ border-radius:16px; font-size:17px; padding:16px; }
+  body.stil-freundlich #frame input[type=text], body.stil-freundlich #frame input[type=number], body.stil-freundlich #frame select{
+    border-radius:12px; border:1.5px solid #C4C9CE; background:#FFFFFF; font-size:16px; padding:10px 12px;
+  }
+  body.stil-freundlich #frame .chip{ border-radius:20px; padding:8px 14px; font-size:13px; }
+  body.stil-freundlich #frame .chips{ padding:8px 18px 6px; }
+  body.stil-freundlich #frame .avatar{ border:none; color:#FFFFFF; }
+  body.stil-freundlich #frame .avatar.small{ border:none; }
+  body.stil-freundlich #frame .stats{ background:#FFFFFF; margin:8px 14px; border:none; border-radius:16px; }
+  body.stil-freundlich #frame .stat:first-child{ border-right:1px solid #E6E8E3; }
+  body.stil-freundlich #frame .entry{ background:#FFFFFF; border-bottom:1px solid #E6E8E3; padding:11px 18px; }
+  body.stil-freundlich #frame .slider-row{ background:#FFFFFF; border-bottom:1px solid #E6E8E3; }
+  body.stil-freundlich #frame .chart{ background:#FFFFFF; border-bottom:1px solid #E6E8E3; }
+  body.stil-freundlich #frame .comp-item{ background:#FFFFFF; border-bottom:1px solid #E6E8E3; }
+  body.stil-freundlich #frame .schnell-zeile{ background:#FFFFFF; border-bottom:1px solid #E6E8E3; }
+  body.stil-freundlich #frame .assign-bar{ background:#E9EBE6; border-bottom:none; }
+  body.stil-freundlich #frame .banner{ margin:6px 14px; border:none; border-radius:16px; }
+  body.stil-freundlich #frame .grade-tile{ border-radius:12px; }
+  body.stil-freundlich #frame .stufe-btn{ border-radius:14px; }
+  body.stil-freundlich #frame .fehlt-btn{ border-radius:14px; }
+  body.stil-freundlich #frame .thumb{ border-radius:10px; }
+
+  body.stil-freundlich #frame .chips{ border-bottom-color:transparent !important; }
+  body.stil-freundlich #frame button.kachel{ border:none; border-radius:18px; padding:16px; min-height:132px; font-size:inherit; }
+  body.stil-freundlich #frame button.kachel.neu{ border:2px dashed #A9AEB4; background:transparent; }
+  body.stil-freundlich #frame button.tabbtn{ border:none; border-radius:20px; padding:8px 4px; min-height:72px; font-size:15px; background:transparent; }
+
+  /* Startseite als Kacheln */
+  .kachel-raster{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; padding:8px 14px 4px; }
+  .kachel{ background:#FFFFFF; border-radius:18px; padding:16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;
+    box-shadow:0 1px 2px rgba(28,31,34,0.06); min-height:132px; text-align:left; border:none; font-family:inherit; color:#1C1F22; }
+  .kachel-marke{ min-width:44px; height:44px; padding:0 8px; align-self:flex-start; border-radius:14px; color:#FFFFFF;
+    display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:800; }
+  .kachel-fach{ font-size:17px; font-weight:700; line-height:1.2; }
+  .kachel-info{ font-size:13px; color:#565C63; }
+  .kachel-info .warn{ color:var(--red); font-weight:700; }
+  .kachel.neu{ background:transparent; border:2px dashed #A9AEB4; box-shadow:none; align-items:center; justify-content:center;
+    color:#565C63; font-size:15px; font-weight:700; }
+  .kachel.neu svg{ width:28px; height:28px; }
+  .zuletzt{ background:#FFFFFF; border-radius:18px; margin:0 14px 8px; overflow:hidden; }
+  .zuletzt-zeile{ display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid #E6E8E3; cursor:pointer; }
+  .zuletzt-zeile:last-child{ border-bottom:none; }
+  .zuletzt-text{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .zuletzt-name{ font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .zuletzt-sub{ font-size:12px; color:#565C63; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .zuletzt-note{ min-width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:17px; font-weight:800; flex-shrink:0; }
+
+  /* Reiter als schwebendes Dock */
+  body.stil-freundlich #tabbar{
+    margin:8px 12px calc(12px + env(safe-area-inset-bottom, 0px)); padding:8px; gap:8px; border-top:none;
+    background:#FFFFFF; border-radius:26px; bottom:12px; box-shadow:0 6px 20px rgba(28,31,34,0.12);
+  }
+  body.stil-freundlich .tabbtn{ border-top:none; border-radius:20px; color:#1C1F22; background:transparent; min-height:72px; }
+  body.stil-freundlich .tabbtn.active{ color:#FFFFFF; }
 
   /* ---------- AUSDRUCK ELTERNSPRECHTAG ----------
      Am Bildschirm unsichtbar, beim Drucken wird nur dieser Bereich ausgegeben. */
@@ -257,7 +355,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.4";
+const APP_FASSUNG = "17.9.5";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1521,7 +1619,7 @@ function normaliseClass(cls){
 /* Grundeinstellungen der App, unabhängig von den Klassen */
 function defaultSettings(){
   return { lehrkraft: "", schuljahr: "", lastBackup: null, intervallTage: 7, geraet: "", semester: semesterHeute(),
-           schrift: "normal", ordnung: "vorname", jahresGewicht: "gleich" };
+           schrift: "normal", stil: "freundlich", ordnung: "vorname", jahresGewicht: "gleich" };
 }
 
 /* ---------- REIHENFOLGE DER KLASSENLISTE ----------
@@ -1621,6 +1719,7 @@ function normaliseSettings(s){
     geraet: typeof s.geraet === "string" ? s.geraet : "",
     semester: (s.semester === 1 || s.semester === 2 || s.semester === "alle") ? s.semester : semesterHeute(),
     schrift: (s.schrift === "klein" || s.schrift === "gross") ? s.schrift : "normal",
+    stil: (s.stil === "amtlich") ? "amtlich" : "freundlich",
     /* Diese drei sind lange durchgefallen: sie standen in den Vorgaben und in
        den Knöpfen, aber nicht in dieser Liste. Damit waren sie nach jedem
        Neustart wieder auf der Vorgabe, und die Jahresnote rechnete plötzlich
@@ -2916,10 +3015,22 @@ function initials(name){
 /* Avatar: Foto, wenn eines hinterlegt ist, sonst die Initialen.
    Fotos liegen als kleines JPEG direkt am Datensatz und bleiben damit
    auf dem Gerät und im Backup. */
+/* Farbreihe für Avatare und Klassenkacheln. Alle dunkel genug für weiße
+   Schrift (Kontrast AA). Die Farbe hängt am Namen, bleibt also gleich. */
+const MARKEN_FARBEN = ["#2457A6","#B5622A","#2E7D6B","#6B4FA0","#A33B5C","#4A6A2A","#7A5A12","#4B5563"];
+
+function markenFarbe(text){
+  const t = String(text || "");
+  let h = 0;
+  for(let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  return MARKEN_FARBEN[h % MARKEN_FARBEN.length];
+}
+
 function avatarHtml(s, klein){
   const cls = klein ? "avatar small" : "avatar";
   if(s && s.photo) return `<div class="${cls}"><img src="${s.photo}" alt=""></div>`;
-  return `<div class="${cls}">${initials(s ? s.name : "")}</div>`;
+  const farbe = istFreundlich() ? ` style="background:${markenFarbe(s ? s.name : "")};"` : "";
+  return `<div class="${cls}"${farbe}>${initials(s ? s.name : "")}</div>`;
 }
 
 /* ---------- RAHMEN ---------- */
@@ -2968,15 +3079,26 @@ function render(){
   renderTabBar();
 }
 
+/* Symbole als Inline-SVG, keine Emojis: die sehen auf jedem Gerät anders aus. */
+const TAB_SYMBOLE = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/>',
+  statistik: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
+  einstellungen: '<path d="M4 6h10"/><circle cx="16" cy="6" r="2"/><path d="M18 6h2"/><path d="M4 12h4"/><circle cx="10" cy="12" r="2"/><path d="M12 12h8"/><path d="M4 18h12"/><circle cx="18" cy="18" r="2"/>'
+};
+
 function renderTabBar(){
   const bar = document.getElementById("tabbar");
+  bar.setAttribute("role", "navigation");
+  bar.setAttribute("aria-label", "Hauptnavigation");
+  const freundlich = istFreundlich();
   bar.innerHTML = Object.keys(TAB_COLORS).map(k => {
     const c = TAB_COLORS[k];
     const active = tab === k;
     const style = active
-      ? `border-top-color:${c.fg}; background:${c.bg}; color:${c.fg};`
-      : "border-top-color:transparent;";
-    return `<div class="tabbtn ${active ? "active" : ""}" style="${style}" onclick="switchTab('${k}')">${c.label}</div>`;
+      ? (freundlich ? `background:${c.fg}; color:#fff;` : `border-top-color:${c.fg}; background:${c.bg}; color:${c.fg};`)
+      : "";
+    const symbol = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_SYMBOLE[k] || ""}</svg>`;
+    return `<button type="button" class="tabbtn ${active ? "active" : ""}" style="${style}" ${active ? 'aria-current="page"' : ""} onclick="switchTab('${k}')">${symbol}<span>${c.label}</span></button>`;
   }).join("");
 }
 
@@ -3015,6 +3137,7 @@ function renderHome(){
 }
 
 function renderHomeList(){
+  if(istFreundlich()) return renderHomeKacheln();
   const rows = allSubjectRows().map(({cls, sub}) => {
     const avgs = cls.students.map(s => computeSchnitt(sub, s.id)).filter(v => v !== null);
     const schnitt = avgs.length ? avgs.reduce((a,b) => a+b, 0) / avgs.length : null;
@@ -3045,6 +3168,87 @@ function renderHomeList(){
       <button onclick="goHome('newSubject')">+ Neue Klasse oder Fach</button>
     </div>
   `;
+}
+
+/* Startseite im Erscheinungsbild „Freundlich“: Klassen als Kacheln, darunter
+   die zuletzt eingetragenen Einträge. Rechnet genau wie die Liste. */
+const WOCHENTAGE = ["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
+const MONATE = ["Jänner","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+
+function renderHomeKacheln(){
+  const jetzt = new Date();
+  const datum = WOCHENTAGE[jetzt.getDay()] + ", " + jetzt.getDate() + ". " + MONATE[jetzt.getMonth()];
+
+  const kacheln = allSubjectRows().map(({cls, sub}) => {
+    const avgs = cls.students.map(s => computeSchnitt(sub, s.id)).filter(v => v !== null);
+    const schnitt = avgs.length ? avgs.reduce((a,b) => a+b, 0) / avgs.length : null;
+    const bad = schnitt !== null && schnitt >= 4.0;
+    const schnittTxt = schnitt === null ? "noch keine Noten"
+      : (bad ? `<span class="warn">${fmtO(schnitt)} &middot; auffällig</span>` : fmtO(schnitt));
+    return `<button type="button" class="kachel" onclick="goHome('roster','${cls.id}','${sub.id}')">
+      <span class="kachel-marke" style="background:${markenFarbe(cls.name)};">${esc(cls.name)}</span>
+      <span class="kachel-fach">${esc(sub.fach)}</span>
+      <span class="kachel-info">${schnittTxt} &middot; ${cls.students.length} Schüler:innen</span>
+    </button>`;
+  }).join("");
+
+  const neu = `<button type="button" class="kachel neu" onclick="goHome('newSubject')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      ${state.classes.length ? "Klasse oder Fach anlegen" : "Erste Klasse anlegen"}
+    </button>`;
+
+  return `
+    <div class="header" style="${headerStyle("home")}">
+      <div class="sub" style="margin:0 0 2px;">${datum}</div>
+      <div class="title" style="${titleStyle("home")}">Meine Klassen</div>
+    </div>
+    ${backupBanner()}
+    ${gewichtHinweisBanner()}
+    ${sicherungBereitBlock()}
+    ${semesterLeiste("home")}
+    <div class="kachel-raster">${kacheln}${neu}</div>
+    ${zuletztEingetragen()}
+  `;
+}
+
+/* Die drei zuletzt erfassten Einträge über alle Fächer. Ein Tipp führt
+   direkt zur Person im richtigen Fach. */
+function zuletztEingetragen(){
+  const liste = [];
+  state.classes.forEach(cls => cls.subjects.forEach(sub => (sub.entries || []).forEach(e => {
+    if(!e || e.type === "abschluss" || typeof e.ts !== "number") return;
+    const s = getStudent(cls, e.studentId);
+    if(s) liste.push({ cls, sub, e, s });
+  })));
+  if(!liste.length) return "";
+  liste.sort((a, b) => b.e.ts - a.e.ts);
+  const zeilen = liste.slice(0, 3).map(({cls, sub, e, s}) => {
+    let art, marke = "";
+    if(e.type === "note"){
+      art = e.cat ? esc(catLabel(sub, e.cat)) : "Note";
+      if(typeof e.value === "number"){
+        const f = gradeColor(e.value);
+        const wert = Number.isInteger(e.value) ? String(e.value) : fmt(e.value);
+        const grund = (f.bg === "#FFFFFF") ? "#EEF0EA" : f.bg;
+        marke = `<span class="zuletzt-note" style="background:${grund}; color:${f.fg};">${wert}</span>`;
+      }
+    } else if(e.type === "fehlt"){
+      art = (e.cat ? esc(catLabel(sub, e.cat)) + " &middot; " : "") + "nicht mitgeschrieben";
+    } else if(e.type === "stufe"){
+      art = e.cat ? esc(catLabel(sub, e.cat)) : "Stufe";
+    } else {
+      art = e.text ? esc(String(e.text)) : "Eintrag";
+    }
+    return `<div class="zuletzt-zeile" onclick="goHome('student','${cls.id}','${sub.id}','${s.id}')">
+      ${avatarHtml(s, true)}
+      <div class="zuletzt-text">
+        <span class="zuletzt-name">${esc(s.name)}</span>
+        <span class="zuletzt-sub">${esc(cls.name)} &middot; ${esc(sub.fach)} &middot; ${art}</span>
+      </div>
+      ${marke}
+    </div>`;
+  }).join("");
+  return `<div class="label">ZULETZT EINGETRAGEN</div><div class="zuletzt">${zeilen}</div>`;
 }
 
 function renderNewSubject(){
@@ -7754,6 +7958,8 @@ function renderSettingsList(){
     <div class="label" style="border-top:2px solid #000;">DARSTELLUNG</div>
     <div class="helptext">Schriftgröße für dieses Gerät. Am Handy meist klein oder normal, am iPad und am Rechner oft groß angenehmer.</div>
     <div class="chips">${schriftChips}</div>
+    <div class="helptext">Erscheinungsbild. <b>Freundlich</b> mit Kacheln und hellem Grund, <b>Amtlich-klar</b> schwarz-weiß und dicht, bei direkter Sonne am besten lesbar. Ändert nur das Aussehen, keine Note.</div>
+    <div class="chips">${chipReihe([["freundlich","Freundlich"],["amtlich","Amtlich-klar"]], istFreundlich() ? "freundlich" : "amtlich", "setStil")}</div>
 
     <div class="label" style="border-top:2px solid #000;">REIHENFOLGE DER KLASSENLISTE</div>
     <div class="helptext">Wird beim Anlegen und bei jedem weiteren Namen sofort angewendet. „Nach Nachname" geht vom letzten Wort im Namen aus, taugt also nur, wenn die Namen als „Sophie Maier" eingetragen sind.</div>
@@ -7827,6 +8033,25 @@ const SCHRIFT_SKALA = { klein: 0.9, normal: 1, gross: 1.2 };
 function schriftAnwenden(){
   const wert = SCHRIFT_SKALA[state.settings.schrift] || 1;
   document.documentElement.style.setProperty("--skala", String(wert));
+}
+
+/* Erscheinungsbild. Ändert nur das Aussehen, nie eine Note oder Rechnung. */
+const STIL_THEME_FARBE = { freundlich:"#F2F3EF", amtlich:"#ffffff" };
+
+function stilAnwenden(){
+  const stil = (state.settings.stil === "amtlich") ? "amtlich" : "freundlich";
+  document.body.classList.toggle("stil-freundlich", stil === "freundlich");
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", STIL_THEME_FARBE[stil]);
+}
+
+function istFreundlich(){ return state.settings.stil !== "amtlich"; }
+
+function setStil(wert){
+  state.settings.stil = (wert === "amtlich") ? "amtlich" : "freundlich";
+  save();
+  stilAnwenden();
+  render();
 }
 
 function setSchrift(wert){
@@ -8739,6 +8964,7 @@ function deleteClass(){
 
 fassungPruefen();
 schriftAnwenden();
+stilAnwenden();
 render();
 ladefehlerMelden();
 
