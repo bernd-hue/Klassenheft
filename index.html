@@ -81,6 +81,14 @@
   input[type=text], input[type=number], select{
     font-family:inherit; font-size:14px; padding:8px; border:1.5px solid #000000; border-radius:6px; width:100%; margin-bottom:10px;
   }
+  input[type=date]{
+    font-family:inherit; font-size:14px; padding:7px 8px; border:1.5px solid #000000; border-radius:6px;
+    background:#ffffff; color:#000000; margin:0; flex:0 1 160px; min-width:130px; min-height:36px;
+  }
+  @media (max-width:480px){ .datumbereich .feinlabel{flex:0 0 100%;} }
+  .chip.datum-kurz{border-color:#000000;}
+  .chip.datum-kurz.an{background:#000000; color:#ffffff;}
+  .banner.korrektur{background:#E6F1FB;}
   form{padding:16px;}
   .field-label{font-size:12px; font-weight:bold; margin-bottom:4px; display:block;}
   .avatar{
@@ -308,6 +316,227 @@
   .rail-fuss{ margin-top:auto; color:rgba(244,241,232,0.8); font-size:13px; padding:0 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   body.stil-tafel .kachel-raster{ grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); }
 
+  /* ---------- GLAS (seit 17.10) ----------
+     Verfeinert „Freundlich“ und die Tafel-Leiste: ein weicher, farbiger Grund,
+     darauf durchscheinende Flächen mit heller Kante. Echte Unschärfe bekommen
+     nur die wenigen großen Flächen (Kopfzeile, Dock, Kacheln, Hinweise); die
+     vielen Listenzeilen sind bloß durchscheinend, damit auch ältere Tablets
+     flüssig scrollen. Alles ist reines CSS: keine Bibliothek, keine Webschrift,
+     nichts wird aus dem Internet nachgeladen. Amtlich-klar bleibt unberührt. */
+  body.stil-freundlich{
+    --tinte:#101820; --tinte2:#4B5665;
+    --glas:rgba(255,255,255,0.58); --glas-fest:rgba(255,255,255,0.80);
+    --kante:rgba(255,255,255,0.90); --linie:rgba(16,24,32,0.09); --linie-fest:rgba(16,24,32,0.16);
+    --tafel:#1E3832;
+    --unscharf:blur(22px) saturate(180%);
+    --schatten:0 1px 1px rgba(16,24,32,0.04), 0 12px 28px -14px rgba(16,24,32,0.26);
+    --schatten-klein:0 1px 1px rgba(16,24,32,0.03), 0 6px 16px -10px rgba(16,24,32,0.20);
+    background:#EEF1F6;
+  }
+  body.stil-freundlich::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(62% 46% at 6% 0%, #CFE2FF 0%, rgba(207,226,255,0) 62%),
+      radial-gradient(56% 42% at 100% 10%, #D0F2E4 0%, rgba(208,242,228,0) 64%),
+      radial-gradient(70% 46% at 88% 100%, #FFE4CF 0%, rgba(255,228,207,0) 62%),
+      radial-gradient(52% 40% at 0% 88%, #E5DDFF 0%, rgba(229,221,255,0) 62%),
+      #EEF1F6;
+  }
+  body.stil-freundlich #frame{ background:transparent; color:var(--tinte); -webkit-font-smoothing:antialiased; }
+  @media (min-width:560px){
+    body.stil-freundlich{ background:#EEF1F6; }
+    body.stil-freundlich:not(.stil-tafel) #frame{
+      background:rgba(255,255,255,0.30); border:1px solid var(--kante); border-radius:34px;
+      box-shadow:0 30px 70px -30px rgba(16,24,32,0.35);
+    }
+  }
+
+  /* Kopfzeile: bleibt oben stehen, der Inhalt läuft unscharf darunter durch */
+  /* Die Glasfläche liegt als eigene Schicht hinter dem Text der Kopfzeile und
+     läuft nach unten weich aus. Direkt an der Kopfzeile selbst blieb in Chrome
+     am unteren Rand ein Streifen scharf, durch den die Schrift der Zeile
+     darunter durchschien. */
+  body.stil-freundlich #frame .header{
+    position:sticky; top:0; z-index:6; padding:16px 18px 12px;
+    background:transparent !important; border-bottom:none;
+  }
+  body.stil-freundlich #frame .header::before{
+    content:""; position:absolute; inset:0 0 -14px 0; z-index:-1; pointer-events:none;
+    background:rgba(240,243,248,0.72);
+    -webkit-backdrop-filter:var(--unscharf); backdrop-filter:var(--unscharf);
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+            mask-image:linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  }
+  body.stil-freundlich #frame .header .title{ font-size:22px; font-weight:800; letter-spacing:-0.02em; color:var(--tinte) !important; }
+  body.stil-freundlich #frame .header .sub{ font-size:13px; color:var(--tinte2); margin-top:3px; }
+  body.stil-freundlich #frame .back{ color:var(--tinte) !important; font-size:30px; line-height:0.8; padding:0 8px 0 0; }
+  body.stil-tafel #frame .header{
+    top:0; margin:10px 0 6px; border-radius:20px; border:1px solid var(--kante);
+    box-shadow:var(--schatten-klein);
+  }
+  body.stil-tafel #frame .header::before{
+    inset:0; border-radius:inherit; -webkit-mask-image:none; mask-image:none;
+  }
+
+  body.stil-freundlich #frame .label{ color:var(--tinte2); font-size:12px; font-weight:700; letter-spacing:0.05em; padding:20px 20px 7px; }
+  body.stil-freundlich #frame .helptext{ color:#39424E; }
+  body.stil-freundlich #frame [style*="solid #000"]:not(.label){ border-color:var(--linie-fest) !important; }
+
+  /* Flächen */
+  body.stil-freundlich #frame .row{
+    background:var(--glas-fest); border:1px solid var(--kante); border-radius:18px;
+    box-shadow:var(--schatten-klein); transition:transform .15s ease, box-shadow .15s ease;
+  }
+  body.stil-freundlich #frame .row:last-child{ border-bottom:1px solid var(--kante); }
+  body.stil-freundlich #frame .row:active{ transform:scale(0.985); }
+  body.stil-freundlich #frame .row .sub{ color:var(--tinte2); }
+  body.stil-freundlich #frame .stats,
+  body.stil-freundlich #frame .zuletzt,
+  body.stil-freundlich #frame .chart{
+    background:var(--glas); border:1px solid var(--kante); border-radius:20px; box-shadow:var(--schatten-klein);
+    -webkit-backdrop-filter:var(--unscharf); backdrop-filter:var(--unscharf);
+  }
+  body.stil-freundlich #frame .chart{ margin:8px 14px; padding:12px 14px 14px; }
+  body.stil-freundlich #frame .stat:first-child{ border-right:1px solid var(--linie); }
+  body.stil-freundlich #frame .stat .val,
+  body.stil-freundlich #frame .grade,
+  body.stil-freundlich #frame .schnell-ergebnis,
+  body.stil-freundlich #frame .zuletzt-note{ font-variant-numeric:tabular-nums; }
+  body.stil-freundlich .zuletzt-zeile{ border-bottom-color:var(--linie); }
+
+  /* Listen: aufeinanderfolgende Zeilen bilden eine gemeinsame Karte */
+  body.stil-freundlich #frame .entry,
+  body.stil-freundlich #frame .slider-row,
+  body.stil-freundlich #frame .comp-item,
+  body.stil-freundlich #frame .schnell-zeile{
+    background:var(--glas-fest); margin:0 12px; border:none; border-bottom:1px solid var(--linie);
+  }
+  body.stil-freundlich #frame .schnell-zeile{ padding:9px 12px; }
+  body.stil-freundlich #frame .entry:not(.entry + .entry),
+  body.stil-freundlich #frame .slider-row:not(.slider-row + .slider-row),
+  body.stil-freundlich #frame .comp-item:not(.comp-item + .comp-item),
+  body.stil-freundlich #frame .schnell-zeile:not(.schnell-zeile + .schnell-zeile){
+    border-top-left-radius:18px; border-top-right-radius:18px; margin-top:6px;
+  }
+  body.stil-freundlich #frame .entry:not(:has(+ .entry)),
+  body.stil-freundlich #frame .slider-row:not(:has(+ .slider-row)),
+  body.stil-freundlich #frame .comp-item:not(:has(+ .comp-item)),
+  body.stil-freundlich #frame .schnell-zeile:not(:has(+ .schnell-zeile)){
+    border-bottom-left-radius:18px; border-bottom-right-radius:18px; border-bottom:none; margin-bottom:8px;
+    box-shadow:var(--schatten-klein);
+  }
+  body.stil-freundlich #frame .feinbereich{ border-top-color:var(--linie); padding:10px 18px; }
+  body.stil-freundlich #frame .assign-bar{ background:var(--glas); border-bottom:1px solid var(--linie); }
+
+  /* Knöpfe */
+  body.stil-freundlich #frame button{
+    border-radius:14px; border:1px solid var(--linie-fest); background:var(--glas-fest); color:var(--tinte);
+    box-shadow:0 1px 0 rgba(255,255,255,0.9) inset, 0 4px 10px -8px rgba(16,24,32,0.35);
+    transition:transform .12s ease, background-color .15s ease, box-shadow .15s ease;
+  }
+  body.stil-freundlich #frame button:active{ transform:scale(0.975); }
+  body.stil-freundlich #frame button:disabled{ transform:none; }
+  body.stil-freundlich #frame button.ghost{ border:none; background:none; box-shadow:none; color:#1F4E8C; text-decoration:none; font-weight:600; }
+  body.stil-freundlich #frame button.ghost.small{ color:var(--tinte2); }
+  body.stil-freundlich #frame button.green{ background:var(--green-bg); border-color:var(--green); color:var(--green); }
+  body.stil-freundlich #frame button.red{ background:var(--red-bg); border-color:var(--red); color:var(--red); }
+  body.stil-freundlich #frame button.gross:not(.red):not(.green){
+    border:none; color:#FFFFFF; border-radius:18px;
+    background:linear-gradient(180deg, #2A4F45 0%, #1B352E 100%);
+    box-shadow:0 1px 0 rgba(255,255,255,0.22) inset, 0 12px 22px -12px rgba(27,53,46,0.85);
+  }
+  body.stil-freundlich #frame :is(button, .chip, .row, .kachel, .grade-tile, .schnell-tile, .schnell-stufe, .stufe-btn, .fehlt-btn, input, select):focus-visible{
+    outline:3px solid rgba(31,78,140,0.55); outline-offset:2px;
+  }
+
+  /* Eingabefelder */
+  body.stil-freundlich #frame input[type=text],
+  body.stil-freundlich #frame input[type=number],
+  body.stil-freundlich #frame input[type=date],
+  body.stil-freundlich #frame select{
+    border-radius:13px; border:1px solid var(--linie-fest); background:rgba(255,255,255,0.86); color:var(--tinte);
+    box-shadow:0 1px 2px rgba(16,24,32,0.05) inset; transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  body.stil-freundlich #frame input[type=date]{ font-size:16px; padding:9px 12px; min-height:44px; }
+  body.stil-freundlich #frame input.schnell-punkte{ padding:8px 6px; font-weight:700; font-variant-numeric:tabular-nums; }
+  body.stil-freundlich #frame :is(input[type=text], input[type=number], input[type=date], select):focus{
+    outline:none; border-color:#1F4E8C; box-shadow:0 0 0 4px rgba(31,78,140,0.18);
+  }
+
+  /* Wählbares */
+  body.stil-freundlich #frame .chip{ transition:transform .12s ease; box-shadow:0 2px 6px -4px rgba(16,24,32,0.35); }
+  body.stil-freundlich #frame .chip:active{ transform:scale(0.96); }
+  body.stil-freundlich #frame .chip.datum-kurz{ background:var(--glas-fest); border-color:var(--linie-fest); color:var(--tinte); }
+  body.stil-freundlich #frame .chip.datum-kurz.an{ background:var(--tafel); border-color:var(--tafel); color:#FFFFFF; }
+  body.stil-freundlich #frame .grade-tile{ border-radius:16px; box-shadow:0 1px 0 rgba(255,255,255,0.7) inset, var(--schatten-klein); }
+  body.stil-freundlich #frame .schnell-tile,
+  body.stil-freundlich #frame .schnell-stufe{ border-radius:10px; }
+  body.stil-freundlich #frame .schnell-tile{ width:34px; height:34px; }
+  body.stil-freundlich #frame .avatar{ box-shadow:0 1px 0 rgba(255,255,255,0.35) inset, 0 4px 10px -6px rgba(16,24,32,0.5); }
+
+  /* Hinweise */
+  body.stil-freundlich #frame .banner{
+    background:rgba(255,244,214,0.72); border:1px solid rgba(206,160,44,0.35); border-radius:20px;
+    -webkit-backdrop-filter:var(--unscharf); backdrop-filter:var(--unscharf); box-shadow:var(--schatten-klein);
+    padding:12px 14px;
+  }
+  body.stil-freundlich #frame .banner.korrektur{ background:rgba(226,238,252,0.78); border-color:rgba(31,78,140,0.30); }
+  body.stil-freundlich #frame .banner .txt{ font-size:13px; line-height:1.4; }
+
+  /* Startseite */
+  body.stil-freundlich #frame button.kachel{
+    background:var(--glas); border:1px solid var(--kante); border-radius:24px; box-shadow:var(--schatten);
+    -webkit-backdrop-filter:var(--unscharf); backdrop-filter:var(--unscharf);
+  }
+  body.stil-freundlich #frame button.kachel.neu{ background:rgba(255,255,255,0.22); border:1.5px dashed rgba(16,24,32,0.28); box-shadow:none; color:var(--tinte2); }
+  body.stil-freundlich .kachel-marke{ box-shadow:0 1px 0 rgba(255,255,255,0.35) inset, 0 6px 12px -6px rgba(16,24,32,0.55); }
+  body.stil-freundlich .kachel-info, body.stil-freundlich .zuletzt-sub{ color:var(--tinte2); }
+  @media (hover:hover){
+    body.stil-freundlich #frame button.kachel:hover,
+    body.stil-freundlich #frame .row:hover{ transform:translateY(-1px); box-shadow:var(--schatten); }
+    body.stil-freundlich #frame .row[style*="cursor:default"]:hover{ transform:none; box-shadow:var(--schatten-klein); }
+  }
+
+  /* Dock: die eine Fläche, die wirklich wie Glas über dem Inhalt schwebt */
+  body.stil-freundlich:not(.stil-tafel) #tabbar{
+    background:rgba(255,255,255,0.52); border:1px solid var(--kante); border-radius:32px; padding:7px; gap:6px;
+    -webkit-backdrop-filter:blur(28px) saturate(200%); backdrop-filter:blur(28px) saturate(200%);
+    box-shadow:0 1px 0 rgba(255,255,255,0.95) inset, 0 18px 40px -16px rgba(16,24,32,0.45);
+    z-index:8;
+  }
+  body.stil-freundlich #frame button.tabbtn{ position:relative; overflow:hidden; border:none; box-shadow:none; background:transparent; border-radius:25px; }
+  body.stil-freundlich:not(.stil-tafel) #frame button.tabbtn.active{ box-shadow:0 10px 18px -12px rgba(16,24,32,0.7); }
+  body.stil-freundlich #frame button.tabbtn.active::after{
+    content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0) 52%);
+  }
+
+  /* Tafel-Leiste */
+  body.stil-tafel #tabbar{
+    background:linear-gradient(180deg, #24473E 0%, #162E28 100%);
+    border-right:1px solid rgba(255,255,255,0.10); box-shadow:10px 0 40px -20px rgba(16,24,32,0.5);
+  }
+  body.stil-tafel #frame button.tabbtn{
+    border:1px solid rgba(244,241,232,0.20); background:rgba(255,255,255,0.06); border-radius:20px;
+    box-shadow:0 1px 0 rgba(255,255,255,0.10) inset;
+  }
+  body.stil-tafel #frame button.tabbtn.active{ border-color:#F4F1E8; box-shadow:0 14px 26px -16px rgba(0,0,0,0.8); }
+
+  /* Ohne Unschärfe (alte Browser) oder auf Wunsch des Geräts: feste Flächen */
+  @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+    body.stil-freundlich{ --glas:rgba(255,255,255,0.94); }
+    body.stil-freundlich #frame .header::before{ background:rgba(240,243,248,0.97); }
+    body.stil-freundlich:not(.stil-tafel) #tabbar{ background:rgba(255,255,255,0.96); }
+  }
+  @media (prefers-reduced-transparency: reduce){
+    body.stil-freundlich{ --glas:rgba(255,255,255,0.96); --glas-fest:#FFFFFF; }
+    body.stil-freundlich #frame .header::before{ background:#F0F3F8; }
+    body.stil-freundlich:not(.stil-tafel) #tabbar{ background:#FFFFFF; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    body.stil-freundlich #frame *{ transition:none !important; }
+  }
+
   /* ---------- AUSDRUCK ELTERNSPRECHTAG ----------
      Am Bildschirm unsichtbar, beim Drucken wird nur dieser Bereich ausgegeben. */
   #printArea{display:none;}
@@ -340,6 +569,8 @@
   .pr-sign div{flex:1; border-top:1px solid #000000; padding-top:1.5mm;}
   @media print{
     body{background:#ffffff !important; margin:0;}
+    /* Der farbige Glasgrund gehört nur auf den Bildschirm, nie aufs Papier. */
+    body::before{display:none !important;}
     #frame{display:none !important;}
     #printArea{display:block !important;}
     @page{ size:A4; margin:16mm 14mm; }
@@ -388,7 +619,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.9.7";
+const APP_FASSUNG = "17.10";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1253,7 +1484,7 @@ function arbeitWahl(sub, cat, gewaehlt, aufruf){
   return `<div style="padding:8px 16px 0;">
     <span class="field-label">Welche ${esc(catLabel(sub, cat))}?</span>
     <div class="chips" style="padding:6px 0 2px;">${felder.join("")}</div>
-    <div class="helptext" style="padding:0 0 4px;">Die Nummer entscheidet, was zusammengehört, nicht das Datum. So kannst du die 1. und die 2. am selben Nachmittag nachtragen und trotzdem getrennt auswerten. In Klammern steht, wie viele Einträge es dort schon gibt.</div>
+    <div class="helptext" style="padding:0 0 4px;">Die Nummer entscheidet, was zusammengehört, nicht das Datum. So kannst du die 1. und die 2. am selben Nachmittag nachtragen und trotzdem getrennt auswerten. In Klammern steht, wie viele Einträge es dort schon gibt.${aufruf === "setSchnellArbeit" ? " Ein Tipp auf eine Nummer mit Einträgen öffnet diese Arbeit zum Ausbessern." : ""}</div>
   </div>`;
 }
 
@@ -1966,7 +2197,8 @@ let tab = "home";
 let homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                  newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                  zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
-                 thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null };
+                 thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null,
+                 schnellDatum:null, schnellKorrektur:null, noteDatum:null };
 let statView = { screen:"list", classId:null, subjectId:null, arbeitCat:null, arbeitKennung:null };
 let settingsView = { screen:"list", classId:null, subjectId:null, stufenOffen:null, schluesselOffen:null };
 
@@ -3110,7 +3342,51 @@ function render(){
   else if(tab === "statistik") content.innerHTML = renderStat();
   else content.innerHTML = renderSettings();
   renderTabBar();
+  schnellFokusAnwenden();
 }
+
+/* ---------- PUNKTE DER REIHE NACH EINTIPPEN (seit 17.10) ----------
+   Jede Punkteeingabe speichert und baut die Liste neu auf. Dabei ging bisher
+   die Schreibmarke verloren: nach jeder Zahl musste das nächste Feld neu
+   angetippt werden. Jetzt merkt sich die App, wohin es weitergehen soll.
+   Eingabetaste und Tabulator springen in die nächste Zeile, Umschalt und
+   Tabulator in die vorige. */
+let schnellFokusZiel = null;
+
+function schnellFokusAnwenden(){
+  if(!schnellFokusZiel) return;
+  const ziel = schnellFokusZiel;
+  schnellFokusZiel = null;
+  const feld = Array.from(document.querySelectorAll("input.schnell-punkte"))
+    .find(el => el.getAttribute("data-sid") === ziel);
+  if(feld){ feld.focus(); try{ feld.select(); }catch(e){} }
+}
+
+document.addEventListener("keydown", function(ev){
+  const el = ev.target;
+  if(!el || !el.classList || !el.classList.contains("schnell-punkte")) return;
+  if(ev.key !== "Enter" && ev.key !== "Tab") return;
+  const felder = Array.from(document.querySelectorAll("input.schnell-punkte"));
+  const nachbar = felder[felder.indexOf(el) + (ev.shiftKey ? -1 : 1)];
+  /* Am Ende der Liste macht der Tabulator, was er immer macht. */
+  if(!nachbar && ev.key === "Tab") return;
+  ev.preventDefault();
+  schnellFokusZiel = nachbar ? nachbar.getAttribute("data-sid") : null;
+  el.blur();                 /* löst das Speichern aus, falls sich etwas geändert hat */
+  schnellFokusAnwenden();    /* hat sich nichts geändert, gab es keinen Neuaufbau */
+});
+
+/* Mit dem Finger oder der Maus direkt ins nächste Punktefeld. */
+document.addEventListener("pointerdown", function(ev){
+  const el = ev.target;
+  if(el && el.classList && el.classList.contains("schnell-punkte") && document.activeElement !== el
+     && document.activeElement && document.activeElement.classList
+     && document.activeElement.classList.contains("schnell-punkte")){
+    schnellFokusZiel = el.getAttribute("data-sid");
+  } else {
+    schnellFokusZiel = null;
+  }
+});
 
 /* Symbole als Inline-SVG, keine Emojis: die sehen auf jedem Gerät anders aus. */
 const TAB_SYMBOLE = {
@@ -3158,6 +3434,7 @@ function goHome(screen, classId, subjectId, studentId){
     homeView.newNoteGrade = null;
     homeView.noteBasis = null;
     homeView.noteWeight = startWeight(sub, homeView.newNoteCat);
+    homeView.noteDatum = null;
   }
   render();
 }
@@ -4102,6 +4379,74 @@ function datumGueltig(text){
   return String(tag).padStart(2, "0") + "." + String(monat).padStart(2, "0") + ".";
 }
 
+/* ---------- DATUM DER LEISTUNG BEIM EINTRAGEN (seit 17.10) ----------
+   Eine Schularbeit wird fast nie an dem Tag eingetragen, an dem sie
+   geschrieben wurde. Bisher bekam jeder Eintrag das heutige Datum und musste
+   danach einzeln ausgebessert werden. Jetzt steht das Datum oben in der Maske,
+   in der Klassenbewertung einmal für die ganze Runde.
+
+   Gespeichert wird weiter "TT.MM." ohne Jahr. Das Datumsfeld des Browsers
+   braucht ein Jahr; es wird aus dem laufenden Schuljahr ergänzt: September
+   bis Dezember gehören zum ersten Kalenderjahr, Jänner bis August zum zweiten. */
+function schuljahrStart(){
+  const d = new Date();
+  return (d.getMonth() + 1 >= 9) ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+function datumAlsIso(datum){
+  const m = String(datum || "").match(/^(\d{1,2})\.(\d{1,2})\.?$/);
+  if(!m) return "";
+  const tag = parseInt(m[1], 10), monat = parseInt(m[2], 10);
+  const jahr = schuljahrStart() + (monat >= 9 ? 0 : 1);
+  const probe = new Date(jahr, monat - 1, tag);
+  if(probe.getMonth() !== monat - 1 || probe.getDate() !== tag) return "";
+  return jahr + "-" + String(monat).padStart(2, "0") + "-" + String(tag).padStart(2, "0");
+}
+
+/* Nimmt beides: "2026-11-13" aus dem Datumsfeld und "13.11." getippt. */
+function datumLesen(wert){
+  const t = String(wert || "").trim();
+  const iso = t.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return iso ? datumGueltig(iso[2] + "." + iso[1] + ".") : datumGueltig(t);
+}
+
+function tagVersetzt(tage){
+  const d = new Date();
+  d.setDate(d.getDate() + tage);
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + ".";
+}
+
+/* Die Datumszeile, einmal für alle Masken. */
+function datumZeile(wert, aufruf, hinweis){
+  const kurz = [[today(), "heute"], [tagVersetzt(-1), "gestern"]].map(([d, text]) =>
+    `<div class="chip datum-kurz${wert === d ? " an" : ""}" data-d="${d}" onclick="${aufruf}('${d}')">${text}</div>`).join("");
+  return `<div class="feinbereich datumbereich" style="border-top:none; padding-bottom:6px;">
+    <div class="feinzeile" style="flex-wrap:wrap;">
+      <label class="feinlabel" for="datumInput">Datum der Leistung</label>
+      <input type="date" id="datumInput" class="datum-input" value="${datumAlsIso(wert)}" onchange="${aufruf}(this.value)">
+      ${kurz}
+    </div>
+    ${hinweis ? `<div class="helptext" style="padding:4px 0 0;">${hinweis}</div>` : ""}
+  </div>`;
+}
+
+/* Einzelmaske: das Datum gilt für den einen Eintrag, der gerade entsteht.
+   Bewusst ohne Neuaufbau, damit ein schon getipptes Thema stehen bleibt. */
+function neuDatum(){ return homeView.noteDatum || today(); }
+
+function setNoteDatum(wert){
+  const neu = datumLesen(wert);
+  const feld = document.getElementById("datumInput");
+  if(!neu){
+    if(String(wert || "").trim()) alert("Das Datum konnte ich nicht lesen.");
+    if(feld) feld.value = datumAlsIso(neuDatum());
+    return;
+  }
+  homeView.noteDatum = neu;
+  if(feld) feld.value = datumAlsIso(neu);
+  document.querySelectorAll(".datum-kurz").forEach(c => c.classList.toggle("an", c.getAttribute("data-d") === neu));
+}
+
 function datumAendern(entryId){
   const cls = getClass(homeView.classId);
   const sub = getSubject(cls, homeView.subjectId);
@@ -4373,6 +4718,7 @@ function renderNewNote(){
         <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
       </div>
       <div class="chips">${chips}</div>
+      ${datumZeile(neuDatum(), "setNoteDatum", "Der Tag, an dem die Leistung erbracht wurde. Vorbelegt ist heute.")}
       ${themaFeld("themaInput", homeView.thema, themaVorschlag(cat))}
       <div class="label" style="color:${col.fg};">EINTRAG, EIN TIPP GENÜGT</div>
       <div style="padding:0 16px 12px;">${stufen}</div>
@@ -4395,6 +4741,7 @@ function renderNewNote(){
         <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}</div>
       </div>
       <div class="chips">${chips}</div>
+      ${datumZeile(neuDatum(), "setNoteDatum", "Der Tag, an dem die Leistung erbracht wurde. Vorbelegt ist heute.")}
       ${themaFeld("themaInput", homeView.thema, themaVorschlag("kompetenz"))}
       <div class="label" style="color:${col.fg};">ERREICHTE KOMPETENZEN</div>
       <div style="padding:0 16px;">${boxen || '<div class="helptext" style="padding-left:0;">Noch keine Kompetenzen hinterlegt, siehe Einstellungen.</div>'}</div>
@@ -4462,6 +4809,7 @@ function renderNewNote(){
       <div class="sub">${esc(s.name)} &middot; ${esc(sub.fach)}${(cls.stufe === 1 || !hatNiveaus(sub)) ? "" : " &middot; " + esc(niveauLabel(sub, s.niveau))} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
     </div>
     <div class="chips">${chips}</div>
+      ${datumZeile(neuDatum(), "setNoteDatum", "Der Tag, an dem die Leistung erbracht wurde. Vorbelegt ist heute.")}
     ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.arbeitNr, "setArbeitNr") : ""}
     <div class="grade-row" style="padding-top:12px;">${tiles}</div>
     ${themaFeld("themaInput", homeView.thema, themaVorschlag(cat))}
@@ -4489,10 +4837,121 @@ function goSchnell(){
   homeView.schnellIds = {};
   homeView.schnellMax = null;
   homeView.schnellThema = null;
+  homeView.schnellDatum = null;
+  homeView.schnellKorrektur = null;
   homeView.schnellArbeit = nummeriert(sub, homeView.newNoteCat)
     ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, homeView.newNoteCat, semesterFuerNeu()) + 1) : null;
   homeView.screen = "schnell";
   render();
+}
+
+/* Datum und Semester der laufenden Runde. In einer Korrektur gehört beides
+   der Arbeit, die geöffnet wurde, nicht dem heutigen Tag. */
+function schnellDatum(){ return homeView.schnellDatum || today(); }
+function schnellSem(){ return homeView.schnellKorrektur ? homeView.schnellKorrektur.sem : semesterFuerNeu(); }
+
+/* Datum für die ganze Runde. Zeilen, die schon stehen, ziehen mit, genau wie
+   bei Thema, Nummer und Höchstpunktezahl. Ein Eintrag mit einem anderen Tag,
+   etwa ein Nachschreibtermin in einer geöffneten Arbeit, bleibt wie er ist. */
+function setSchnellDatum(wert){
+  const neu = datumLesen(wert);
+  if(!neu){
+    if(String(wert || "").trim()) alert("Das Datum konnte ich nicht lesen.");
+    render();
+    return;
+  }
+  const alt = schnellDatum();
+  homeView.schnellDatum = neu;
+  const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
+  if(sub && neu !== alt){
+    let geaendert = 0;
+    Object.keys(homeView.schnellIds || {}).forEach(sid => {
+      const e = sub.entries.find(x => x.id === homeView.schnellIds[sid]);
+      if(e && e.date === alt){ e.date = neu; e.ts = Date.now(); geaendert++; }
+    });
+    if(geaendert){ sub.entries = nachDatum(sub.entries); save(); }
+  }
+  render();
+}
+
+/* Woher ein neu angelegter Eintrag Thema, Nummer, Semester und Datum nimmt.
+   Ersetzt er in einer Korrektur einen bestehenden, erbt er dessen Angaben. */
+function schnellVorlage(alt){
+  const erbt = !!(homeView.schnellKorrektur && alt);
+  return {
+    thema: erbt ? (alt.thema || null) : (homeView.schnellThema || null),
+    arbeit: homeView.schnellArbeit || null,
+    sem: erbt ? eintragSemester(alt) : schnellSem(),
+    date: erbt ? (alt.date || schnellDatum()) : schnellDatum()
+  };
+}
+
+/* Ein Eintrag mit einem Tag in der Vergangenheit gehört an seinen Platz in
+   der zeitlichen Folge, nicht ans Ende der Liste. */
+function schnellEinsortieren(sub){
+  if(schnellDatum() !== today()) sub.entries = nachDatum(sub.entries);
+}
+
+function haeufigster(werte){
+  const zahl = {};
+  let bester = null;
+  werte.forEach(w => {
+    const k = String(w);
+    zahl[k] = (zahl[k] || 0) + 1;
+    if(bester === null || zahl[k] > zahl[String(bester)]) bester = w;
+  });
+  return bester;
+}
+
+/* "31,5 von 40 Punkten, 78,8 %" -> { punkte: 31.5, max: 40 } */
+function punkteAusBasis(basis){
+  const m = String(basis || "").match(/^([\d.,]+) von ([\d.,]+) Punkten/);
+  if(!m) return null;
+  const punkte = parseFloat(m[1].replace(/,/g, ".")), max = parseFloat(m[2].replace(/,/g, "."));
+  return (isNaN(punkte) || isNaN(max) || max <= 0) ? null : { punkte: punkte, max: max };
+}
+
+/* ---------- EINE BESTEHENDE ARBEIT KORRIGIEREN (seit 17.10) ----------
+   Ein übersehener halber Punkt soll in derselben Liste auszubessern sein, in
+   der die Arbeit eingetragen wurde. Dazu werden die vorhandenen Einträge der
+   Arbeit in die Klassenbewertung geladen; jede Zeile bessert dann ihren
+   bestehenden Eintrag aus, statt einen zweiten anzulegen. */
+function schnellLaden(cat, sem, nr){
+  const cls = getClass(homeView.classId);
+  const sub = getSubject(cls, homeView.subjectId);
+  if(!cls || !sub) return false;
+  const treffer = nachDatum(sub.entries.filter(e =>
+    e.cat === cat && (e.type === "note" || e.type === "fehlt") &&
+    arbeitNr(e) === nr && eintragSemester(e) === sem &&
+    !!getStudent(cls, e.studentId)));
+  if(!treffer.length) return false;
+  const ids = {};
+  let doppelt = 0;
+  treffer.forEach(e => { if(ids[e.studentId]) doppelt++; ids[e.studentId] = e.id; });
+  const noten = treffer.filter(e => e.type === "note");
+  const grenzen = noten.map(e => punkteAusBasis(e.basis)).filter(Boolean).map(x => x.max);
+  const themen = Object.keys(treffer.reduce((m, e) => { if(e.thema) m[e.thema] = true; return m; }, {}));
+  homeView.newNoteCat = cat;
+  homeView.schnellIds = ids;
+  homeView.schnellArbeit = nr;
+  homeView.schnellKorrektur = { sem: sem, nr: nr, doppelt: doppelt };
+  homeView.schnellDatum = haeufigster(treffer.map(e => e.date).filter(Boolean)) || today();
+  homeView.schnellMax = grenzen.length ? haeufigster(grenzen) : null;
+  homeView.schnellThema = themen.length === 1 ? themen[0] : null;
+  homeView.noteWeight = noten.length ? haeufigster(noten.map(n => noteWeight(sub, n))) : startWeight(sub, cat);
+  return true;
+}
+
+/* Einstieg aus der Auswertung einer Arbeit. */
+function schnellKorrigieren(classId, subjectId, cat, sem, nr){
+  homeView.classId = classId;
+  homeView.subjectId = subjectId;
+  if(!schnellLaden(cat, sem, nr)){ alert("Zu dieser Arbeit gibt es keine Einträge mehr."); return; }
+  homeView.zeigeGewicht = false;
+  homeView.screen = "schnell";
+  tab = "home";
+  render();
+  window.scrollTo(0, 0);
 }
 
 function schnellCat(cat){
@@ -4502,6 +4961,7 @@ function schnellCat(cat){
   homeView.schnellIds = {};
   homeView.schnellMax = null;
   homeView.schnellThema = null;
+  homeView.schnellKorrektur = null;
   homeView.schnellArbeit = nummeriert(sub, cat)
     ? Math.min(ARBEITEN_MAX, hoechsteArbeitNr(sub, cat, semesterFuerNeu()) + 1) : null;
   render();
@@ -4576,9 +5036,12 @@ function schnellPunkte(studentId, roh){
   const text = String(roh || "").trim();
   if(text === ""){ schnellLoeschen(studentId); return; }
   const punkte = zahlOderNull(text);
-  if(punkte === null){ render(); return; }
+  /* Bei einer unlesbaren oder unmöglichen Eingabe bleibt die Schreibmarke
+     in dieser Zeile, statt in die nächste zu springen. */
+  if(punkte === null){ schnellFokusZiel = studentId; render(); return; }
   /* Mehr Punkte als vergeben sind ein Vertipper, keine Eins. */
   if(punkte > max){
+    schnellFokusZiel = studentId;
     alert("Bei " + fmtPct(max) + " möglichen Punkten sind " + fmtPct(punkte) + " Punkte nicht möglich.\n\n"
       + "Falls die Höchstpunktezahl nicht stimmt, bitte oben im Feld „Punkte gesamt“ richtigstellen.");
     render();
@@ -4607,26 +5070,33 @@ function schnellSpeichern(studentId, daten, leise){
        Schlüsseländerung mitgezogen, obwohl sie ein eigenes Urteil ist. */
     if(typeof daten.pct === "number"){ vorhanden.pct = daten.pct; } else { delete vorhanden.pct; }
     if(typeof daten.fz === "number"){ vorhanden.fz = daten.fz; } else { delete vorhanden.fz; }
-    vorhanden.thema = thema;
-    vorhanden.arbeit = homeView.schnellArbeit || null;
-    /* Die Gewichtung heißt "für alle" und gilt für alle: wer sie mitten in
-       der Runde nachstellt, meint auch die Zeilen, die schon stehen. Sonst
-       trügen zwei Noten derselben Erfassung stillschweigend verschiedene
-       Gewichte. */
-    if(typeof homeView.noteWeight === "number") gewichtSetzen(sub, vorhanden, homeView.noteWeight);
+    /* In einer Korrektur bleiben Thema, Nummer und Gewicht eines bestehenden
+       Eintrags, wie sie sind: geändert wird nur, was in der Zeile getippt
+       wurde. Thema und Gewicht für alle ändert man weiterhin oben. */
+    if(!homeView.schnellKorrektur){
+      vorhanden.thema = thema;
+      vorhanden.arbeit = homeView.schnellArbeit || null;
+      /* Die Gewichtung heißt "für alle" und gilt für alle: wer sie mitten in
+         der Runde nachstellt, meint auch die Zeilen, die schon stehen. Sonst
+         trügen zwei Noten derselben Erfassung stillschweigend verschiedene
+         Gewichte. */
+      if(typeof homeView.noteWeight === "number") gewichtSetzen(sub, vorhanden, homeView.noteWeight);
+    }
     vorhanden.ts = Date.now();
   } else {
     if(vorhanden) sub.entries = sub.entries.filter(e => e.id !== vorhanden.id);
+    const v = schnellVorlage(vorhanden);
     const eintrag = { id: uid(), studentId: studentId, type: "note", cat: cat,
       value: daten.value,
-      basis: daten.basis || null, thema: thema, arbeit: homeView.schnellArbeit || null,
-      ts: Date.now(), sem: semesterFuerNeu(), date: today(),
+      basis: daten.basis || null, thema: v.thema, arbeit: v.arbeit,
+      ts: Date.now(), sem: v.sem, date: v.date,
       label: catLabel(sub, cat) };
     gewichtSetzen(sub, eintrag, homeView.noteWeight);
     if(typeof daten.pct === "number") eintrag.pct = daten.pct;
     if(typeof daten.fz === "number") eintrag.fz = daten.fz;
     sub.entries.push(eintrag);
     homeView.schnellIds[studentId] = eintrag.id;
+    schnellEinsortieren(sub);
   }
   if(leise) return;
   save();
@@ -4639,12 +5109,22 @@ function schnellFehlt(studentId){
   const cat = homeView.newNoteCat;
   if(!sub) return;
   const bekannt = homeView.schnellIds[studentId];
+  const alt = bekannt ? sub.entries.find(e => e.id === bekannt) : null;
+  /* In einer Korrektur ist das eine bestehende Note. Die geht nicht mit
+     einem einzigen Tipp daneben verloren. */
+  if(homeView.schnellKorrektur && alt && alt.type === "note"){
+    const st = getStudent(getClass(homeView.classId), studentId);
+    if(!confirm("Die Note " + alt.value + " von " + (st ? st.name : "dieser Person")
+      + " durch „nicht mitgeschrieben“ ersetzen?")) return;
+  }
   if(bekannt) sub.entries = sub.entries.filter(e => e.id !== bekannt);
+  const v = schnellVorlage(alt);
   const eintrag = { id: uid(), studentId: studentId, type: "fehlt", cat: cat,
-    thema: homeView.schnellThema || null, arbeit: homeView.schnellArbeit || null,
-    ts: Date.now(), sem: semesterFuerNeu(), date: today() };
+    thema: v.thema, arbeit: v.arbeit,
+    ts: Date.now(), sem: v.sem, date: v.date };
   sub.entries.push(eintrag);
   homeView.schnellIds[studentId] = eintrag.id;
+  schnellEinsortieren(sub);
   save();
   render();
 }
@@ -4676,9 +5156,10 @@ function schnellStufe(studentId, index, leise){
     const eintrag = { id: uid(), studentId: studentId, type: "stufe", cat: cat,
       stufe: index, label: stufenListe(sub, cat)[index],
       thema: homeView.schnellThema || null, ts: Date.now(),
-      sem: semesterFuerNeu(), date: today() };
+      sem: schnellSem(), date: schnellDatum() };
     sub.entries.push(eintrag);
     homeView.schnellIds[studentId] = eintrag.id;
+    schnellEinsortieren(sub);
   }
   if(leise) return;
   save();
@@ -4721,6 +5202,12 @@ function setArbeitNr(n){
 /* Nummer für die ganze Runde in der Sammelerfassung. Bereits gesetzte
    Zeilen ziehen mit, damit man sie auch nachträglich richtigstellen kann. */
 function setSchnellArbeit(n){
+  if(homeView.schnellKorrektur) return;
+  /* Ist in dieser Runde noch nichts eingetragen und gibt es die gewählte
+     Arbeit schon, dann will man sie ansehen oder ausbessern. Bisher legte
+     jede Eingabe dort einen zweiten Eintrag für dieselbe Person an. */
+  if(!Object.keys(homeView.schnellIds || {}).length
+     && schnellLaden(homeView.newNoteCat, semesterFuerNeu(), n)){ render(); return; }
   homeView.schnellArbeit = n;
   const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
   if(sub){
@@ -4750,6 +5237,10 @@ function schnellLoeschen(studentId){
   const sub = getSubject(getClass(homeView.classId), homeView.subjectId);
   const id = homeView.schnellIds[studentId];
   if(!sub || !id) return;
+  if(homeView.schnellKorrektur){
+    const st = getStudent(getClass(homeView.classId), studentId);
+    if(!confirm("Den Eintrag von " + (st ? st.name : "dieser Person") + " in dieser Arbeit wirklich löschen?")){ render(); return; }
+  }
   sub.entries = sub.entries.filter(e => e.id !== id);
   delete homeView.schnellIds[studentId];
   save();
@@ -4798,14 +5289,15 @@ function renderSchnell(){
       }).join("") + `</div>`;
 
     } else if(punkteModus){
-      const wert = (eintrag && eintrag.type === "note" && eintrag.basis)
-        ? (eintrag.basis.split(" von ")[0] || "") : "";
+      const pb = (eintrag && eintrag.type === "note") ? punkteAusBasis(eintrag.basis) : null;
+      const wert = (pb && gewichtGleich(pb.max, homeView.schnellMax)) ? fmtPct(pb.punkte) : "";
       const anzeige = fehlt
         ? `<span class="schnell-ergebnis" style="color:#4A4943;">&ndash;</span>`
         : (eintrag && eintrag.type === "note"
             ? `<span class="schnell-ergebnis" style="color:${gradeColor(eintrag.value).fg};">${eintrag.value}</span>`
             : `<span class="schnell-ergebnis" style="color:#999;">&middot;</span>`);
-      felder = `<input type="text" class="schnell-punkte" inputmode="decimal" value="${esc(wert)}"
+      felder = `<input type="text" class="schnell-punkte" inputmode="decimal" value="${esc(wert)}" data-sid="${s.id}"
+                       aria-label="Punkte ${esc(s.name)}" autocomplete="off"
                        placeholder="Pkt" onchange="schnellPunkte('${s.id}', this.value)">${anzeige}`;
 
     } else {
@@ -4899,17 +5391,39 @@ function renderSchnell(){
       ${homeView.zeigeGewicht ? `<input type="range" min="0" max="3" step="0.1" value="${homeView.noteWeight}" oninput="updateNoteWeight(this.value)" onchange="gewichtFuerAlle()" style="margin-top:6px;">` : ""}
     </div>`;
 
+  const korr = homeView.schnellKorrektur;
+  const datum = schnellDatum();
+  const semDatum = semesterAusDatum(datum);
+  const datumHinweis = (korr
+      ? "Der Tag, an dem geschrieben wurde. Eine Änderung gilt für alle Einträge mit diesem Tag."
+      : "Der Tag, an dem geschrieben wurde, nicht der Tag des Eintragens. Gilt für alle Zeilen dieser Runde.")
+    + (semDatum !== schnellSem()
+      ? " <b>Achtung:</b> Der " + esc(datum) + " liegt im " + semDatum + ". Semester, eingetragen wird im "
+        + schnellSem() + ". Semester. Zum Wechseln den Zeitraum auf der Klassenseite umstellen."
+      : "");
+  const korrekturBox = !korr ? "" : `
+    <div class="banner korrektur">
+      <div class="txt"><b>Du bearbeitest die ${korr.nr}. ${esc(catLabel(sub, cat))}, die schon eingetragen ist.</b>
+        ${homeView.schnellMax
+          ? "Punkte in der Zeile ausbessern, die Note wird neu berechnet und sofort gespeichert."
+          : "Note in der Zeile antippen, sie wird sofort gespeichert. Für Punkte oben „Punkte gesamt“ eintragen."}
+        ${korr.doppelt ? "<br>Für " + korr.doppelt + (korr.doppelt === 1 ? " Person gibt" : " Personen gibt")
+          + " es mehr als einen Eintrag in dieser Arbeit. Hier steht der jüngste; die übrigen stehen bei der Person und zählen mit." : ""}</div>
+      <button onclick="goSchnell()">Neue Runde beginnen</button>
+    </div>`;
+
   return `
     <div class="header" style="${headerStyle("home")}">
       <span class="back" style="${titleStyle("home")}" onclick="goHome('roster')">&lsaquo;</span>
-      <span class="title" style="${titleStyle("home")}">Ganze Klasse bewerten</span>
-      <div class="sub">${esc(cls.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[semesterFuerNeu()]}</div>
+      <span class="title" style="${titleStyle("home")}">${korr ? korr.nr + ". " + esc(catLabel(sub, cat)) + " korrigieren" : "Ganze Klasse bewerten"}</span>
+      <div class="sub">${esc(cls.name)} &middot; ${esc(sub.fach)} &middot; ${SEM_LABELS[schnellSem()]}</div>
     </div>
-    <div class="chips">${chips}</div>
+    ${korr ? korrekturBox : `<div class="chips">${chips}</div>
     <div class="helptext" style="color:${col.fg};">${stufenModus
       ? catLabel(sub, cat) + ": ein Tipp je Zeile, wird sofort gespeichert. " + zaehltText(sub, cat) + "."
       : "Ein Tipp je Zeile genügt, die Note wird sofort gespeichert. Nochmal tippen bessert aus."}</div>
-    ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.schnellArbeit, "setSchnellArbeit") : ""}
+    ${nummeriert(sub, cat) ? arbeitWahl(sub, cat, homeView.schnellArbeit, "setSchnellArbeit") : ""}`}
+    ${datumZeile(datum, "setSchnellDatum", datumHinweis)}
     ${themaZeile}
     ${sammelZeile}
     ${gewichtZeile}
@@ -4918,7 +5432,7 @@ function renderSchnell(){
     <div class="footer">
       <button onclick="goHome('roster')">Fertig${gesetzt ? " (" + gesetzt + " eingetragen)" : ""}</button>
       ${(gesetzt && nummeriert(sub, cat) && homeView.schnellArbeit)
-        ? `<button class="gross" onclick="goArbeit('${cls.id}','${sub.id}','${cat}','${semesterFuerNeu()}|${homeView.schnellArbeit}')">Auswertung dieser ${esc(catLabel(sub, cat))} ansehen</button>`
+        ? `<button class="gross" onclick="goArbeit('${cls.id}','${sub.id}','${cat}','${schnellSem()}|${homeView.schnellArbeit}')">Auswertung dieser ${esc(catLabel(sub, cat))} ansehen</button>`
         : ""}
     </div>
   `;
@@ -4946,7 +5460,7 @@ function createFehlt(){
   if(!sub) return;
   sub.entries.push({ id: uid(), studentId: homeView.studentId, type: "fehlt", cat: cat,
     thema: themaLesen("themaInput"), arbeit: homeView.arbeitNr || null,
-    ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+    ts: Date.now(), sem: semesterFuerNeu(), date: neuDatum() });
   homeView.thema = null;
   save();
   goHome("student");
@@ -4960,7 +5474,7 @@ function createStufe(index){
   if(!sub || !istStufenCat(sub, cat)) return;
   sub.entries.push({ id: uid(), studentId: homeView.studentId, type: "stufe", cat: cat,
     stufe: index, label: stufenListe(sub, cat)[index], thema: themaLesen("themaInput"),
-    ts: Date.now(), sem: semesterFuerNeu(), date: today() });
+    ts: Date.now(), sem: semesterFuerNeu(), date: neuDatum() });
   homeView.thema = null;
   save();
   goHome("student");
@@ -4981,7 +5495,7 @@ function createNote(ev){
     const kc = { id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       achieved: angehakt, total: gesamt, value: gradeFromRatio(gesamt > 0 ? angehakt.length / gesamt : 0),
       thema: thema, arbeit: homeView.arbeitNr || null,
-      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) };
+      ts: Date.now(), sem: semesterFuerNeu(), date: neuDatum(), label: catLabel(sub,cat) };
     gewichtSetzen(sub, kc, w);
     sub.entries.push(kc);
   } else {
@@ -4989,7 +5503,7 @@ function createNote(ev){
     const eintrag = { id: uid(), studentId: homeView.studentId, type:"note", cat: cat,
       value: homeView.newNoteGrade, basis: homeView.noteBasis || null, thema: thema,
       arbeit: homeView.arbeitNr || null,
-      ts: Date.now(), sem: semesterFuerNeu(), date: today(), label: catLabel(sub,cat) };
+      ts: Date.now(), sem: semesterFuerNeu(), date: neuDatum(), label: catLabel(sub,cat) };
     if(typeof homeView.notePct === "number") eintrag.pct = homeView.notePct;
     if(typeof homeView.noteFz === "number") eintrag.fz = homeView.noteFz;
     gewichtSetzen(sub, eintrag, w);
@@ -6432,7 +6946,8 @@ function ansichtenZuruecksetzen(){
   homeView = { screen:"list", classId:null, subjectId:null, studentId:null, noteFilter:"alle", entryType:null,
                newNoteCat:"schularbeit", newNoteGrade:null, noteBasis:null, noteWeight:1,
                zeigeGewicht:false, zeigeSchluessel:false, zeigeEintraege:false, schnellIds:{}, schnellMax:null,
-                 thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null };
+                 thema:null, schnellThema:null, arbeitNr:null, schnellArbeit:null,
+                 schnellDatum:null, schnellKorrektur:null, noteDatum:null };
   statView = { screen:"list", classId:null, subjectId:null };
   settingsView = { screen:"list", classId:null, subjectId:null, newCatColor:null, stufenOffen:null, schluesselOffen:null };
 }
@@ -7398,6 +7913,9 @@ function renderStat(){
 
 /* Eine einzelne Arbeit für sich, mit allem was dazugehört. */
 function goArbeit(classId, subjectId, cat, kennung){
+  /* Der Knopf "Auswertung ansehen" steht auch in der Klassenbewertung im
+     Reiter Home. Ohne den Reiterwechsel blieb er dort ohne Wirkung. */
+  tab = "statistik";
   statView.screen = "arbeit";
   statView.classId = classId;
   statView.subjectId = subjectId;
@@ -7477,6 +7995,7 @@ function renderStatArbeit(){
     ${zeilen || '<div class="helptext">Keine Noten.</div>'}
     ${fehlZeilen}
     <div class="footer">
+      ${a.nr ? `<button class="gross" onclick="schnellKorrigieren('${cls.id}','${sub.id}','${statView.arbeitCat}',${a.sem},${a.nr})">Punkte, Noten oder Datum ausbessern</button>` : ""}
       <button onclick="printArbeit('${cls.id}','${sub.id}','${statView.arbeitCat}','${arbeitKennung(a)}')">Diese ${esc(label)} drucken</button>
       <button class="ghost" onclick="goStat('detail')">zurück zur Übersicht</button>
     </div>
@@ -7997,7 +8516,7 @@ function renderSettingsList(){
     <div class="label" style="border-top:2px solid #000;">DARSTELLUNG</div>
     <div class="helptext">Schriftgröße für dieses Gerät. Am Handy meist klein oder normal, am iPad und am Rechner oft groß angenehmer.</div>
     <div class="chips">${schriftChips}</div>
-    <div class="helptext">Erscheinungsbild. <b>Automatisch</b> nimmt am Handy und am iPad im Hochformat <i>Freundlich</i>, am Rechner und am iPad im Querformat die <i>Tafel-Leiste</i> mit der Seitenleiste links. <b>Amtlich-klar</b> ist schwarz-weiß und dicht, bei direkter Sonne am besten lesbar. Ändert nur das Aussehen, keine Note.</div>
+    <div class="helptext">Erscheinungsbild. <b>Automatisch</b> nimmt am Handy und am iPad im Hochformat <i>Freundlich</i>, am Rechner und am iPad im Querformat die <i>Tafel-Leiste</i> mit der Seitenleiste links. Ist das Fenster am Rechner sehr schmal, gilt auch dort <i>Freundlich</i>. <b>Amtlich-klar</b> ist schwarz-weiß und dicht, bei direkter Sonne am besten lesbar. Ändert nur das Aussehen, keine Note.</div>
     <div class="chips">${chipReihe([["auto","Automatisch"],["freundlich","Freundlich"],["tafel","Tafel-Leiste"],["amtlich","Amtlich-klar"]], stilWahl(), "setStil")}</div>
     <div class="helptext">Schriftgröße, Erscheinungsbild und Gerätename gelten nur für dieses Gerät. Sie bleiben auch beim Übertragen und beim Einspielen einer Sicherung erhalten.</div>
 
@@ -8116,12 +8635,17 @@ function schriftAnwenden(){
 }
 
 /* Erscheinungsbild. Ändert nur das Aussehen, nie eine Note oder Rechnung. */
-const STIL_THEME_FARBE = { freundlich:"#F2F3EF", amtlich:"#ffffff" };
+const STIL_THEME_FARBE = { freundlich:"#E7EEF9", amtlich:"#ffffff" };
 
 /* „Automatisch": schmale Bildschirme bekommen Freundlich, breite die
    Tafel-Leiste. Die Tafel-Leiste braucht Platz; auf einem Handy wird sie
    deshalb auch bei ausdrücklicher Wahl zu Freundlich. */
-const BREIT = window.matchMedia ? window.matchMedia("(min-width: 900px)") : null;
+/* Seit 17.9.8 auch ein Fenster im Querformat ab 760 px, damit ein Laptop mit
+   vergrößerter Anzeige nicht unbemerkt ins Handy-Layout fällt. Die Mindesthöhe
+   hält ein quer gehaltenes Handy draußen. */
+const BREIT = window.matchMedia
+  ? window.matchMedia("(min-width: 900px), (min-width: 760px) and (orientation: landscape) and (min-height: 500px)")
+  : null;
 const SCHMAL = window.matchMedia ? window.matchMedia("(max-width: 699px)") : null;
 
 function stilWahl(){
