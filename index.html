@@ -522,6 +522,193 @@
   }
   body.stil-tafel #frame button.tabbtn.active{ border-color:#F4F1E8; box-shadow:0 14px 26px -16px rgba(0,0,0,0.8); }
 
+  /* ---------- PROGNOSE (seit 17.11) ---------- */
+  .prog{ display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; padding:4px 12px 8px; }
+  .prog-feld{ border:1px solid #000000; text-align:center; padding:8px 2px 6px; min-width:0; background:#FFFFFF; }
+  .prog-sa{ font-size:10px; line-height:1.2; }
+  .prog-note{ font-size:30px; font-weight:800; line-height:1.15; font-variant-numeric:tabular-nums; }
+  .prog-ws{ font-size:11px; }
+  .prog-feld.besser{ background:#EAF3E7; }
+  .prog-feld.schlechter{ background:#FBEAEA; }
+  .prog-satz{ padding:6px 16px 4px; font-size:15px; line-height:1.4; }
+  body.stil-freundlich #frame .prog-feld{ border:1px solid var(--kante); border-radius:16px; background:var(--glas-fest); box-shadow:var(--schatten-klein); }
+  body.stil-freundlich #frame .prog-satz{ padding:6px 20px 4px; }
+
+  /* ---------- FARBWELT „SCHIEFER“ (seit 17.11) ----------
+     Dunkler, graugrüner Grund, cremeweiße Schrift, ein einziger weicher
+     Akzent: Salbei oder Terrakotta. Das Glas bleibt eine feine, helle Fläche
+     mit dünner Kante. Liegt über Freundlich und Tafel-Leiste, ändert nur
+     Farben, nie eine Rechnung. Reines CSS, nichts wird nachgeladen. */
+  body.farbe-dunkel{
+    --tinte:#F5EFE2; --tinte2:#C9D3D4; --akzent:#A9CDA4; --akzent-text:#1E3140;
+    --glas:rgba(255,255,255,0.10); --glas-fest:rgba(255,255,255,0.12);
+    --kante:rgba(255,255,255,0.20); --linie:rgba(255,255,255,0.14); --linie-fest:rgba(255,255,255,0.26);
+    --tafel:#22394A;
+    --unscharf:blur(20px) saturate(125%);
+    --schatten:0 12px 30px -14px rgba(8,18,26,0.55);
+    --schatten-klein:0 6px 16px -10px rgba(8,18,26,0.5);
+    --red:#FFB3A8; --red-bg:rgba(255,120,100,0.16);
+    --green:#B5E0AE; --green-bg:rgba(150,210,140,0.16);
+    --blue:#B7D3F0; --blue-bg:rgba(150,190,235,0.16);
+    background:#2A4150; color:var(--tinte); color-scheme:dark;
+  }
+  body.farbe-terrakotta{ --akzent:#E8A98B; }
+  body.farbe-dunkel.stil-freundlich::before{
+    background:
+      radial-gradient(70% 50% at 12% 0%, #4F7186 0%, rgba(79,113,134,0) 70%),
+      radial-gradient(60% 46% at 100% 100%, #34505F 0%, rgba(52,80,95,0) 70%),
+      #2A4150;
+  }
+  body.farbe-dunkel.stil-freundlich:not(.stil-tafel) #frame{ background:rgba(255,255,255,0.05); }
+  body.farbe-dunkel #frame .header::before{ background:rgba(42,65,80,0.78); }
+  body.farbe-dunkel #frame .header .title,
+  body.farbe-dunkel #frame .back{ color:var(--akzent) !important; }
+  body.farbe-dunkel #frame .helptext,
+  body.farbe-dunkel #frame .sub,
+  body.farbe-dunkel #frame .row .sub{ color:var(--tinte2); }
+  body.farbe-dunkel #frame .label{ color:var(--akzent); }
+  body.farbe-dunkel #frame .field-label{ color:var(--tinte2); }
+  body.farbe-dunkel #frame [style*="solid #000"]:not(.label){ border-color:var(--linie-fest) !important; }
+  body.farbe-dunkel #frame .label[style*="solid #000"]{ border-top-color:var(--linie-fest) !important; }
+  body.farbe-dunkel #frame .row,
+  body.farbe-dunkel #frame .entry,
+  body.farbe-dunkel #frame .slider-row,
+  body.farbe-dunkel #frame .comp-item,
+  body.farbe-dunkel #frame .schnell-zeile{ color:var(--tinte); }
+  body.farbe-dunkel #frame .row .name,
+  body.farbe-dunkel #frame .row .chev{ color:var(--tinte); }
+  body.farbe-dunkel #frame .assign-bar{ background:rgba(255,255,255,0.08); }
+  body.farbe-dunkel #frame .stats,
+  body.farbe-dunkel #frame .zuletzt,
+  body.farbe-dunkel #frame .chart,
+  body.farbe-dunkel #frame button.kachel{ color:var(--tinte); }
+  body.farbe-dunkel #frame button.kachel.neu{ background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.3); color:var(--tinte2); }
+  body.farbe-dunkel #frame .kachel-info,
+  body.farbe-dunkel #frame .zuletzt-sub{ color:var(--tinte2); }
+  body.farbe-dunkel #frame .kachel-fach,
+  body.farbe-dunkel #frame .zuletzt-name{ color:var(--tinte); }
+  body.farbe-dunkel #frame .stat .lbl{ color:var(--tinte2); }
+  body.farbe-dunkel #frame .stat .val{ color:var(--tinte) !important; }
+  body.farbe-dunkel #frame .stat:first-child{ border-right-color:var(--linie); }
+  body.farbe-dunkel #frame .stats .stat{ border-right-color:var(--linie) !important; }
+  body.farbe-dunkel .zuletzt-zeile{ border-bottom-color:var(--linie); }
+
+  /* Knöpfe, Felder, Wählbares */
+  body.farbe-dunkel #frame button{
+    background:var(--glas-fest); color:var(--tinte); border-color:var(--linie-fest);
+    box-shadow:0 1px 0 rgba(255,255,255,0.16) inset, 0 4px 10px -8px rgba(8,18,26,0.6);
+  }
+  body.farbe-dunkel #frame button.ghost{ background:none; color:var(--akzent); box-shadow:none; }
+  body.farbe-dunkel #frame button.ghost.small{ color:var(--tinte2); }
+  body.farbe-dunkel #frame button.green{ background:var(--green-bg); border-color:var(--green); color:var(--green); }
+  body.farbe-dunkel #frame button.red{ background:var(--red-bg); border-color:var(--red); color:var(--red); }
+  body.farbe-dunkel #frame button.gross:not(.red):not(.green){
+    background:var(--akzent); color:var(--akzent-text); border:none;
+    box-shadow:0 1px 0 rgba(255,255,255,0.4) inset, 0 12px 22px -12px rgba(8,18,26,0.7);
+  }
+  body.farbe-dunkel #frame button:disabled{ opacity:0.45; }
+  body.farbe-dunkel #frame :is(button, .chip, .row, .kachel, .grade-tile, .schnell-tile, .schnell-stufe, .stufe-btn, .fehlt-btn, input, select):focus-visible{
+    outline:3px solid var(--akzent); outline-offset:2px;
+  }
+  body.farbe-dunkel #frame input[type=text],
+  body.farbe-dunkel #frame input[type=number],
+  body.farbe-dunkel #frame input[type=date],
+  body.farbe-dunkel #frame input[type=search],
+  body.farbe-dunkel #frame select,
+  body.farbe-dunkel #frame textarea{
+    background:rgba(255,255,255,0.10); color:var(--tinte); border:1px solid var(--linie-fest);
+    box-shadow:none; color-scheme:dark;
+  }
+  body.farbe-dunkel #frame input::placeholder, body.farbe-dunkel #frame textarea::placeholder{ color:rgba(201,211,212,0.7); }
+  body.farbe-dunkel #frame :is(input[type=text], input[type=number], input[type=date], select):focus{
+    border-color:var(--akzent); box-shadow:0 0 0 4px rgba(169,205,164,0.22);
+  }
+  body.farbe-terrakotta #frame :is(input[type=text], input[type=number], input[type=date], select):focus{
+    box-shadow:0 0 0 4px rgba(232,169,139,0.24);
+  }
+  body.farbe-dunkel #frame .chip,
+  body.farbe-dunkel #frame .chip[style]{
+    background:rgba(255,255,255,0.10) !important; color:var(--tinte) !important; border-color:var(--linie-fest) !important;
+  }
+  body.farbe-dunkel #frame .chip[style*="background:#000"]{
+    background:var(--akzent) !important; color:var(--akzent-text) !important; border-color:var(--akzent) !important;
+  }
+  body.farbe-dunkel #frame .chip.datum-kurz{ background:rgba(255,255,255,0.10) !important; color:var(--tinte) !important; border-color:var(--linie-fest) !important; }
+  body.farbe-dunkel #frame .chip.datum-kurz.an{ background:var(--akzent) !important; color:var(--akzent-text) !important; border-color:var(--akzent) !important; }
+  body.farbe-dunkel #frame .banner{ background:rgba(255,255,255,0.10); border-color:var(--linie-fest); color:var(--tinte); }
+  body.farbe-dunkel #frame .banner.korrektur{ background:rgba(169,196,230,0.14); border-color:rgba(169,196,230,0.4); }
+  body.farbe-dunkel #frame .banner .txt{ color:var(--tinte); }
+
+  /* Fest eingetragene helle Flächen und dunkle Schriften umfärben (Schiefer) */
+  body.farbe-dunkel #frame [style*="background:#FBECEA"], body.farbe-dunkel #frame [style*="background:#FBEAEA"],
+  body.farbe-dunkel #frame [style*="background:#FAEEEE"], body.farbe-dunkel #frame [style*="background:var(--red-bg)"]{ background:rgba(255,120,100,0.16) !important; }
+  body.farbe-dunkel #frame [style*="background:#EDF6EC"], body.farbe-dunkel #frame [style*="background:#EAF3E7"],
+  body.farbe-dunkel #frame [style*="background:#EDF5EB"]{ background:rgba(150,210,140,0.16) !important; }
+  body.farbe-dunkel #frame [style*="background:#FAF3E8"], body.farbe-dunkel #frame [style*="background:#FFF6DA"],
+  body.farbe-dunkel #frame [style*="background:#F1EFE8"], body.farbe-dunkel #frame [style*="background:#F7F4E8"]{ background:rgba(240,205,139,0.15) !important; }
+  body.farbe-dunkel #frame [style*="background:#E6F1FB"]{ background:rgba(150,190,235,0.16) !important; }
+  body.farbe-dunkel #frame [style*="background:#F4F3F0"]{ background:rgba(255,255,255,0.08) !important; }
+  body.farbe-dunkel #frame [style*="color:#8E1C16"], body.farbe-dunkel #frame [style*="color:#B3241C"],
+  body.farbe-dunkel #frame [style*="color:#A8241C"]{ color:#FFB3A8 !important; }
+  body.farbe-dunkel #frame [style*="color:#215E24"], body.farbe-dunkel #frame [style*="color:#3B6E2E"],
+  body.farbe-dunkel #frame [style*="color:#2A6B2E"]{ color:#B5E0AE !important; }
+  body.farbe-dunkel #frame [style*="color:#96650F"], body.farbe-dunkel #frame [style*="color:#7A5209"],
+  body.farbe-dunkel #frame [style*="color:#7A6B10"]{ color:#F0CD8B !important; }
+  body.farbe-dunkel #frame [style*="color:#185FA5"], body.farbe-dunkel #frame [style*="color:#1F4E8C"]{ color:#B7D3F0 !important; }
+  body.farbe-dunkel #frame [style*="color:#565C63"], body.farbe-dunkel #frame [style*="color:#4A4943"],
+  body.farbe-dunkel #frame [style*="color:#3F454B"], body.farbe-dunkel #frame [style*="color:#39424E"],
+  body.farbe-dunkel #frame [style*="color:#999"]{ color:var(--tinte2) !important; }
+  body.farbe-dunkel #frame [style*="color:#000"]:not([style*="background"]),
+  body.farbe-dunkel #frame [style*="color:#1C1F22"]:not([style*="background"]){ color:var(--tinte) !important; }
+  body.farbe-dunkel #frame .badge[style*="border-color"]{ background:rgba(255,255,255,0.08) !important; }
+  body.farbe-dunkel #frame .badge{ border-color:var(--linie-fest); }
+  body.farbe-dunkel #frame button[style*="background:#fff"], body.farbe-dunkel #frame button[style*="background:#FFF"]{ background:var(--glas-fest) !important; color:var(--tinte) !important; }
+  body.farbe-dunkel #frame [style*="border-left:"][style*="solid #B3241C"]{ border-left-color:#FF9B8C !important; }
+
+  /* Diagramme (SVG) auf dunklem Grund */
+  body.farbe-dunkel #frame svg text[fill="#666666"], body.farbe-dunkel #frame svg text[fill="#555555"],
+  body.farbe-dunkel #frame svg text[fill="#4A4943"], body.farbe-dunkel #frame svg text[fill="#000000"]{ fill:var(--tinte2); }
+  body.farbe-dunkel #frame svg line[stroke="#cccccc"], body.farbe-dunkel #frame svg line[stroke="#dddddd"],
+  body.farbe-dunkel #frame svg line[stroke="#DDDDDD"]{ stroke:rgba(255,255,255,0.22); }
+  body.farbe-dunkel #frame svg line[stroke="#000000"], body.farbe-dunkel #frame svg polyline[stroke="#000000"]{ stroke:var(--tinte); }
+  body.farbe-dunkel #frame svg rect[fill="#E9E7E1"]{ fill:rgba(255,255,255,0.14); stroke:var(--linie-fest); }
+  body.farbe-dunkel #frame svg text[fill="#000000"]{ fill:var(--tinte); }
+  body.farbe-dunkel #frame svg circle[stroke="#FFFFFF"]{ stroke:#2A4150; }
+
+  /* Reiter: nur Symbole */
+  body.stil-freundlich #frame button.tabbtn span{
+    position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+  }
+  body.stil-freundlich #frame button.tabbtn{ min-height:64px; }
+  body.stil-freundlich #frame button.tabbtn svg{ width:30px; height:30px; }
+  body.stil-tafel #frame button.tabbtn{ min-height:84px; }
+  body.stil-tafel #frame button.tabbtn svg{ width:38px; height:38px; }
+  body.farbe-dunkel:not(.stil-tafel) #tabbar{
+    background:rgba(34,57,74,0.66); border-color:var(--kante);
+    box-shadow:0 1px 0 rgba(255,255,255,0.18) inset, 0 16px 34px -14px rgba(8,18,26,0.7);
+  }
+  body.farbe-dunkel #frame button.tabbtn{ color:var(--tinte2) !important; background:transparent; box-shadow:none; }
+  body.farbe-dunkel #frame button.tabbtn.active{
+    color:var(--akzent) !important; background:rgba(255,255,255,0.14) !important;
+    border:1px solid rgba(255,255,255,0.28) !important; box-shadow:0 1px 0 rgba(255,255,255,0.28) inset !important;
+  }
+  body.farbe-dunkel #frame button.tabbtn.active::after{ display:none; }
+  body.farbe-dunkel.stil-tafel #tabbar{
+    background:linear-gradient(180deg, rgba(34,57,74,0.88) 0%, rgba(28,48,62,0.92) 100%);
+    border-right:1px solid var(--kante); box-shadow:10px 0 40px -20px rgba(8,18,26,0.6);
+    -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px);
+  }
+  body.farbe-dunkel.stil-tafel #frame button.tabbtn{ border:1px solid transparent; }
+  body.farbe-dunkel .rail-marke{ color:var(--tinte); border-bottom-color:rgba(255,255,255,0.28); }
+  body.farbe-dunkel .rail-fuss{ color:var(--tinte2); }
+
+  /* Prognose auf Schiefer */
+  body.farbe-dunkel #frame .prog-feld{ background:rgba(255,255,255,0.08); color:var(--tinte); }
+  body.farbe-dunkel #frame .prog-feld.besser{ background:rgba(255,255,255,0.14); border-color:var(--akzent); }
+  body.farbe-dunkel #frame .prog-feld.besser .prog-note{ color:var(--akzent) !important; }
+  body.farbe-dunkel #frame .prog-feld.schlechter{ background:rgba(255,255,255,0.05); }
+  body.farbe-dunkel #frame .prog-satz b{ color:var(--akzent); font-weight:700; }
+
   /* Ohne Unschärfe (alte Browser) oder auf Wunsch des Geräts: feste Flächen */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
     body.stil-freundlich{ --glas:rgba(255,255,255,0.94); }
@@ -619,7 +806,7 @@
 
 /* Die Fassung. Bitte hochzählen, wenn du etwas geändert hast. Die App legt
    dann beim nächsten Start von selbst eine Sicherheitskopie an. */
-const APP_FASSUNG = "17.10";
+const APP_FASSUNG = "17.11";
 
 /* ---------- AUSGABE ----------
    Dieselbe App gibt es in zwei Ausgaben aus derselben Datei. Zwei getrennte
@@ -1883,7 +2070,7 @@ function normaliseClass(cls){
 /* Grundeinstellungen der App, unabhängig von den Klassen */
 function defaultSettings(){
   return { lehrkraft: "", schuljahr: "", lastBackup: null, intervallTage: 7, geraet: "", semester: semesterHeute(),
-           schrift: "normal", stil: "auto", ordnung: "vorname", jahresGewicht: "gleich" };
+           schrift: "normal", stil: "auto", farbe: "salbei", ordnung: "vorname", jahresGewicht: "gleich" };
 }
 
 /* ---------- REIHENFOLGE DER KLASSENLISTE ----------
@@ -1984,6 +2171,7 @@ function normaliseSettings(s){
     semester: (s.semester === 1 || s.semester === 2 || s.semester === "alle") ? s.semester : semesterHeute(),
     schrift: (s.schrift === "klein" || s.schrift === "gross") ? s.schrift : "normal",
     stil: (s.stil === "freundlich" || s.stil === "tafel" || s.stil === "amtlich") ? s.stil : "auto",
+    farbe: (s.farbe === "terrakotta" || s.farbe === "hell") ? s.farbe : "salbei",
     /* Diese drei sind lange durchgefallen: sie standen in den Vorgaben und in
        den Knöpfen, aber nicht in dieser Liste. Damit waren sie nach jedem
        Neustart wieder auf der Vorgabe, und die Jahresnote rechnete plötzlich
@@ -2589,6 +2777,13 @@ function tendenz(sub, studentId, sem){
 /* Gedeckte Farbe für die große Tendenzkachel. Bewusst nicht grell:
    das Feld ist groß, ein kräftiger Ton würde den ganzen Bildschirm dominieren. */
 function tendenzFarbe(v){
+  if(document.body && document.body.classList.contains("farbe-dunkel")){
+    if(v === null) return { fg:"#C9D3D4", bg:"rgba(255,255,255,0.08)" };
+    if(v < 2.5) return { fg:"#B5E0AE", bg:"rgba(150,210,140,0.14)" };
+    if(v < 3.5) return { fg:"#E6DA9A", bg:"rgba(230,218,154,0.12)" };
+    if(v < 4.5) return { fg:"#F0CD8B", bg:"rgba(240,205,139,0.14)" };
+    return { fg:"#FFB3A8", bg:"rgba(255,120,100,0.16)" };
+  }
   if(v === null) return { fg:"#4A4943", bg:"#F4F3F0" };
   if(v < 2.5) return { fg:"#2A6B2E", bg:"#EDF5EB" };
   if(v < 3.5) return { fg:"#7A6B10", bg:"#F7F4E8" };
@@ -2787,6 +2982,55 @@ function ausblick(cls, sub, studentId, sem){
     annahme: teile,
     zeitraum: z
   };
+}
+
+/* ---------- PROGNOSE: NÄCHSTE SCHULARBEIT (seit 17.11) ----------
+   Ersetzt den früheren Ausblick. Für jede mögliche Note 1 bis 5 wird eine
+   Schularbeit dazugedacht und der Rechenwert neu gebildet. Die Note ist wie
+   überall in der App der gerundete Rechenwert. */
+const NOTEN_NAMEN_ER = ["Einser", "Zweier", "Dreier", "Vierer", "F\u00fcnfer"];
+const NOTEN_NAMEN_ZAHL = ["Eins", "Zwei", "Drei", "Vier", "F\u00fcnf"];
+
+function naechsteSchularbeit(sub, studentId, sem){
+  const z = (sem === undefined) ? aktivesSemester() : sem;
+  if(abschlussNote(sub, studentId, z) !== null) return null;
+  const jetzt = rechenwert(sub, studentId, z);
+  if(jetzt === null) return null;
+  const cat = activeCats(sub).indexOf("schularbeit") !== -1 && catZaehlt(sub, "schularbeit")
+    ? "schularbeit" : null;
+  if(!cat) return null;
+  const jetztNote = Math.max(1, Math.min(5, Math.round(jetzt)));
+  const felder = [];
+  for(let g = 1; g <= 5; g++){
+    const e = { id: "__prog" + g, studentId: studentId, type: "note", cat: cat, value: g,
+      ts: Date.now(), sem: (z === "alle") ? semesterFuerNeu() : z, date: today() };
+    const kopie = Object.assign({}, sub, { entries: sub.entries.concat([e]) });
+    const wert = rechenwert(kopie, studentId, z);
+    if(wert === null) return null;
+    const note = Math.max(1, Math.min(5, Math.round(wert)));
+    felder.push({ sa: g, wert: wert, note: note, besser: note < jetztNote, schlechter: note > jetztNote });
+  }
+  /* Der Satz fürs Gespräch. */
+  const besserAb = felder.filter(f => f.besser).map(f => f.sa);
+  const schlechterAb = felder.filter(f => f.schlechter).map(f => f.sa);
+  const wort = n => "eine " + NOTEN_NAMEN_ZAHL[n - 1];
+  let satz;
+  if(!besserAb.length && !schlechterAb.length){
+    satz = "Die n\u00e4chste Schularbeit \u00e4ndert an der Gesamtnote nichts mehr: Sie bleibt bei <b>" + NOTEN_NAMEN_ZAHL[jetztNote - 1] + "</b>.";
+  } else {
+    const teile = [];
+    if(besserAb.length){
+      const ab = Math.max.apply(null, besserAb);
+      teile.push("Ab einem <b>" + NOTEN_NAMEN_ER[ab - 1] + "</b> in der n\u00e4chsten Schularbeit hast du insgesamt "
+        + wort(felder[ab - 1].note) + " statt einer " + NOTEN_NAMEN_ZAHL[jetztNote - 1] + ".");
+    }
+    if(schlechterAb.length){
+      const ab = Math.min.apply(null, schlechterAb);
+      teile.push("Bei einem <b>" + NOTEN_NAMEN_ER[ab - 1] + "</b> rutscht du auf " + wort(felder[ab - 1].note) + ".");
+    }
+    satz = teile.join(" ");
+  }
+  return { felder: felder, satz: satz, jetzt: jetzt, jetztNote: jetztNote };
 }
 
 /* Die eine Zeile, die vom alten Was-wäre-wenn übrig bleibt: was die
@@ -3260,6 +3504,11 @@ function fmtPct(n){
 function fmtW(n){ return "×" + Number(n).toFixed(1).replace(".", ","); }
 
 function gradeColor(v){
+  if(document.body && document.body.classList.contains("farbe-dunkel")){
+    if(v <= 2) return { fg:"#B5E0AE", bg:"rgba(150,210,140,0.16)" };
+    if(v >= 4) return { fg:"#FFB3A8", bg:"rgba(255,120,100,0.16)" };
+    return { fg:"#F5EFE2", bg:"rgba(255,255,255,0.08)" };
+  }
   if(v <= 2) return { fg:"#3B6E2E", bg:"#EAF3E7" };
   if(v >= 4) return { fg:"#B3241C", bg:"#FBEAEA" };
   return { fg:"#000000", bg:"#FFFFFF" };
@@ -3409,7 +3658,7 @@ function renderTabBar(){
         : (freundlich ? `background:${c.fg}; color:#fff;` : `border-top-color:${c.fg}; background:${c.bg}; color:${c.fg};`))
       : "";
     const symbol = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_SYMBOLE[k] || ""}</svg>`;
-    return `<button type="button" class="tabbtn ${active ? "active" : ""}" style="${style}" ${active ? 'aria-current="page"' : ""} onclick="switchTab('${k}')">${symbol}<span>${c.label}</span></button>`;
+    return `<button type="button" class="tabbtn ${active ? "active" : ""}" style="${style}" ${active ? 'aria-current="page"' : ""} aria-label="${c.label}" title="${c.label}" onclick="switchTab('${k}')">${symbol}<span>${c.label}</span></button>`;
   }).join("");
   bar.innerHTML = tafel
     ? `<div class="rail-marke">${esc(APP_NAME)}</div>${knoepfe}<div class="rail-fuss">${esc(state.settings.geraet || "")}</div>`
@@ -4034,76 +4283,27 @@ function renderStudent(){
       }).join("")}
     </div>`;
 
-  /* ---------- AUSBLICK ----------
-     Drei Zeilen, mehr nicht. Was im Gespräch mit dem Kind gesagt wird,
-     steht dort wörtlich. */
-  const aus = ausblick(cls, sub, s.id);
-  const ohneMit = ohneMitarbeit(sub, s.id);
-
-  /* Eine Zeile des Ausblicks. `bezug` ist der Wert, gegen den verglichen
-     wird: die erste Zeile gegen den heutigen Stand, die beiden anderen
-     gegen die erste. Ändert sich nichts, steht der Grund da statt einer
-     Null, sonst sähe die Zeile nach einem Fehler aus. */
-  const ausblickZeile = (titel, wert, bezug, bezugName, gleichText, fett) => {
-    if(wert === null) return "";
-    const g = gradeColor(Math.max(1, Math.min(5, Math.round(wert))));
-    const d = wert - bezug;
-    const zusatz = Math.abs(d) < 0.05
-      ? gleichText
-      : fmtB(Math.abs(d)) + (d < 0 ? " besser " : " schlechter ") + bezugName;
-    return `<div style="display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid #000;${
-        fett ? " background:" + g.bg + ";" : ""}">
-      <div style="flex:1; min-width:0;">
-        <div style="font-size:14px;${fett ? " font-weight:bold;" : ""}">${esc(titel)}</div>
-        <div class="sub">${esc(notenWort(wert))} &middot; ${esc(zusatz)}</div>
-      </div>
-      <span style="font-size:23px; font-weight:bold; color:${g.fg}; white-space:nowrap;">${fmtO(wert)}</span>
-    </div>`;
-  };
-
-  const was = aus ? (aus.beweglich.join(" und ") || "die Mitarbeit") : "";
-  const ausblickBlock = !aus ? "" : `
-    <div class="label" style="border-top:2px solid #000;">AUSBLICK BIS ${
-      aus.zeitraum === "alle" ? "ZUM SCHULJAHRESENDE" : "ZUM SEMESTERENDE"}</div>
-    ${ausblickZeile("So weiter wie bisher", aus.weiter, aus.jetzt, "als jetzt", "bleibt wie jetzt", true)}
-    ${aus.besser === null ? "" : ausblickZeile("Wenn die " + was + " besser wird",
-        aus.besser, aus.weiter, "als so weiter", "ändert nichts mehr")}
-    ${aus.schlechter === null ? "" : ausblickZeile("Wenn die " + was + " nachlässt",
-        aus.schlechter, aus.weiter, "als so weiter", "ändert nichts mehr")}
-    ${!aus.ohneBasis ? "" : '<div class="helptext">Für ' + esc(was)
-      + " gibt es in diesem Zeitraum noch keine Eintragungen. Sobald welche da sind, steht hier, was "
-      + esc(aus.beweglich.length === 1 ? "sie" : "sie") + " an der Note noch ausmachen "
-      + esc(aus.beweglich.length === 1 ? "würde" : "würden") + ".</div>"}
-    <div class="helptext">${aus.annahme.length
-      ? "Angenommen, es kommen bis dahin noch etwa " + esc(aus.annahme.join(", ")) + " dazu. Geschätzt aus dem, was bisher da ist, und der noch verbleibenden Zeit."
-      : "Der Zeitraum ist fast vorbei, es kommt kaum noch etwas dazu."}
-      Es wird dabei nichts verändert und nichts gespeichert.</div>
-    ${!ohneMit ? "" : `<div style="padding:9px 16px; border-bottom:1px solid #000; background:${
-        ohneMit.ohne < ohneMit.jetzt ? "#FBECEA" : "#EDF6EC"};">
-      <div style="font-size:13px; font-weight:bold; color:${
-        ohneMit.ohne < ohneMit.jetzt ? "#8E1C16" : "#215E24"};">Die ${esc(ohneMit.was.join(" und "))} ${
-        ohneMit.ohne < ohneMit.jetzt
-          ? "kostet dich gerade " + fmtB(ohneMit.jetzt - ohneMit.ohne) + " Notenstufen."
-          : "bringt dir gerade " + fmtB(ohneMit.ohne - ohneMit.jetzt) + " Notenstufen."}</div>
-      <div style="font-size:11px; margin-top:2px;">Ohne sie stünde jetzt ${fmtO(ohneMit.ohne)} da statt ${fmtO(ohneMit.jetzt)}.${
-        aus.gedeckelt ? " Mehr als " + fmtB(bonusMax(sub)) + " Notenstufen kann sie nie ausmachen, so ist die Obergrenze eingestellt." : ""}</div>
-    </div>`}`;
-
-  /* Ist der Zeitraum abgeschlossen, entfällt der Ausblick, denn die Note ist
-     vergeben. Was die Mitarbeit ausgemacht hat, bleibt trotzdem die Zahl für
-     das Gespräch und steht dann für sich. */
-  const mitarbeitBlockAllein = (aus || !ohneMit) ? "" : `
-    <div class="label" style="border-top:2px solid #000;">WAS DIE MITARBEIT AUSGEMACHT HAT</div>
-    <div style="padding:9px 16px; border-bottom:1px solid #000; background:${
-        ohneMit.ohne < ohneMit.jetzt ? "#FBECEA" : "#EDF6EC"};">
-      <div style="font-size:13px; font-weight:bold; color:${
-        ohneMit.ohne < ohneMit.jetzt ? "#8E1C16" : "#215E24"};">Die ${esc(ohneMit.was.join(" und "))} ${
-        ohneMit.ohne < ohneMit.jetzt
-          ? "hat dich " + fmtB(ohneMit.jetzt - ohneMit.ohne) + " Notenstufen gekostet."
-          : "hat dir " + fmtB(ohneMit.ohne - ohneMit.jetzt) + " Notenstufen gebracht."}</div>
-      <div style="font-size:11px; margin-top:2px;">Ohne sie stünde als Rechenwert ${fmtO(ohneMit.ohne)} da statt ${fmtO(ohneMit.jetzt)}.</div>
-    </div>`;
-
+  /* ---------- PROGNOSE: NÄCHSTE SCHULARBEIT (seit 17.11) ----------
+     Eine einzige Frage: Was steht insgesamt da, wenn die nächste Schularbeit
+     ein Einser, Zweier, Dreier, Vierer oder Fünfer wird? Gerechnet wird mit
+     der echten Notenrechnung der App (Gewichtung, Vorgaben, alles), indem eine
+     Schularbeit mit dieser Note dazugedacht wird. Es wird nichts gespeichert. */
+  const prog = naechsteSchularbeit(sub, s.id);
+  const progBlock = !prog ? "" : `
+    <div class="label" style="border-top:2px solid #000;">PROGNOSE &middot; N&Auml;CHSTE SCHULARBEIT</div>
+    <div class="prog">
+      ${prog.felder.map(f => {
+        const g = gradeColor(f.note);
+        return `<div class="prog-feld${f.besser ? " besser" : ""}${f.schlechter ? " schlechter" : ""}">
+          <div class="prog-sa">SA-Note ${f.sa}</div>
+          <div class="prog-note" style="color:${g.fg};">${f.note}</div>
+          <div class="prog-ws">${fmtO(f.wert)}</div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="prog-satz">${prog.satz}</div>
+    <div class="helptext">Die gro&szlig;e Zahl ist die Gesamtnote, darunter der genaue Wert. Berechnet wie die Note selbst, mit allem, was schon eingetragen ist.</div>`;
+  const mitarbeitBlockAllein = "";
   const abschlussBlock = abschlussZeile(cls, sub, s);
 
   /* Kronen dieser Person in diesem Fach. */
@@ -4163,7 +4363,7 @@ function renderStudent(){
       + '<div class="helptext">Jede Beurteilungsart für sich, in zeitlicher Folge. Oben ist das Gute. Bei Einstufungen stehen die Stufen an der Achse, sie werden nicht in Noten umgerechnet.</div>'
       + verlaufKats : ""}
     ${bilanzZeilen}
-    ${ausblickBlock}
+    ${progBlock}
     ${mitarbeitBlockAllein}
     <div style="padding:12px 16px; border-top:2px solid #000000; border-bottom:${homeView.zeigeEintraege ? "1px" : "2px"} solid #000000;">
       <button onclick="toggleEintraege()" style="width:100%;">${homeView.zeigeEintraege
@@ -8518,7 +8718,9 @@ function renderSettingsList(){
     <div class="chips">${schriftChips}</div>
     <div class="helptext">Erscheinungsbild. <b>Automatisch</b> nimmt am Handy und am iPad im Hochformat <i>Freundlich</i>, am Rechner und am iPad im Querformat die <i>Tafel-Leiste</i> mit der Seitenleiste links. Ist das Fenster am Rechner sehr schmal, gilt auch dort <i>Freundlich</i>. <b>Amtlich-klar</b> ist schwarz-weiß und dicht, bei direkter Sonne am besten lesbar. Ändert nur das Aussehen, keine Note.</div>
     <div class="chips">${chipReihe([["auto","Automatisch"],["freundlich","Freundlich"],["tafel","Tafel-Leiste"],["amtlich","Amtlich-klar"]], stilWahl(), "setStil")}</div>
-    <div class="helptext">Schriftgröße, Erscheinungsbild und Gerätename gelten nur für dieses Gerät. Sie bleiben auch beim Übertragen und beim Einspielen einer Sicherung erhalten.</div>
+    <div class="helptext">Farbe. <b>Salbei</b> und <b>Terrakotta</b> sind das dunkle Schiefer-Design mit weichem grünem oder orangem Akzent. <b>Hell</b> ist das bisherige helle Glas. Bei Amtlich-klar gilt immer Schwarz-Weiß.</div>
+    <div class="chips">${chipReihe([["salbei","Salbei"],["terrakotta","Terrakotta"],["hell","Hell"]], farbeWahl(), "setFarbe")}</div>
+    <div class="helptext">Schriftgröße, Erscheinungsbild, Farbe und Gerätename gelten nur für dieses Gerät. Sie bleiben auch beim Übertragen und beim Einspielen einer Sicherung erhalten.</div>
 
     <div class="label" style="border-top:2px solid #000;">REIHENFOLGE DER KLASSENLISTE</div>
     <div class="helptext">Wird beim Anlegen und bei jedem weiteren Namen sofort angewendet. „Nach Nachname" geht vom letzten Wort im Namen aus, taugt also nur, wenn die Namen als „Sophie Maier" eingetragen sind.</div>
@@ -8596,7 +8798,7 @@ function setSetting(feld, wert){
    hieße auch so. Beim Zusammenführen bleiben die eigenen Einstellungen ohnehin
    stehen. */
 const GERAET_KEY = "klassenheft" + SCHLUESSEL_ZUSATZ + "_geraet_v1";
-const GERAET_FELDER = ["stil", "schrift", "geraet"];
+const GERAET_FELDER = ["stil", "farbe", "schrift", "geraet"];
 
 function geraetLesen(){
   try{
@@ -8635,7 +8837,7 @@ function schriftAnwenden(){
 }
 
 /* Erscheinungsbild. Ändert nur das Aussehen, nie eine Note oder Rechnung. */
-const STIL_THEME_FARBE = { freundlich:"#E7EEF9", amtlich:"#ffffff" };
+const STIL_THEME_FARBE = { freundlich:"#E7EEF9", amtlich:"#ffffff", schiefer:"#2A4150" };
 
 /* „Automatisch": schmale Bildschirme bekommen Freundlich, breite die
    Tafel-Leiste. Die Tafel-Leiste braucht Platz; auf einem Handy wird sie
@@ -8660,16 +8862,41 @@ function stilWirksam(){
   return (BREIT && BREIT.matches) ? "tafel" : "freundlich";
 }
 
+/* Farbwelt (seit 17.11): Schiefer mit Salbei oder Terrakotta als Akzent, oder
+   das bisherige helle Glas. Amtlich-klar bleibt immer schwarz-weiß. */
+function farbeWahl(){
+  const w = state.settings.farbe;
+  return (w === "terrakotta" || w === "hell") ? w : "salbei";
+}
+function farbeWirksam(){
+  if(stilWirksam() === "amtlich") return "hell";
+  return farbeWahl();
+}
+function istDunkel(){ return farbeWirksam() !== "hell"; }
+
 function stilAnwenden(){
   const stil = stilWirksam();
+  const farbe = farbeWirksam();
   document.body.classList.toggle("stil-freundlich", stil !== "amtlich");
   document.body.classList.toggle("stil-tafel", stil === "tafel");
+  document.body.classList.toggle("farbe-dunkel", farbe !== "hell");
+  document.body.classList.toggle("farbe-salbei", farbe === "salbei");
+  document.body.classList.toggle("farbe-terrakotta", farbe === "terrakotta");
   const meta = document.querySelector('meta[name="theme-color"]');
-  if(meta) meta.setAttribute("content", stil === "amtlich" ? STIL_THEME_FARBE.amtlich : STIL_THEME_FARBE.freundlich);
+  if(meta) meta.setAttribute("content", stil === "amtlich" ? STIL_THEME_FARBE.amtlich
+    : (farbe === "hell" ? STIL_THEME_FARBE.freundlich : STIL_THEME_FARBE.schiefer));
 }
 
 function istFreundlich(){ return stilWirksam() !== "amtlich"; }
 function istTafel(){ return stilWirksam() === "tafel"; }
+
+function setFarbe(wert){
+  state.settings.farbe = (wert === "terrakotta" || wert === "hell") ? wert : "salbei";
+  geraetMerken();
+  save();
+  stilAnwenden();
+  render();
+}
 
 function setStil(wert){
   state.settings.stil = (wert === "freundlich" || wert === "tafel" || wert === "amtlich") ? wert : "auto";
